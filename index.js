@@ -4,7 +4,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const { WebhookServer } = require("./WebhookServer");
 const { TwitchWrapper } = require("./TwitchWrapper");
 const EventEmitter = require("events");
-require("dotenv").config();
+// require("dotenv").config();
 
 const server = new WebhookServer();
 
