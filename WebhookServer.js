@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const express = require("express");
 const EventEmitter = require("events");
-// require("dotenv").config();
+require("dotenv").config();
 
 class WebhookServer extends EventEmitter {
   constructor(port, secret) {
