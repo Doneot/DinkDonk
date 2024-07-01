@@ -10,6 +10,8 @@ const server = new WebhookServer();
 
 const twitch = new TwitchWrapper();
 
+console.log(`process.env.DATABASE_URI : ${process.env.DATABASE_URI}`);
+
 const client = new MongoClient(process.env.DATABASE_URI, {
   serverApi: {
     version: ServerApiVersion.v1,
