@@ -126,7 +126,7 @@ class TwitchWrapper {
           condition: condition,
           transport: {
             method: "webhook",
-            callback: `${process.env.WEBHOOK_URL}:${process.env.PORT}/eventsub`,
+            callback: `${process.env.WEBHOOK_URL}/eventsub`,
             secret: process.env.CLIENT_SECRET,
           },
         },
