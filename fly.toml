@@ -18,3 +18,4 @@ primary_region = 'cdg'
 
 [[vm]]
   size = 'shared-cpu-1x'
+  memory_mb = 256
