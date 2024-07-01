@@ -166,11 +166,6 @@ process.on("SIGINT", async () => {
   console.log("Terminating script...");
 
   // Unsubscribe from all active subscriptions
-  const streamers = await firestore.getStreamers();
-  for (const streamer of streamers) {
-    await twitch.unsubscribeEvent("stream.online", {
-      broadcaster_user_id: streamer.id,
-    });
-  }
+  await twitch.unsubscribeAllEvents();
   process.exit();
 });

@@ -132,10 +132,10 @@ class TwitchWrapper {
         },
         { headers: this._headers }
       );
+      console.log(`Subscribed from subscription ${res.data.data[0]["id"]}`);
       this._activeSubscriptions.push(res.data.data[0]["id"]);
     } catch (error) {
       if (error instanceof axios.AxiosError) {
-        console.log(error.response.config.data);
         console.log(
           `Error ${error.response?.data?.status} : ${error.response?.data?.message}`
         );
