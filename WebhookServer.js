@@ -51,9 +51,12 @@ class WebhookServer extends EventEmitter {
               .update(message)
               .digest("hex");
 
+            console.log(process.env.TWITCH_WEBHOOK_SECRET);
             console.log("Twitch Signature:", signatureHash);
             console.log("Computed HMAC:", ourSignatureHash);
             console.log("Message:", message);
+            console.log("Request headers:", req.headers);
+            console.log("Response headers:", res.headers);
 
             if (!tsscmp(signatureHash, ourSignatureHash)) {
               console.log("Signature not matched");
