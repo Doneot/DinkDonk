@@ -94,11 +94,22 @@ class WebhookServer extends EventEmitter {
   }
 
   getHmacMessage(request) {
+    const timestamp = request.headers[this.TWITCH_MESSAGE_TIMESTAMP];
+    const normalizedTimestamp = this.normalizeTimestamp(timestamp);
     return (
       request.headers[this.TWITCH_MESSAGE_ID] +
-      request.headers[this.TWITCH_MESSAGE_TIMESTAMP] +
+      normalizedTimestamp +
       request.body
     );
+  }
+
+  normalizeTimestamp(timestamp) {
+    const parts = timestamp.split(".");
+    const secondsPart = parts[0]; // The seconds part of the timestamp
+    const microsecondsPart = parts[1] ? parts[1].slice(0, 6) : ""; // Truncate to 6 digits if present
+    return microsecondsPart
+      ? `${secondsPart}.${microsecondsPart}Z`
+      : `${secondsPart}Z`;
   }
 
   getHmac(secret, message) {
