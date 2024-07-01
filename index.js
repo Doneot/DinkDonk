@@ -68,17 +68,14 @@ bot.on("ready", async () => {
   server.start();
   console.log(clc.green(`Logged in as ${bot.user.username}`));
   setTimeout(async () => {
-    // console.clear();
+    console.clear();
     console.log(clc.green("Ready to go"));
   }, 2000);
 });
 
 bot.on("messageCreate", async (message) => {
-  const OwnerDMChannel = await bot.channels.fetch("1256237800722796696");
-  // const OwnerServerGuild = await bot.guilds.fetch("431708372295876618");
-  // const AkenouilleServerGuild = await bot.guilds.fetch("756627396282679387");
+  const OwnerDMChannel = await bot.channels.fetch(process.env.OWNER_DM_CHANNEL);
   if (message.channel.id === OwnerDMChannel.id) {
-    // console.log(message.embeds);
     if (message.content.startsWith("!getToken")) {
       await getTokens(twitch);
     }
@@ -113,7 +110,6 @@ bot.on("messageCreate", async (message) => {
       let args = message.content.split(" ");
       handleStreamerOnLive(args[1]);
     }
-    //   console.log(message.channel.id);
   }
 });
 
