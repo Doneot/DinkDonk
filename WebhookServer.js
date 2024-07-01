@@ -27,42 +27,38 @@ class WebhookServer extends EventEmitter {
     this.app.use(
       express.json({
         verify: function (req, res, buf, encoding) {
-          // is there a hub to verify against
           req.twitch_eventsub = false;
+
           if (
             req.headers &&
             req.headers.hasOwnProperty("twitch-eventsub-message-signature")
           ) {
             req.twitch_eventsub = true;
 
-            // id for dedupe
-            let message_id = req.headers["twitch-eventsub-message-id"];
-            // check age
-            let timestamp = req.headers["twitch-eventsub-message-timestamp"];
-            // extract algo and signature for comparison
-            let [signatureAlgo, signatureHash] =
+            const messageId = req.headers["twitch-eventsub-message-id"];
+            const timestamp = req.headers["twitch-eventsub-message-timestamp"];
+            const [signatureAlgo, signatureHash] =
               req.headers["twitch-eventsub-message-signature"].split("=");
 
             if (signatureAlgo !== "sha256") {
-              console.log("Signature algo not matched");
-              res.status(500).send("Invalid signature algo");
-              return;
+              console.log("Signature algorithm not matched");
+              return res.status(500).send("Invalid signature algorithm");
             }
 
+            const message = `${messageId}${timestamp}${buf}`;
             const ourSignatureHash = crypto
               .createHmac("sha256", process.env.TWITCH_WEBHOOK_SECRET)
-              .update(`${message_id}${timestamp}${buf}`)
+              .update(message)
               .digest("hex");
 
-            if (!signatureHash || !tsscmp(signatureHash, ourSignatureHash)) {
-              console.log("Signature not matched");
-              res.status(500).send("Signature not matched");
-              return;
-            }
+            console.log("Twitch Signature:", signatureHash);
+            console.log("Computed HMAC:", ourSignatureHash);
+            console.log("Message:", message);
 
-            // as an API style/EventSub handler
-            // force set a/ensure a correct content type header
-            // for all event sub routes
+            if (!tsscmp(signatureHash, ourSignatureHash)) {
+              console.log("Signature not matched");
+              return res.status(403).send("Signature not matched");
+            }
             res.set("Content-Type", "text/plain");
             console.log("Signature matched");
           }
@@ -83,27 +79,19 @@ class WebhookServer extends EventEmitter {
   }
 
   handleRequest(req, res) {
-    // poor man cop out from the json verify function above
     if (res.headersSent) {
       return;
     }
 
-    let notification = req.body;
+    const notification = req.body;
 
-    // the middleware above ran
-    // and it prepared the tests for us
-    // so check if we event generated a twitch_hub
     if (req.twitch_eventsub) {
-      // is it a verification request
       if (this.MESSAGE_TYPE_VERIFICATION === req.headers[this.MESSAGE_TYPE]) {
-        // it's a another check for if it's a challenge request
-        if (req.body.hasOwnProperty("challenge")) {
-          console.log("Got a challenge, return the challenge");
-          res.send(encodeURIComponent(req.body.challenge));
-          return;
+        if (notification.hasOwnProperty("challenge")) {
+          console.log("Got a challenge, returning the challenge");
+          return res.status(200).send(notification.challenge);
         }
-        // unexpected hook request
-        res.status(403).send("Denied");
+        return res.status(403).send("Denied");
       } else if (
         this.MESSAGE_TYPE_REVOCATION === req.headers[this.MESSAGE_TYPE]
       ) {
@@ -121,11 +109,9 @@ class WebhookServer extends EventEmitter {
       } else if (
         this.MESSAGE_TYPE_NOTIFICATION === req.headers[this.MESSAGE_TYPE]
       ) {
-        // Process the notification event
-        // console.log(`Event type: ${notification.subscription.type}`);
-        // console.log(JSON.stringify(notification.event, null, 4));
+        console.log(`Event type: ${notification.subscription.type}`);
+        console.log(JSON.stringify(notification.event, null, 4));
 
-        // Emit event for external handling
         this.emit(notification.subscription.type, notification.event);
 
         res.sendStatus(204);
@@ -135,8 +121,6 @@ class WebhookServer extends EventEmitter {
       }
     } else {
       console.log("It didn't seem to be a Twitch Hook");
-      // again, not normally called
-      // but dump out a OK
       res.send("Ok");
     }
   }
