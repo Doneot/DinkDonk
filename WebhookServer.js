@@ -45,7 +45,7 @@ class WebhookServer extends EventEmitter {
     let message = this.getHmacMessage(req);
     let hmac = this.HMAC_PREFIX + this.getHmac(this.secret, message); // Signature to compare
 
-    console.log(req.headers);
+    // console.log(req.headers);
     if (
       /*this.verifyMessage(hmac, req.headers[this.TWITCH_MESSAGE_SIGNATURE])*/ true
     ) {
