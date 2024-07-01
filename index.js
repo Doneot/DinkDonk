@@ -17,30 +17,15 @@ const bot = new Discord.Client({
 // Create an event emitter
 const eventEmitter = new EventEmitter();
 
-async function connectWebhookServer() {
-  return new Promise((resolve) => {
-    server.on("ready", () => {
-      console.log("Webhook server is ready!");
-      resolve();
+server.on("ready", async () => {
+  console.log("Webhook server is ready!");
+  const streamers = await firestore.getStreamers();
+  for (const streamer of streamers) {
+    await twitch.subscribeEvent("stream.online", {
+      broadcaster_user_id: streamer["id"],
     });
-  });
-}
-
-// Connect to Firestore and setup event listener for WebhookServer
-Promise.all([connectWebhookServer()])
-  .then(async ([id]) => {
-    console.log("WebhookServer is connected");
-
-    const streamers = await firestore.getStreamers();
-    for (const streamer of streamers) {
-      await twitch.subscribeEvent(id, "stream.online", {
-        broadcaster_user_id: streamer["id"],
-      });
-    }
-  })
-  .catch((error) => {
-    console.error("Error connecting:", error);
-  });
+  }
+});
 
 server.on("stream.online", (event) => {
   console.log("Stream is online:", event);

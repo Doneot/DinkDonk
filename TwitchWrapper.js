@@ -74,10 +74,8 @@ class TwitchWrapper {
    * @param {Object} condition identifies the parameters under which the event fires
    * @param {number} version  identifies the definition of the subscription type to use
    */
-  subscribeEvent = async (sessionId, type, condition, version = 1) =>
-    await this._errorHandler(
-      this._subscribeEvent(sessionId, type, condition, version)
-    );
+  subscribeEvent = async (type, condition, version = 1) =>
+    await this._errorHandler(this._subscribeEvent(type, condition, version));
 
   _errorHandler = async (asyncCallback, args) => {
     try {
@@ -115,7 +113,7 @@ class TwitchWrapper {
     return res.data.data;
   };
 
-  _subscribeEvent = async (sessionId, type, condition, version) => {
+  _subscribeEvent = async (type, condition, version) => {
     this._headers.Authorization = `Bearer ${this._tokens.access_token}`;
     this._headers["Client-Id"] = process.env.CLIENT_ID;
     this._headers["Content-Type"] = "application/json";
@@ -137,6 +135,7 @@ class TwitchWrapper {
       this._activeSubscriptions.push(res.data.data[0]["id"]);
     } catch (error) {
       if (error instanceof axios.AxiosError) {
+        console.log(error.response.config.data);
         console.log(
           `Error ${error.response?.data?.status} : ${error.response?.data?.message}`
         );
@@ -164,7 +163,13 @@ class TwitchWrapper {
       );
       return res.data;
     } catch (error) {
-      console.error("Error unsubscribing:", error);
+      if (error instanceof axios.AxiosError) {
+        console.log(
+          `Error ${error.response?.data?.status} : ${error.response?.data?.message}`
+        );
+      } else {
+        console.log(error);
+      }
     }
   };
 
