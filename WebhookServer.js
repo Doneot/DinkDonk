@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const express = require("express");
 const EventEmitter = require("events");
+const tsscmp = require("tsscmp");
 require("dotenv").config();
 
 class WebhookServer extends EventEmitter {
@@ -24,8 +25,48 @@ class WebhookServer extends EventEmitter {
     this.HMAC_PREFIX = "sha256=";
 
     this.app.use(
-      express.raw({
-        type: "application/json", // Need raw message body for signature verification
+      express.json({
+        verify: function (req, res, buf, encoding) {
+          // is there a hub to verify against
+          req.twitch_eventsub = false;
+          if (
+            req.headers &&
+            req.headers.hasOwnProperty("twitch-eventsub-message-signature")
+          ) {
+            req.twitch_eventsub = true;
+
+            // id for dedupe
+            let message_id = req.headers["twitch-eventsub-message-id"];
+            // check age
+            let timestamp = req.headers["twitch-eventsub-message-timestamp"];
+            // extract algo and signature for comparison
+            let [signatureAlgo, signatureHash] =
+              req.headers["twitch-eventsub-message-signature"].split("=");
+
+            if (signatureAlgo !== "sha256") {
+              console.log("Signature algo not matched");
+              res.status(500).send("Invalid signature algo");
+              return;
+            }
+
+            const ourSignatureHash = crypto
+              .createHmac("sha256", process.env.TWITCH_WEBHOOK_SECRET)
+              .update(`${message_id}${timestamp}${buf}`)
+              .digest("hex");
+
+            if (!signatureHash || !tsscmp(signatureHash, ourSignatureHash)) {
+              console.log("Signature not matched");
+              res.status(500).send("Signature not matched");
+              return;
+            }
+
+            // as an API style/EventSub handler
+            // force set a/ensure a correct content type header
+            // for all event sub routes
+            res.set("Content-Type", "text/plain");
+            console.log("Signature matched");
+          }
+        },
       })
     );
 
@@ -42,33 +83,27 @@ class WebhookServer extends EventEmitter {
   }
 
   handleRequest(req, res) {
-    let message = this.getHmacMessage(req);
-    let hmac = this.HMAC_PREFIX + this.getHmac(this.secret, message); // Signature to compare
+    // poor man cop out from the json verify function above
+    if (res.headersSent) {
+      return;
+    }
 
-    console.log(req.headers[this.TWITCH_MESSAGE_SIGNATURE]);
-    if (this.verifyMessage(hmac, req.headers[this.TWITCH_MESSAGE_SIGNATURE])) {
-      console.log("Signatures match");
+    let notification = req.body;
 
-      // Get JSON object from body, so you can process the message.
-
-      let notification = JSON.parse(req.body);
-
-      if (this.MESSAGE_TYPE_NOTIFICATION === req.headers[this.MESSAGE_TYPE]) {
-        // Process the notification event
-        console.log(`Event type: ${notification.subscription.type}`);
-        console.log(JSON.stringify(notification.event, null, 4));
-
-        // Emit event for external handling
-        this.emit(notification.subscription.type, notification.event);
-
-        res.sendStatus(204);
-      } else if (
-        this.MESSAGE_TYPE_VERIFICATION === req.headers[this.MESSAGE_TYPE]
-      ) {
-        res
-          .set("Content-Type", "text/plain")
-          .status(200)
-          .send(notification.challenge);
+    // the middleware above ran
+    // and it prepared the tests for us
+    // so check if we event generated a twitch_hub
+    if (req.twitch_eventsub) {
+      // is it a verification request
+      if (this.MESSAGE_TYPE_VERIFICATION === req.headers[this.MESSAGE_TYPE]) {
+        // it's a another check for if it's a challenge request
+        if (req.body.hasOwnProperty("challenge")) {
+          console.log("Got a challenge, return the challenge");
+          res.send(encodeURIComponent(req.body.challenge));
+          return;
+        }
+        // unexpected hook request
+        res.status(403).send("Denied");
       } else if (
         this.MESSAGE_TYPE_REVOCATION === req.headers[this.MESSAGE_TYPE]
       ) {
@@ -83,33 +118,27 @@ class WebhookServer extends EventEmitter {
             4
           )}`
         );
+      } else if (
+        this.MESSAGE_TYPE_NOTIFICATION === req.headers[this.MESSAGE_TYPE]
+      ) {
+        // Process the notification event
+        // console.log(`Event type: ${notification.subscription.type}`);
+        // console.log(JSON.stringify(notification.event, null, 4));
+
+        // Emit event for external handling
+        this.emit(notification.subscription.type, notification.event);
+
+        res.sendStatus(204);
       } else {
         res.sendStatus(204);
         console.log(`Unknown message type: ${req.headers[this.MESSAGE_TYPE]}`);
       }
     } else {
-      console.log("403 - Signatures didn't match.");
-      res.sendStatus(403);
+      console.log("It didn't seem to be a Twitch Hook");
+      // again, not normally called
+      // but dump out a OK
+      res.send("Ok");
     }
-  }
-
-  getHmacMessage(request) {
-    return (
-      request.headers[this.TWITCH_MESSAGE_ID] +
-      request.headers[this.TWITCH_MESSAGE_TIMESTAMP] +
-      request.body
-    );
-  }
-
-  getHmac(secret, message) {
-    return crypto.createHmac("sha256", secret).update(message).digest("hex");
-  }
-
-  verifyMessage(hmac, verifySignature) {
-    return crypto.timingSafeEqual(
-      Buffer.from(hmac),
-      Buffer.from(verifySignature)
-    );
   }
 }
 
