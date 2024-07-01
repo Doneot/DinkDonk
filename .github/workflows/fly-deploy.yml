@@ -20,5 +20,5 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           OWNER_DM_CHANNEL: ${{ secrets.OWNER_DM_CHANNEL }}
           TWITCH_WEBHOOK_SECRET: ${{ secrets.TWITCH_WEBHOOK_SECRET }}
-          PORT: ${{ variables.PORT }}
-          WEBHOOK_URL: ${{ variables.WEBHOOK_URL }}
+          PORT: ${{ vars.PORT }}
+          WEBHOOK_URL: ${{ vars.WEBHOOK_URL }}
