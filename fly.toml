@@ -16,5 +16,8 @@ primary_region = 'cdg'
   min_machines_running = 0
   processes = ['app']
 
+ [[services.ports]]
+ http_options = { response = { headers = { via = false, x-request-start = false, fly-client-ip = false, x-forwarded-for = false, fly-forwarded-proto = false, x-forwarded-proto = false , fly-forwarded-ssl = false, x-forwarded-ssl = false, fly-forwarded-port = false, x-forwarded-port = false, fly-region = false, fly-request-id = false, fly-tracestate = false, fly-traceparent = false } } } 
+
 [[vm]]
   size = 'shared-cpu-1x'
