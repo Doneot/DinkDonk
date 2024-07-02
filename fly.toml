@@ -11,11 +11,11 @@ primary_region = 'cdg'
 [http_service]
   internal_port = 3000
   force_https = true
-  auto_stop_machines = true
+  auto_stop_machines = false
   auto_start_machines = false
   min_machines_running = 0
   processes = ['app']
 
 [[vm]]
   size = 'shared-cpu-1x'
-  memory = 1024
+  memory = 256
