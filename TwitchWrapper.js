@@ -97,6 +97,7 @@ class TwitchWrapper {
 
   _getStreamer = async ([login]) => {
     this._headers.Authorization = `Bearer ${this._tokens.access_token}`;
+    this._headers["Cache-Control"] = 'no-cache';
     const res = await axios.get(
       `https://api.twitch.tv/helix/users?login=${login.toLowerCase()}`,
       { headers: this._headers }
@@ -106,6 +107,7 @@ class TwitchWrapper {
 
   _getStream = async ([streamerId]) => {
     this._headers.Authorization = `Bearer ${this._tokens.access_token}`;
+    this._headers["Cache-Control"] = 'no-cache';
     const res = await axios.get(
       `https://api.twitch.tv/helix/streams?user_id=${streamerId.toLowerCase()}`,
       { headers: this._headers }
