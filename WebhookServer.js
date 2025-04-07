@@ -42,13 +42,10 @@ class WebhookServer extends EventEmitter {
   }
 
   handleRequest(req, res) {
-    let message = this.getHmacMessage(req);
-    let hmac = this.HMAC_PREFIX + this.getHmac(this.secret, message); // Signature to compare
+    const message = this.getHmacMessage(req);
+    const hmac = this.HMAC_PREFIX + this.getHmac(this.secret, message); // Signature to compare
 
-    // console.log(req.headers);
-    if (
-      /*this.verifyMessage(hmac, req.headers[this.TWITCH_MESSAGE_SIGNATURE])*/ true
-    ) {
+    if (this.verifyMessage(hmac, req.headers[this.TWITCH_MESSAGE_SIGNATURE])) {
       console.log("Signatures match");
 
       // Get JSON object from body, so you can process the message.
@@ -107,11 +104,16 @@ class WebhookServer extends EventEmitter {
     return crypto.createHmac("sha256", secret).update(message).digest("hex");
   }
 
-  verifyMessage(hmac, verifySignature) {
-    return crypto.timingSafeEqual(
-      Buffer.from(hmac),
-      Buffer.from(verifySignature)
-    );
+  verifyMessage(hmac, twitchSignature) {
+    try {
+      return crypto.timingSafeEqual(
+        Buffer.from(hmac),
+        Buffer.from(twitchSignature)
+      );
+    } catch (err) {
+      console.error("Signature verification error:", err.message);
+      return false;
+    }
   }
 }
 

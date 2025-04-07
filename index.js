@@ -3,7 +3,6 @@ const clc = require("cli-color");
 const { WebhookServer } = require("./WebhookServer");
 const { TwitchWrapper } = require("./TwitchWrapper");
 const { FirestoreWrapper } = require("./FirestoreWrapper");
-const EventEmitter = require("events");
 require("dotenv").config();
 
 const server = new WebhookServer();
@@ -13,9 +12,6 @@ const firestore = new FirestoreWrapper(twitch);
 const bot = new Discord.Client({
   disableMentions: "everyone",
 });
-
-// Create an event emitter
-const eventEmitter = new EventEmitter();
 
 server.on("ready", async () => {
   console.log("Webhook server is ready!");
@@ -44,8 +40,7 @@ bot.on("ready", async () => {
 });
 
 bot.on("messageCreate", async (message) => {
-  const OwnerDMChannel = await bot.channels.fetch(process.env.OWNER_DM_CHANNEL);
-  if (message.channel.id === OwnerDMChannel.id) {
+  if (message.channel.id === process.env.OWNER_DM_CHANNEL) {
     if (message.content.startsWith("!getToken")) {
       await getTokens(twitch);
     }
@@ -123,7 +118,7 @@ const handleStreamerOnLive = async (streamername) => {
   for (const user of users) {
     discordUsers.push(await bot.users.fetch(user["id"]));
   }
-  const OwnerDMChannel = await bot.channels.fetch("1256237800722796696");
+  const OwnerDMChannel = await bot.channels.fetch(process.env.OWNER_DM_CHANNEL);
   const streamer = (await twitch.getStreamer(streamername))[0];
   const stream = (await twitch.getStream(streamer["id"]))[0];
   console.log(stream);

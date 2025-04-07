@@ -1,8 +1,7 @@
-const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const admin = require("firebase-admin");
 require("dotenv").config();
 
-// Your web app's Firebase configuration
 const serviceAccount = {
   type: "service_account",
   project_id: process.env.FIREBASE_PROJECT_ID,
@@ -23,8 +22,8 @@ class FirestoreWrapper {
    */
   constructor(twitchWrapper) {
     // Initialize firestore database
-    initializeApp({
-      credential: cert(serviceAccount),
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
     });
     this._db = getFirestore();
     this._twitch = twitchWrapper;
