@@ -3,7 +3,7 @@ services:
   dinkdonk:
     build: .
     ports:
-      - "443:443"
+      - "3000:3000"
     env_file:
       - .env
     restart: always

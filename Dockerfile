@@ -14,7 +14,7 @@ RUN npm install
 COPY . .
 
 # Expose the port your server runs on (e.g. 443 if you use https)
-EXPOSE 443
+EXPOSE 3000
 
 # Start the app
 CMD ["node", "index.js"]
