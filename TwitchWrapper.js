@@ -8,7 +8,6 @@ class TwitchWrapper {
       "Content-Type": "application/json",
     };
     this._tokens = {};
-    this._activeSubscriptions = [];
   }
 
   get tokens() {
@@ -67,6 +66,14 @@ class TwitchWrapper {
   };
 
   /**
+   * Get all the subscriptions
+   * @returns {Promise<Array<object>>} current subscriptions of the app
+   */
+  getSubscriptions = async () => {
+    return await this._errorHandler(this._getSubscription);
+  };
+
+  /**
    * Subscribes to events according the subscription type given
    * @param {String} token User access token
    * @param {String} sessionId id of the socket connection
@@ -115,6 +122,16 @@ class TwitchWrapper {
     return res.data.data;
   };
 
+  _getSubscription = async () => {
+    this._headers.Authorization = `Bearer ${this._tokens.access_token}`;
+    this._headers["Client-Id"] = process.env.CLIENT_ID;
+    const res = await axios.get(
+      "https://api.twitch.tv/helix/eventsub/subscriptions",
+      { headers: this._headers }
+    );
+    return res.data.data;
+  };
+
   _subscribeEvent = async (type, condition, version) => {
     this._headers.Authorization = `Bearer ${this._tokens.access_token}`;
     this._headers["Client-Id"] = process.env.CLIENT_ID;
@@ -135,7 +152,6 @@ class TwitchWrapper {
         { headers: this._headers }
       );
       console.log(`Subscribed from subscription ${res.data.data[0]["id"]}`);
-      this._activeSubscriptions.push(res.data.data[0]["id"]);
     } catch (error) {
       if (error instanceof axios.AxiosError) {
         console.log(
@@ -160,9 +176,6 @@ class TwitchWrapper {
         }
       );
       console.log(`Unsubscribed from subscription ${subscriptionId}`);
-      this._activeSubscriptions = this._activeSubscriptions.filter(
-        (id) => id !== subscriptionId
-      );
       return res.data;
     } catch (error) {
       if (error instanceof axios.AxiosError) {
@@ -178,8 +191,9 @@ class TwitchWrapper {
   // Function to unsubscribe from all subscriptions
   unsubscribeAllEvents = async () => {
     // Unsubscribe from each active subscription
-    for (const subscriptionId of this._activeSubscriptions) {
-      await this.unsubscribeEvent(subscriptionId);
+    const subscriptions = await this.getSubscriptions();
+    for (const subscription of subscriptions) {
+      await this.unsubscribeEvent(subscription["id"]);
     }
   };
 }

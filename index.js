@@ -31,6 +31,7 @@ server.on("stream.online", (event) => {
 
 bot.on("ready", async () => {
   await getTokens(twitch);
+  await twitch.unsubscribeAllEvents();
   server.start();
   console.log(clc.green(`Logged in as ${bot.user.username}`));
   setTimeout(async () => {
@@ -71,6 +72,9 @@ bot.on("messageCreate", async (message) => {
     } else if (message.content.startsWith("!addStreamer")) {
       let args = message.content.split(" ");
       await firestore.addStreamer(args[1], args.splice(2).join(" "));
+    } else if (message.content.startsWith("!getSubscriptions")) {
+      const subscriptions = await twitch.getSubscriptions();
+      console.log(subscriptions);
     } else if (message.content.startsWith("!setMessage")) {
       let args = message.content.split(" ");
       await firestore.setMessage(args[1], args.splice(2).join(" "));
