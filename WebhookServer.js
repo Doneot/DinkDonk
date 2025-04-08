@@ -29,6 +29,10 @@ class WebhookServer extends EventEmitter {
       })
     );
 
+    this.app.get("/", (req, res) => {
+      res.send("Hello World");
+    });
+
     this.app.post("/eventsub", (req, res) => this.handleRequest(req, res));
   }
 
