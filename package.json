@@ -15,8 +15,7 @@
     "discord.js-selfbot-v13": "^3.6.1",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "firebase-admin": "^12.7.0",
-    "tsscmp": "^1.0.6"
+    "firebase-admin": "^12.7.0"
   },
   "devDependencies": {
     "@flydotio/dockerfile": "^0.5.9"
