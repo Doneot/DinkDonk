@@ -146,7 +146,7 @@ class TwitchWrapper {
           transport: {
             method: "webhook",
             callback: `${process.env.WEBHOOK_URL}/eventsub`,
-            secret: process.env.CLIENT_SECRET,
+            secret: process.env.TWITCH_WEBHOOK_SECRET,
           },
         },
         { headers: this._headers }
