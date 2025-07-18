@@ -1,9 +1,17 @@
 version: "3"
 services:
-  dinkdonk:
-    build: .
+  dinkdonk-client:
+    build:
+      context: ./client
     ports:
-      - "3000:3000"
+      - "5000:80" # React app served via Nginx on port 5000 (inside the container)
+    restart: always
+
+  dinkdonk-server:
+    build:
+      context: ./server
+    ports:
+      - "3000:3000" # Express app listening on port 3000 (inside the container)
     env_file:
-      - .env
+      - ./.env
     restart: always
