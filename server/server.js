@@ -6,7 +6,7 @@ const { DISCORD_TOKEN } = require("./config");
 
 const twitch = new TwitchWrapper();
 const firestore = new FirestoreWrapper();
-const discord = new DiscordWrapper(DISCORD_TOKEN, twitch, firestore); // Initialize the DiscordWrapper
+const discord = new DiscordWrapper(DISCORD_TOKEN);
 const server = new ExpressServer(discord);
 
 server.on("ready", handleServerReady);

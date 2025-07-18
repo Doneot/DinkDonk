@@ -1,9 +1,7 @@
 const Discord = require("discord.js-selfbot-v13");
 
 class DiscordWrapper {
-  constructor(discordToken, twitch, firestore) {
-    this.twitch = twitch;
-    this.firestore = firestore;
+  constructor(discordToken) {
     this.bot = new Discord.Client({
       disableMentions: "everyone",
     });
@@ -12,52 +10,6 @@ class DiscordWrapper {
 
   async onReady() {
     console.log(`Logged in as ${this.bot.user.username}`);
-  }
-
-  async onMessageCreate(message) {
-    const [command, ...args] = message.content.split(" ");
-
-    const commandMap = {
-      "!getUsers": () => this.sendUsers(message, firestore),
-      "!getMessage": () => this.sendMessage(message, args, firestore),
-      "!addUser": () => this.addUser(message.author.id, firestore),
-      "!addStreamer": () => this.addStreamer(args, firestore),
-      "!getSubscriptions": () => this.getSubscriptions(message, twitch),
-    };
-
-    const action = commandMap[command];
-    if (action) {
-      await action();
-    } else {
-      console.log("Unknown command:", command);
-    }
-  }
-
-  async sendUsers(message, firestore) {
-    const users = await firestore.getUsers();
-    message.channel.send(JSON.stringify(users));
-  }
-
-  async sendMessage(message, args, firestore) {
-    const messageText = await firestore.getMessage(message.author.id, args[0]);
-    message.channel.send(messageText);
-  }
-
-  async addUser(discord_id, firestore) {
-    await firestore.addUser(discord_id);
-  }
-
-  async addStreamer(args, firestore) {
-    await firestore.addStreamer(args[0], args.slice(1).join(" "));
-  }
-
-  async getSubscriptions(message, twitch) {
-    const subscriptions = await twitch.getSubscriptions();
-    message.channel.send(JSON.stringify(subscriptions));
-  }
-
-  async setMessage(args, firestore) {
-    await firestore.setMessage(args[0], args.slice(1).join(" "));
   }
 
   async fetchDiscordUsers(users) {
