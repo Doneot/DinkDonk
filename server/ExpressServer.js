@@ -117,7 +117,7 @@ class ExpressServer extends EventEmitter {
   }
 
   handleDiscordCallback(req, res) {
-    res.redirect(`http://localhost:5000/dashboard`);
+    res.redirect(SERVER_URL.includes("ngrok") ? "http://localhost:5000/dashboard":`${SERVER_URL}/dashboard`);
   }
 
   getUser(req, res) {
