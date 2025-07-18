@@ -12,12 +12,6 @@ class DiscordWrapper {
     console.log(`Logged in as ${this.bot.user.username}`);
   }
 
-  async fetchDiscordUsers(users) {
-    return Promise.all(
-      users.map(async (user) => await this.bot.users.fetch(user.id))
-    );
-  }
-
   createEmbed(streamer, stream, thumbnailUrl) {
     return new Discord.WebEmbed({
       author: {
@@ -26,7 +20,7 @@ class DiscordWrapper {
         iconURL: streamer.profile_image_url,
       },
       color: "PURPLE",
-      description: `${stream.user_name} est en live sur twitch!\n\n**Joue à**\n${stream.game_name}`,
+      description: `${stream.user_name} is live on twitch!\n\n**Playing **\n${stream.game_name}`,
       title: stream.title,
       url: `https://www.twitch.tv/${stream.user_name}`,
       thumbnail: {
@@ -42,26 +36,22 @@ class DiscordWrapper {
     });
   }
 
-  async handleStreamerOnLive(users, streamer, stream, notification_message) {
-    const discordUsers = await this.fetchDiscordUsers(users);
-    const channels = Promise.all(
-      discordUsers.map(async (user) => await this.bot.users.createDM(user))
-    );
+  async handleStreamerOnLive(user_id, streamer, stream, notification_message) {
+    const user = await this.bot.users.fetch(user_id);
+    const channel = await this.bot.users.createDM(user);
     const thumbnailUrl = stream.thumbnail_url
       .replace("{width}", 1280)
       .replace("{height}", 720);
     const embed = this.createEmbed(streamer, stream, thumbnailUrl);
 
-    for (const channel of channels) {
-      channel.send({
-        content: `${notification_message.replace(
-          /%s/g,
-          streamer.display_name
-        )}\n<https://www.twitch.tv/${streamer.name}>\n${
-          Discord.WebEmbed.hiddenEmbed
-        }${embed}`,
-      });
-    }
+    channel.send({
+      content: `${notification_message.replace(
+        /%s/g,
+        streamer.display_name
+      )}\n<https://www.twitch.tv/${streamer.name}>\n${
+        Discord.WebEmbed.hiddenEmbed
+      }${embed}`,
+    });
   }
 }
 

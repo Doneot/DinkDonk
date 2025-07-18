@@ -7,7 +7,7 @@ const { DISCORD_TOKEN } = require("./config");
 const twitch = new TwitchWrapper();
 const firestore = new FirestoreWrapper();
 const discord = new DiscordWrapper(DISCORD_TOKEN);
-const server = new ExpressServer(discord);
+const server = new ExpressServer(discord, twitch, firestore);
 
 server.on("ready", handleServerReady);
 server.on("stream.online", handleStreamOnline);

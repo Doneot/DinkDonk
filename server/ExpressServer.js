@@ -14,10 +14,12 @@ const {
 require("./passport-setup");
 
 class ExpressServer extends EventEmitter {
-  constructor(discordClient) {
+  constructor(discordClient, twitch, firestore) {
     super();
     this.app = express();
     this.discord = discordClient;
+    this.twitch = twitch;
+    this.firestore = firestore;
     this.port = BACKEND_PORT;
     this.secret = TWITCH_WEBHOOK_SECRET;
 
@@ -144,12 +146,12 @@ class ExpressServer extends EventEmitter {
   }
 
   async getUserCount(req, res) {
-    const count = (await this.discord.firestore.getUsers()).length;
+    const count = (await this.firestore.getUsers()).length;
     res.json({ count });
   }
 
   async searchStreamers({ query: { query } }, res) {
-    const streamers = await this.discord.twitch.searchStreamers(query);
+    const streamers = await this.twitch.searchStreamers(query);
     if (streamers) {
       res.json(
         streamers.map(({ display_name: name, thumbnail_url: avatar, id }) => ({
@@ -168,7 +170,7 @@ class ExpressServer extends EventEmitter {
     const streamer_id = req.query.id;
 
     try {
-      const message = await this.discord.firestore.getMessage(
+      const message = await this.firestore.getMessage(
         user_id,
         streamer_id
       );
@@ -184,7 +186,7 @@ class ExpressServer extends EventEmitter {
     const { streamer_id, message } = req.body;
 
     try {
-      await this.discord.firestore.setMessage(user_id, streamer_id, message);
+      await this.firestore.setMessage(user_id, streamer_id, message);
       res.sendStatus(200);
     } catch (err) {
       console.error(err);
@@ -194,13 +196,13 @@ class ExpressServer extends EventEmitter {
 
   async getStreamerInfo({ query: { id } }, res) {
     const [{ display_name, profile_image_url }] =
-      await this.discord.twitch.fetchStreamer(id);
+      await this.twitch.fetchStreamer(id);
     res.json({ display_name, avatar: profile_image_url });
   }
 
   async getStreamers(req, res) {
     const userId = req.user.id;
-    const user = await this.discord.firestore.getUser(userId);
+    const user = await this.firestore.getUser(userId);
     if (user) {
       res.json(user["streamers"]);
     } else {
@@ -212,7 +214,7 @@ class ExpressServer extends EventEmitter {
     const userId = req.user.id;
     const { streamer_id } = req.body;
     try {
-      await this.discord.firestore.subscribe(userId, streamer_id, "");
+      await this.firestore.subscribe(userId, streamer_id, "");
       res.sendStatus(200);
     } catch (err) {
       console.error(err);
@@ -224,7 +226,7 @@ class ExpressServer extends EventEmitter {
     const userId = req.user.id;
     const { streamer_id } = req.body;
     try {
-      await this.discord.firestore.unsubscribe(userId, streamer_id);
+      await this.firestore.unsubscribe(userId, streamer_id);
       res.sendStatus(200);
     } catch (err) {
       console.error(err);
