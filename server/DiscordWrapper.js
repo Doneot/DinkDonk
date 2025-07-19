@@ -48,7 +48,7 @@ class DiscordWrapper {
       content: `${notification_message.replace(
         /%s/g,
         streamer.display_name
-      )}\n<https://www.twitch.tv/${streamer.user_name}>\n${
+      )}\n<https://www.twitch.tv/${stream.user_name}>\n${
         Discord.WebEmbed.hiddenEmbed
       }${embed}`,
     });
