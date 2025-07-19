@@ -115,7 +115,6 @@ class ExpressServer extends EventEmitter {
       express.raw({ type: "application/json" }),
       this.handleRequest.bind(this)
     );
-    this.app.get("*", this.getIndexPage.bind(this));
   }
 
   handleDiscordCallback(req, res) {
@@ -232,10 +231,6 @@ class ExpressServer extends EventEmitter {
       console.error(err);
       res.status(500).json({ error: "Unsubscribe failed" });
     }
-  }
-
-  getIndexPage(req, res) {
-    res.sendFile(path.join(__dirname, "../client/dist", "index.html"));
   }
 
   start() {
