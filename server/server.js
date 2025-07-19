@@ -19,10 +19,6 @@ discord.bot.on("ready", async () => {
   server.start();
 });
 
-discord.bot.on("messageCreate", async (message) => {
-  await discord.onMessageCreate(message, firestore, twitch);
-});
-
 async function handleServerReady() {
   console.log("Express server is ready!");
   if (twitch.ready) {
