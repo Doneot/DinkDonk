@@ -79,6 +79,7 @@ class ExpressServer extends EventEmitter {
     this.app.get("/api/user-count", this.getUserCount.bind(this));
     this.app.get("/api/streamers/search", this.searchStreamers.bind(this));
     this.app.get("/api/streamers/info", this.getStreamerInfo.bind(this));
+    this.app.get("/login-failed", this.handleFailedLogin.bind(this));
 
     // Protected routes (require auth)
     this.app.get(
@@ -118,7 +119,17 @@ class ExpressServer extends EventEmitter {
   }
 
   handleDiscordCallback(req, res) {
-    res.redirect(SERVER_URL.includes("ngrok") ? "http://localhost:5000/dashboard":`${SERVER_URL}/dashboard`);
+    res.redirect(
+      SERVER_URL.includes("ngrok")
+        ? "http://localhost:5000/dashboard"
+        : `${SERVER_URL}/dashboard`
+    );
+  }
+
+  handleFailedLogin(req, res) {
+    res.redirect(
+      SERVER_URL.includes("ngrok") ? "http://localhost:5000" : `${SERVER_URL}`
+    ); // Redirect to home or login page
   }
 
   getUser(req, res) {
@@ -169,10 +180,7 @@ class ExpressServer extends EventEmitter {
     const streamer_id = req.query.id;
 
     try {
-      const message = await this.firestore.getMessage(
-        user_id,
-        streamer_id
-      );
+      const message = await this.firestore.getMessage(user_id, streamer_id);
       res.json({ notification_message: message });
     } catch (err) {
       console.error(err);
