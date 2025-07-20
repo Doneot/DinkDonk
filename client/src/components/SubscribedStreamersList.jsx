@@ -1,9 +1,7 @@
 // SubscribedStreamersList.jsx
-import api from "../api";
 
 const SubscribedStreamersList = ({
   streamerData,
-  messageMap,
   handleUnsubscribe,
   handleSubscribe,
   handleMessageChange,

@@ -1,4 +1,3 @@
-// StreamersManager.js (parent container)
 import { useEffect, useState } from "react";
 import api from "../api";
 import StreamerSearch from "./StreamerSearch";
@@ -7,9 +6,8 @@ import SubscribedStreamersList from "./SubscribedStreamersList";
 const StreamersManager = () => {
   const [subscribedIds, setSubscribedIds] = useState([]);
   const [streamerData, setStreamerData] = useState({});
-  const [messageMap, setMessageMap] = useState({});
   const [infoCache, setInfoCache] = useState({});
-  const [searchFocused, setSearchFocused] = useState(false);
+  const [dirtyMessages, setDirtyMessages] = useState({});
 
   // Fetch subscribed streamer IDs on mount
   useEffect(() => {
@@ -21,11 +19,10 @@ const StreamersManager = () => {
       .catch((err) => console.error("Failed to fetch subscriptions", err));
   }, []);
 
-  // Fetch streamer info and messages whenever subscribedIds change
+  // Fetch info and messages for each subscribed streamer
   useEffect(() => {
     if (subscribedIds.length === 0) {
       setStreamerData({});
-      setMessageMap({});
       return;
     }
 
@@ -43,8 +40,6 @@ const StreamersManager = () => {
               message,
             },
           }));
-
-          setMessageMap((prev) => ({ ...prev, [id]: message }));
         } catch (err) {
           console.error(
             `Failed to fetch message for cached streamer ${id}`,
@@ -82,73 +77,43 @@ const StreamersManager = () => {
             message,
           },
         }));
-
-        setMessageMap((prev) => ({ ...prev, [id]: message }));
       } catch (err) {
         console.error(`Failed to fetch info or message for ${id}`, err);
       }
     });
   }, [subscribedIds, infoCache]);
 
-  // Debounced message updates on messageMap changes
+  // Debounced syncing only for dirty messages
   useEffect(() => {
     const timeouts = [];
 
-    Object.entries(messageMap).forEach(([id, message]) => {
+    Object.entries(dirtyMessages).forEach(([id, message]) => {
       const timeout = setTimeout(() => {
         api
           .post("/streamers/set-message", {
             streamer_id: id,
             message,
           })
-          .catch((err) =>
-            console.error(`Failed to update message for ${id}`, err)
-          );
+          .then(() => {
+            setDirtyMessages((prev) => {
+              const updated = { ...prev };
+              delete updated[id];
+              return updated;
+            });
+          })
+          .catch((err) => {
+            console.error(`Failed to update message for ${id}`, err);
+          });
       }, 600);
 
       timeouts.push(timeout);
     });
 
-    return () => {
-      timeouts.forEach(clearTimeout);
-    };
-  }, [messageMap]);
-
-  // Handlers passed down
-  const handleUnsubscribe = (id) => {
-    api
-      .post("/streamers/unsubscribe", { streamer_id: id })
-      .then(() => {
-        setSubscribedIds((prev) => prev.filter((sid) => sid !== id));
-        setStreamerData((prev) => ({
-          ...prev,
-          [id]: {
-            ...prev[id],
-            isSubscribed: false,
-          },
-        }));
-      })
-      .catch((err) => console.error("Unsubscribe failed", err));
-  };
-
-  const handleSubscribe = (id) => {
-    api
-      .post("/streamers/subscribe", { streamer_id: id })
-      .then(() => {
-        setSubscribedIds((prev) => [...prev, id]);
-        setStreamerData((prev) => ({
-          ...prev,
-          [id]: {
-            ...prev[id],
-            isSubscribed: true,
-          },
-        }));
-      })
-      .catch((err) => console.error("Subscribe failed", err));
-  };
+    return () => timeouts.forEach(clearTimeout);
+  }, [dirtyMessages]);
 
   const handleMessageChange = (id, msg) => {
-    setMessageMap((prev) => ({ ...prev, [id]: msg }));
+    setDirtyMessages((prev) => ({ ...prev, [id]: msg }));
     setStreamerData((prev) => ({
       ...prev,
       [id]: {
@@ -158,18 +123,35 @@ const StreamersManager = () => {
     }));
   };
 
+  const handleUnsubscribe = (id) => {
+    api
+      .post("/streamers/unsubscribe", { streamer_id: id })
+      .then(() => {
+        setSubscribedIds((prev) => prev.filter((sid) => sid !== id));
+        setStreamerData((prev) => {
+          const updated = { ...prev };
+          delete updated[id];
+          return updated;
+        });
+      })
+      .catch((err) => console.error("Unsubscribe failed", err));
+  };
+
+  const handleSubscribe = (id) => {
+    api
+      .post("/streamers/subscribe", { streamer_id: id })
+      .then(() => setSubscribedIds((prev) => [...prev, id]))
+      .catch((err) => console.error("Subscribe failed", err));
+  };
+
   return (
     <div className="relative w-full max-w-3xl mx-auto p-6">
       <StreamerSearch
         subscribedIds={subscribedIds}
         setSubscribedIds={setSubscribedIds}
-        onSubscribe={handleSubscribe}
-        onFocusChange={setSearchFocused}
       />
-      {/* When search is focused, the dropdown overlaps the list below */}
       <SubscribedStreamersList
         streamerData={streamerData}
-        messageMap={messageMap}
         handleUnsubscribe={handleUnsubscribe}
         handleSubscribe={handleSubscribe}
         handleMessageChange={handleMessageChange}
