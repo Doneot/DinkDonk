@@ -114,6 +114,11 @@ async function handleStreamOnline(event) {
   )[0];
   const usersIds = (await firestore.getStreamer(streamer.id))["users"];
   for (const userId of usersIds) {
+    const user = await firestore.getUser(userId);
+    if (!user.canReceiveDM) {
+      console.log(`❌ User ${userId} cannot receive DMs, skipping notification`);
+      continue;
+    }
     const notification_message = await firestore.getMessage(
       userId,
       streamer.id
