@@ -298,7 +298,9 @@ class ExpressServer extends EventEmitter {
   }
 
   async getUserCount(req, res) {
-    const count = (await this.firestore.getUsers()).length;
+    const count = (await this.firestore.getUsers()).filter(
+      (user) => user.canReceiveDM
+    ).length;
     res.json({ count });
   }
 
