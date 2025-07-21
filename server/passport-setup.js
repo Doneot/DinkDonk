@@ -25,7 +25,10 @@ passport.use(
       scope: ["identify"],
     },
     function (accessToken, refreshToken, profile, done) {
-      return done(null, profile); // You could store it in DB here
+      profile.accessToken = accessToken;
+      profile.refreshToken = refreshToken;
+      profile.fetchTime = Date.now();
+      return done(null, profile);
     }
   )
 );

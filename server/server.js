@@ -6,7 +6,7 @@ const { DISCORD_TOKEN } = require("./config");
 
 const twitch = new TwitchWrapper();
 const firestore = new FirestoreWrapper();
-const discord = new DiscordWrapper(DISCORD_TOKEN);
+const discord = new DiscordWrapper(DISCORD_TOKEN, handleUserJoinGuild);
 const server = new ExpressServer(discord, twitch, firestore);
 
 server.on("ready", handleServerReady);
@@ -15,7 +15,6 @@ server.on("stream.online", handleStreamOnline);
 firestore.on("streamerAdd", handleStreamerAdded);
 
 discord.bot.on("ready", async () => {
-  await discord.onReady();
   server.start();
 });
 
@@ -39,6 +38,10 @@ async function subscribeToStreamers() {
       broadcaster_user_id: streamer["streamer_id"],
     });
   }
+}
+
+async function handleUserJoinGuild(userId) {
+  await firestore.updateUserDMability(userId, { canReceiveDM: true });
 }
 
 async function handleStreamerAdded(streamer_id) {

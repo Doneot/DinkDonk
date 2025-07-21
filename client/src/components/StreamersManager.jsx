@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import api from "../api";
 import StreamerSearch from "./StreamerSearch";
 import SubscribedStreamersList from "./SubscribedStreamersList";
+import { useAuth } from "../context/AuthContext";
 
-const StreamersManager = () => {
+const StreamersManager = ({ canReceiveDM }) => {
   const [subscribedIds, setSubscribedIds] = useState([]);
   const [streamerData, setStreamerData] = useState({});
   const [infoCache, setInfoCache] = useState({});
@@ -149,12 +150,14 @@ const StreamersManager = () => {
       <StreamerSearch
         subscribedIds={subscribedIds}
         setSubscribedIds={setSubscribedIds}
+        disabled={!canReceiveDM}
       />
       <SubscribedStreamersList
         streamerData={streamerData}
         handleUnsubscribe={handleUnsubscribe}
         handleSubscribe={handleSubscribe}
         handleMessageChange={handleMessageChange}
+        disabled={!canReceiveDM}
       />
     </div>
   );

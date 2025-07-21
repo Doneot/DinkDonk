@@ -1,17 +1,51 @@
 import StatusCard from "../components/StatusCard";
 import BotUsersCard from "../components/BotUsersCard";
 import StreamersManager from "../components/StreamersManager";
+import DiscordInviteButton from "../components/DiscordInviteButton";
+import CheckDMButton from "../components/CheckDMButton";
+import { useAuth } from "../context/AuthContext";
+import { useState } from "react";
+import api from "../api";
+import { useEffect } from "react";
 
 const Dashboard = () => {
+  const { user } = useAuth();
+  const [canReceiveDM, setCanReceiveDM] = useState(user?.canReceiveDM ?? false);
+
+  useEffect(() => {
+    console.log(`User can receive DM: ${canReceiveDM}`);
+  }, [canReceiveDM]);
+
+  useEffect(() => {
+    console.log(user);
+  }, [user]);
+
+  const checkIfUserCanReceiveDM = async () => {
+    try {
+      const canDM = (await api.get("/can-receive-DM")).data.canReceiveDM;
+      setCanReceiveDM(canDM);
+      return canDM;
+    } catch (err) {
+      console.error("Failed to check DM permission", err);
+    }
+  };
+
   return (
     <div className="p-8 bg-gray-100 min-h-screen">
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        <div className="space-y-6">
+        <div className="space-y-6 my-10 space-x-5">
           <StatusCard />
           <BotUsersCard />
+          {!canReceiveDM && (
+            <DiscordInviteButton inviteLink="https://discord.com/oauth2/authorize?client_id=1359899857971577124&permissions=0&integration_type=0&scope=bot" />
+          )}
+          <CheckDMButton
+            userId={user.id}
+            checkDMFunction={checkIfUserCanReceiveDM}
+          />
         </div>
         <div className="space-y-6 lg:col-span-2">
-          <StreamersManager />
+          <StreamersManager canReceiveDM={canReceiveDM} />
         </div>
       </div>
     </div>

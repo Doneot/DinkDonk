@@ -5,6 +5,7 @@ const SubscribedStreamersList = ({
   handleUnsubscribe,
   handleSubscribe,
   handleMessageChange,
+  disabled,
 }) => {
   const allStreamerIds = Object.keys(streamerData);
 
@@ -37,23 +38,30 @@ const SubscribedStreamersList = ({
                   value={s.message || ""}
                   onChange={(e) => handleMessageChange(id, e.target.value)}
                   placeholder="Custom notification message"
-                  className="flex-1 mx-4 p-2 border rounded-md text-sm text-black"
+                  className={`flex-1 mx-4 p-2 border rounded-md text-sm text-black transition duration-200 ${
+                    disabled
+                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                      : "bg-white"
+                  }`}
+                  disabled={disabled}
                 />
-                {s.isSubscribed ? (
-                  <button
-                    className="bg-red-500 hover:bg-red-600 text-white text-sm px-4 py-2 rounded-md"
-                    onClick={() => handleUnsubscribe(id)}
-                  >
-                    Unsubscribe
-                  </button>
-                ) : (
-                  <button
-                    className="bg-green-500 hover:bg-green-600 text-white text-sm px-4 py-2 rounded-md"
-                    onClick={() => handleSubscribe(id)}
-                  >
-                    Subscribe
-                  </button>
-                )}
+                <button
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-75 ${
+                    s.isSubscribed
+                      ? disabled
+                        ? "bg-gray-300 text-gray-700"
+                        : "bg-red-500 hover:bg-red-600 text-white"
+                      : disabled
+                      ? "bg-gray-300 text-gray-700"
+                      : "bg-green-500 hover:bg-green-600 text-white"
+                  }`}
+                  onClick={() =>
+                    s.isSubscribed ? handleUnsubscribe(id) : handleSubscribe(id)
+                  }
+                  disabled={disabled}
+                >
+                  {s.isSubscribed ? "Unsubscribe" : "Subscribe"}
+                </button>
               </li>
             );
           })}

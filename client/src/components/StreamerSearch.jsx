@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import api from "../api";
 
-const StreamerSearch = ({ subscribedIds, setSubscribedIds }) => {
+const StreamerSearch = ({ subscribedIds, setSubscribedIds, disabled }) => {
   const [search, setSearch] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [highlightIndex, setHighlightIndex] = useState(-1);
@@ -88,7 +88,9 @@ const StreamerSearch = ({ subscribedIds, setSubscribedIds }) => {
         Search Streamers
       </h2>
       <input
-        className="border border-gray-300 rounded-lg p-3 w-full focus:ring-indigo-500 focus:border-indigo-500 transition duration-200 text-black"
+        className={`border border-gray-300 rounded-lg p-3 w-full focus:ring-indigo-500 focus:border-indigo-500 transition duration-200 text-black ${
+          disabled ? "bg-gray-200 cursor-not-allowed text-gray-500" : "bg-white"
+        }`}
         value={search}
         onChange={(e) => {
           setSearch(e.target.value);
@@ -98,6 +100,7 @@ const StreamerSearch = ({ subscribedIds, setSubscribedIds }) => {
         onFocus={() => setIsFocused(true)}
         onKeyDown={handleKeyDown}
         placeholder="Search Twitch streamers..."
+        disabled={disabled}
       />
 
       {isFocused && suggestions.length > 0 && (
@@ -141,6 +144,7 @@ const StreamerSearch = ({ subscribedIds, setSubscribedIds }) => {
                       e.stopPropagation();
                       handleSubscribe(s);
                     }}
+                    disabled={disabled}
                   >
                     Subscribe
                   </button>

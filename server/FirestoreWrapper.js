@@ -35,6 +35,10 @@ class FirestoreWrapper extends EventEmitter {
     this._db = getFirestore();
   }
 
+  get db() {
+    return this._db;
+  }
+
   async getUsers() {
     try {
       const usersSnapshot = await this._db.collection("users").get();
@@ -85,14 +89,44 @@ class FirestoreWrapper extends EventEmitter {
     }
   }
 
-  async _addUser(user_id) {
+  async addUser(user_id) {
+    if (!isValidString(user_id)) {
+      console.error(`Invalid user_id: [${user_id}]`);
+      return;
+    }
     try {
       await this._db
         .collection("users")
         .doc(user_id)
-        .set({ user_id, streamers: [] });
+        .set({ user_id, canReceiveDM: false, streamers: [] });
     } catch (error) {
       console.error("Error adding user:", error);
+    }
+  }
+
+  async updateUserDMability(user_id, canReceiveDM) {
+    if (!isValidString(user_id)) {
+      console.error(`Invalid user_id: [${user_id}]`);
+      return;
+    }
+    try {
+      const userRef = this._db.collection("users").doc(user_id);
+      await userRef.update({ canReceiveDM });
+    } catch (error) {
+      console.error("Error updating user:", user_id, error);
+    }
+  }
+
+  async updateUserTokens(user_id, access_token, refresh_token, fetchTime) {
+    if (!isValidString(user_id)) {
+      console.error(`Invalid user_id: [${user_id}]`);
+      return;
+    }
+    try {
+      const userRef = this._db.collection("users").doc(user_id);
+      await userRef.update({ access_token, refresh_token, fetchTime });
+    } catch (error) {
+      console.error("Error updating user:", user_id, error);
     }
   }
 
@@ -119,7 +153,7 @@ class FirestoreWrapper extends EventEmitter {
       const userRef = this._db.collection("users").doc(user_id);
       let userDoc = await userRef.get();
       if (!userDoc.exists) {
-        await this._addUser(user_id);
+        await this.addUser(user_id);
         userDoc = await userRef.get();
       }
       let streamerAlreadyRegisteredForUser = false;
@@ -234,35 +268,35 @@ class FirestoreWrapper extends EventEmitter {
   }
 
   async setMessage(user_id, streamer_id, notification_message = "") {
-    if (!isValidString(user_id) || !isValidString(streamer_id)) {
-      console.error(
-        `Invalid input in setMessage: user_id=[${user_id}], streamer_id=[${streamer_id}], notification_message=[${notification_message}]`
-      );
-      return null;
-    }
-    const userRef = this._db.collection("users").doc(user_id);
-    const doc = await userRef.get();
-    if (doc.exists) {
-      const streamers = doc.data()["streamers"];
-      const index = streamers.findIndex((s) => s.streamer_id === streamer_id);
-
-      if (index === -1) {
+    if (typeof notification_message === "string") {
+      if (!isValidString(user_id) || !isValidString(streamer_id)) {
         console.error(
-          `Error : Streamer [${streamer_id}] not found for user [${user_id}]`
+          `Invalid input in setMessage: user_id=[${user_id}], streamer_id=[${streamer_id}], notification_message=[${notification_message}]`
         );
-        return;
+        return null;
       }
+      const userRef = this._db.collection("users").doc(user_id);
+      const doc = await userRef.get();
+      if (doc.exists) {
+        const streamers = doc.data()["streamers"];
+        const index = streamers.findIndex((s) => s.streamer_id === streamer_id);
 
-      streamers[index] = {
-        streamer_id,
-        notification_message,
-      };
+        if (index === -1) {
+          console.error(
+            `Error : Streamer [${streamer_id}] not found for user [${user_id}]`
+          );
+          return;
+        }
 
-      await userRef.update({ streamers });
-    } else {
-      console.error(`Error : User [${user_id}] not found`);
+        streamers[index] = {
+          streamer_id,
+          notification_message,
+        };
+        await userRef.update({ streamers: streamers });
+      } else {
+        console.error(`Error : User [${user_id}] not found`);
+      }
     }
   }
 }
-
 module.exports = { FirestoreWrapper };

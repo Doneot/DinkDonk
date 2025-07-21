@@ -1,3 +1,5 @@
+const axios = require("axios");
+const querystring = require("querystring");
 const crypto = require("crypto");
 const express = require("express");
 const session = require("express-session");
@@ -10,8 +12,11 @@ const {
   SESSION_SECRET,
   TWITCH_WEBHOOK_SECRET,
   BACKEND_PORT,
+  DISCORD_CLIENT_ID,
+  DISCORD_CLIENT_SECRET,
 } = require("./config");
 require("./passport-setup");
+const FirestoreSessionStore = require("./FireSessionStore");
 
 class ExpressServer extends EventEmitter {
   constructor(discordClient, twitch, firestore) {
@@ -36,6 +41,47 @@ class ExpressServer extends EventEmitter {
     res.redirect("/");
   }
 
+  // Middleware to ensure the Discord token is fresh
+  async ensureFreshToken(req, res, next) {
+    const user = await this.firestore.getUser(req.user.id);
+    const tokenAge = Date.now() - user.fetchTime;
+
+    if (tokenAge > 55 * 60 * 1000) {
+      try {
+        const newTokens = await this.refreshDiscordToken(user.refreshToken);
+
+        user.accessToken = newTokens.access_token;
+        user.refreshToken = newTokens.refresh_token || user.refreshToken;
+        user.fetchTime = Date.now();
+
+        await this.firestore.updateUserTokens(
+          req.user.id,
+          user.accessToken,
+          user.refreshToken,
+          user.fetchTime
+        );
+      } catch (err) {
+        console.error(
+          "[OAuth2] Failed to refresh token:",
+          err.response?.data || err.message
+        );
+
+        // Cleanup session and force logout
+        req.logout(() => {
+          req.session.destroy(() => {
+            res.clearCookie("connect.sid");
+            return res.status(401).json({
+              error: "Your session has expired. Please log in again.",
+            });
+          });
+        });
+        return;
+      }
+    }
+
+    next();
+  }
+
   initializeMiddlewares() {
     this.app.use(
       cors({
@@ -44,13 +90,15 @@ class ExpressServer extends EventEmitter {
       })
     );
     this.app.use(express.static(path.join(__dirname, "../client/dist")));
+    const firestoreSessionStore = new FirestoreSessionStore(this.firestore.db);
     this.app.use(
       session({
+        store: firestoreSessionStore,
         secret: SESSION_SECRET,
         resave: false,
         saveUninitialized: false,
         cookie: {
-          secure: false, // should be true if using https in production
+          secure: !SERVER_URL.includes("ngrok"), // should be true if using https in production
           sameSite: "lax", // or 'none' if cross-origin, but needs secure: true
         },
       })
@@ -69,48 +117,85 @@ class ExpressServer extends EventEmitter {
     this.app.get(
       "/api/auth/discord/callback",
       passport.authenticate("discord", { failureRedirect: "/login-failed" }),
-      this.handleDiscordCallback
+      this.handleDiscordCallback.bind(this)
     );
 
     // Public routes (no auth)
     this.app.get("/api/auth/user", this.getUser.bind(this));
-    this.app.get("/api/auth/logout", this.logout.bind(this));
-    this.app.get("/api/status", this.getStatus.bind(this));
-    this.app.get("/api/user-count", this.getUserCount.bind(this));
-    this.app.get("/api/streamers/search", this.searchStreamers.bind(this));
-    this.app.get("/api/streamers/info", this.getStreamerInfo.bind(this));
     this.app.get("/login-failed", this.handleFailedLogin.bind(this));
 
     // Protected routes (require auth)
     this.app.get(
+      "/api/auth/logout",
+      this.ensureAuthenticated.bind(this),
+      this.ensureFreshToken.bind(this),
+      this.logout.bind(this)
+    );
+    this.app.get(
+      "/api/status",
+      this.ensureAuthenticated.bind(this),
+      this.ensureFreshToken.bind(this),
+      this.getStatus.bind(this)
+    );
+    this.app.get(
+      "/api/user-count",
+      this.ensureAuthenticated.bind(this),
+      this.ensureFreshToken.bind(this),
+      this.getUserCount.bind(this)
+    );
+    this.app.get(
+      "/api/streamers/search",
+      this.ensureAuthenticated.bind(this),
+      this.ensureFreshToken.bind(this),
+      this.searchStreamers.bind(this)
+    );
+    this.app.get(
+      "/api/streamers/info",
+      this.ensureAuthenticated.bind(this),
+      this.ensureFreshToken.bind(this),
+      this.getStreamerInfo.bind(this)
+    );
+    this.app.get(
       "/api/streamers/subscribed-streamers",
       this.ensureAuthenticated.bind(this),
+      this.ensureFreshToken.bind(this),
       this.getStreamers.bind(this)
     );
     this.app.post(
       "/api/streamers/subscribe",
       this.ensureAuthenticated.bind(this),
+      this.ensureFreshToken.bind(this),
       express.json(),
       this.subscribeToStreamer.bind(this)
     );
     this.app.post(
       "/api/streamers/unsubscribe",
       this.ensureAuthenticated.bind(this),
+      this.ensureFreshToken.bind(this),
       express.json(),
       this.unsubscribeToStreamer.bind(this)
     );
     this.app.get(
       "/api/streamers/get-message",
       this.ensureAuthenticated.bind(this),
+      this.ensureFreshToken.bind(this),
       this.getNotificationMessage.bind(this)
     );
     this.app.post(
       "/api/streamers/set-message",
       this.ensureAuthenticated.bind(this),
+      this.ensureFreshToken.bind(this),
       express.json(),
       this.setNotificationMessage.bind(this)
     );
+    this.app.get(
+      "/api/can-receive-dm",
+      this.ensureAuthenticated.bind(this),
+      this.ensureFreshToken.bind(this),
+      this.canUserReceiveDM.bind(this)
+    );
 
+    // Eventsub route
     this.app.post(
       "/eventsub",
       express.raw({ type: "application/json" }),
@@ -118,7 +203,46 @@ class ExpressServer extends EventEmitter {
     );
   }
 
-  handleDiscordCallback(req, res) {
+  async refreshDiscordToken(refresh_token) {
+    const data = {
+      client_id: DISCORD_CLIENT_ID,
+      client_secret: DISCORD_CLIENT_SECRET,
+      grant_type: "refresh_token",
+      refresh_token,
+      redirect_uri: `${SERVER_URL}/api/auth/discord/callback`,
+      scope: "identify",
+    };
+
+    const response = await axios.post(
+      "https://discord.com/api/oauth2/token",
+      querystring.stringify(data),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    return response.data;
+  }
+
+  async handleDiscordCallback(req, res) {
+    const { id, accessToken, refreshToken, fetchTime } = req.user;
+    let user = await this.firestore.getUser(id);
+    if (!user) {
+      await this.firestore.addUser(id);
+      const canReceiveDM = await this.discord.canSendDM(id);
+      await this.firestore.updateUserDMability(id, canReceiveDM);
+      req.session.canReceiveDM = canReceiveDM;
+    } else {
+      req.session.canReceiveDM = user.canReceiveDM;
+    }
+    await this.firestore.updateUserTokens(
+      id,
+      accessToken,
+      refreshToken,
+      fetchTime
+    );
     res.redirect(
       SERVER_URL.includes("ngrok")
         ? "http://localhost:5000/dashboard"
@@ -132,10 +256,13 @@ class ExpressServer extends EventEmitter {
     ); // Redirect to home or login page
   }
 
-  getUser(req, res) {
+  async getUser(req, res) {
     //console.log("GET /auth/user called. req.user:", req.user);
     if (!req.user) return res.status(401).json({ error: "Not authenticated" });
-    res.json(req.user);
+    res.json({
+      ...req.user,
+      canReceiveDM: req.session.canReceiveDM || false,
+    });
   }
 
   logout(req, res) {
@@ -153,6 +280,12 @@ class ExpressServer extends EventEmitter {
 
   getStatus(req, res) {
     res.json({ online: this.discord.bot.isReady() });
+  }
+
+  async canUserReceiveDM(req, res) {
+    const canReceiveDM = await this.discord.canSendDM(req.user.id);
+    await this.firestore.updateUserDMability(req.user.id, canReceiveDM);
+    res.json({ canReceiveDM });
   }
 
   async getUserCount(req, res) {
