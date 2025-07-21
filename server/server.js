@@ -1,28 +1,36 @@
-const http = require('http');
-const socketIo = require('socket.io');
+const http = require("http");
+const socketIo = require("socket.io");
 const { ExpressServer } = require("./ExpressServer");
 const { TwitchWrapper } = require("./TwitchWrapper");
 const { FirestoreWrapper } = require("./FirestoreWrapper");
 const { DiscordWrapper } = require("./DiscordWrapper");
-const { DISCORD_TOKEN, SERVER_URL } = require("./config");
-const { credential } = require('firebase-admin');
+const { DISCORD_TOKEN, SERVER_URL, SOCKET_URL } = require("./config");
 
 const twitch = new TwitchWrapper();
 const firestore = new FirestoreWrapper({
   handleUserChange: async (userId, updatedUser) => {
-  if (connectedClients.has(userId)) {
-    connectedClients.get(userId).forEach((socket) => {
-      socket.emit("user_data_updated", updatedUser);
-    });
-    console.log(`📢 Notified user ${userId} of update`);
-  }
-} });
-const discord = new DiscordWrapper(DISCORD_TOKEN, handleUserJoinGuild, handleUserUpdateDMability);
+    if (connectedClients.has(userId)) {
+      connectedClients.get(userId).forEach((socket) => {
+        socket.emit("user_data_updated", updatedUser);
+      });
+      console.log(`📢 Notified user ${userId} of update`);
+    }
+  },
+});
+const discord = new DiscordWrapper(
+  DISCORD_TOKEN,
+  handleUserJoinGuild,
+  handleUserUpdateDMability
+);
 const server = new ExpressServer(discord, twitch, firestore);
 
 const httpServer = http.createServer(); // no express attached, you're using Express separately
 const io = socketIo(httpServer, {
-  cors: { origin: SERVER_URL, methods: ["GET", "POST"], credentials: true },
+  cors: {
+    origin: SOCKET_URL,
+    methods: ["GET", "POST"],
+    credentials: !SOCKET_URL.includes("localhost"),
+  },
 });
 
 const connectedClients = new Map(); // userId => Set<socket>
@@ -52,8 +60,6 @@ io.on("connection", (socket) => {
   });
 });
 
-
-
 server.on("ready", handleServerReady);
 server.on("stream.online", handleStreamOnline);
 
@@ -62,8 +68,8 @@ firestore.on("streamerAdd", handleStreamerAdded);
 discord.bot.on("ready", async () => {
   server.start();
   httpServer.listen(4000, () => {
-  console.log("🧠 WebSocket server listening on port 4000");
-});
+    console.log("🧠 WebSocket server listening on port 4000");
+  });
 });
 
 async function handleServerReady() {
@@ -112,16 +118,13 @@ async function handleStreamOnline(event) {
       userId,
       streamer.id
     );
-    await discord.handleStreamerOnLive(
-      userId,
-      streamer,
-      notification_message
-    );
+    await discord.handleStreamerOnLive(userId, streamer, notification_message);
   }
 }
 
 process.on("SIGINT", async () => {
   console.log("Terminating script...");
   await twitch.unsubscribeAllEvents();
+  await io.close();
   process.exit();
 });

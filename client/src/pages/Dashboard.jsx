@@ -11,7 +11,6 @@ import socket from "../socket";
 
 const Dashboard = () => {
   const { user, setUser } = useAuth();
-  const [canReceiveDM, setCanReceiveDM] = useState(user?.canReceiveDM ?? false);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -31,7 +30,6 @@ const Dashboard = () => {
   const checkIfUserCanReceiveDM = async () => {
     try {
       const canDM = (await api.get("/can-receive-DM")).data.canReceiveDM;
-      setCanReceiveDM(canDM);
       return canDM;
     } catch (err) {
       console.error("Failed to check DM permission", err);
@@ -44,7 +42,7 @@ const Dashboard = () => {
         <div className="space-y-6 my-10 space-x-5">
           <StatusCard />
           <BotUsersCard />
-          {!canReceiveDM && (
+          {!user?.canReceiveDM && (
             <DiscordInviteButton inviteLink="https://discord.com/oauth2/authorize?client_id=1359899857971577124&permissions=0&integration_type=0&scope=bot" />
           )}
           <CheckDMButton
@@ -53,7 +51,7 @@ const Dashboard = () => {
           />
         </div>
         <div className="space-y-6 lg:col-span-2">
-          <StreamersManager canReceiveDM={canReceiveDM} />
+          <StreamersManager canReceiveDM={user?.canReceiveDM} />
         </div>
       </div>
     </div>

@@ -1,6 +1,9 @@
 // socket.js
 import { io } from "socket.io-client";
 
-const socket = io(`${import.meta.env.VITE_SERVER_URL}:4000`, {transports: ["websocket"], withCredentials: true});
+const socket = io(`${import.meta.env.VITE_SOCKET_URL}`, {
+  transports: ["websocket"],
+  withCredentials: !import.meta.env.VITE_SOCKET_URL.includes("localhost"),
+});
 
 export default socket;
