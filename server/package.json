@@ -20,6 +20,7 @@
     "express-session": "^1.18.1",
     "firebase-admin": "^12.7.0",
     "passport": "^0.7.0",
-    "passport-discord": "^0.1.4"
+    "passport-discord": "^0.1.4",
+    "socket.io": "^4.8.1"
   }
 }

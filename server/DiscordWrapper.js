@@ -3,13 +3,13 @@ const {
   GatewayIntentBits,
   Events,
   Partials,
-  EmbedBuilder,
 } = require("discord.js");
 
 class DiscordWrapper {
-  constructor(discordToken, handleUserJoin) {
+  constructor(discordToken, handleUserJoin, handleUserUpdateDMability) {
     this.token = discordToken;
     this.handleUserJoin = handleUserJoin;
+    this.handleUserUpdateDMability = handleUserUpdateDMability;
     this.bot = new Client({
       intents: [
         GatewayIntentBits.Guilds,
@@ -64,45 +64,21 @@ class DiscordWrapper {
     }
   };
 
-  createEmbed(streamer, stream, thumbnailUrl) {
-    return new EmbedBuilder()
-      .setAuthor({
-        name: stream.user_name,
-        url: `https://www.twitch.tv/${stream.user_name}`,
-        iconURL: streamer.profile_image_url,
-      })
-      .setColor("PURPLE")
-      .setDescription(
-        `${stream.user_name} is live on twitch!\n\n**Playing **\n${stream.game_name}`
-      )
-      .setTitle(stream.title)
-      .setUrl(`https://www.twitch.tv/${stream.user_name}`)
-      .setThumbnail({
-        url: thumbnailUrl,
-        height: 720,
-        width: 1280,
-      })
-      .setVideo({
-        url: `https://player.twitch.tv/?channel=${stream.user_name}&player=facebook&autoplay=true&parent=meta.tag`,
-        height: 378,
-        width: 620,
+  async handleStreamerOnLive(user_id, streamer, notification_message) {
+    try {
+      const user = await this.bot.users.fetch(user_id);
+      const channel = await user.createDM();
+
+      await channel.send({
+        content: `${notification_message.replace(/%s/g, streamer.display_name)}\nhttps://www.twitch.tv/${streamer.login}`
       });
-  }
-
-  async handleStreamerOnLive(user_id, streamer, stream, notification_message) {
-    const user = await this.bot.users.fetch(user_id);
-    const channel = await user.createDM();
-    const thumbnailUrl = stream.thumbnail_url
-      .replace("{width}", 1280)
-      .replace("{height}", 720);
-    const embed = this.createEmbed(streamer, stream, thumbnailUrl);
-
-    channel.send({
-      content: `${notification_message.replace(
-        /%s/g,
-        streamer.display_name
-      )}\n<https://www.twitch.tv/${stream.user_name}>\n${embed}`,
-    });
+    } catch (err) {
+      if (err.code === 50007) {
+        this.handleUserUpdateDMability(user_id, false);
+        return;
+      }
+      console.error(`❌ Could not notify user ${user_id} about streamer ${streamer.display_name}:`, err);
+    }
   }
 }
 

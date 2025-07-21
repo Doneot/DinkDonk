@@ -7,18 +7,26 @@ import { useAuth } from "../context/AuthContext";
 import { useState } from "react";
 import api from "../api";
 import { useEffect } from "react";
+import socket from "../socket";
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [canReceiveDM, setCanReceiveDM] = useState(user?.canReceiveDM ?? false);
 
   useEffect(() => {
-    console.log(`User can receive DM: ${canReceiveDM}`);
-  }, [canReceiveDM]);
+    if (!user?.id) return;
 
-  useEffect(() => {
-    console.log(user);
-  }, [user]);
+    socket.emit("register_user", user.id);
+
+    socket.on("user_data_updated", (updatedUser) => {
+      console.log("🔁 Got updated user data:", updatedUser);
+      setUser((prev) => ({ ...prev, ...updatedUser }));
+    });
+
+    return () => {
+      socket.off("user_data_updated");
+    };
+  }, [user?.id]);
 
   const checkIfUserCanReceiveDM = async () => {
     try {

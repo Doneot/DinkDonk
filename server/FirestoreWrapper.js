@@ -15,7 +15,7 @@ function isValidString(str) {
 }
 
 class FirestoreWrapper extends EventEmitter {
-  constructor() {
+  constructor({handleUserChange}) {
     super();
     const serviceAccount = {
       type: "service_account",
@@ -31,8 +31,19 @@ class FirestoreWrapper extends EventEmitter {
       universe_domain: "googleapis.com",
     };
 
+    this.handleUserChange = handleUserChange;
+
     admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
     this._db = getFirestore();
+    this._db.collection('users').onSnapshot((snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'modified') {
+          const updatedUser = change.doc.data();
+          const userId = change.doc.id;
+          this.handleUserChange(userId, updatedUser);
+        }
+      });
+    });
   }
 
   get db() {

@@ -66,13 +66,19 @@ class ExpressServer extends EventEmitter {
           err.response?.data || err.message
         );
 
+        if (err === 'invalid_grant') {
+          console.warn("Refresh token invalid or expired. User must re-authenticate.");
+          await firestore.updateUserTokens(userId, null, null, null);
+          
+        }
+
         // Cleanup session and force logout
         req.logout(() => {
           req.session.destroy(() => {
             res.clearCookie("connect.sid");
-            return res.status(401).json({
-              error: "Your session has expired. Please log in again.",
-            });
+            return res.redirect(
+              SERVER_URL.includes("ngrok") ? "http://localhost:5000" : `${SERVER_URL}`
+          );
           });
         });
         return;
