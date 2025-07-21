@@ -29,7 +29,7 @@ const io = socketIo(httpServer, {
   cors: {
     origin: SOCKET_URL,
     methods: ["GET", "POST"],
-    credentials: !SOCKET_URL.includes("localhost"),
+    credentials: false,//!SOCKET_URL.includes("localhost"),
   },
 });
 

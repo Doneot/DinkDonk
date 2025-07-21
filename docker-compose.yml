@@ -4,6 +4,8 @@ services:
       context: ./client
     ports:
       - "5000:80" # React app served via Nginx on port 5000 (inside the container)
+    env_file:
+      - ./client/.env
     restart: always
 
   dinkdonk-server:
@@ -11,6 +13,7 @@ services:
       context: ./server
     ports:
       - "3000:3000" # Express app listening on port 3000 (inside the container)
+      - "4000:4000" # WebSocket server listening on port 4000 (inside the container)
     env_file:
       - ./server/.env
     restart: always
