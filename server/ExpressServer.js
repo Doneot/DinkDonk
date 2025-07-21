@@ -68,7 +68,7 @@ class ExpressServer extends EventEmitter {
 
         if (err === 'invalid_grant') {
           console.warn("Refresh token invalid or expired. User must re-authenticate.");
-          await firestore.updateUserTokens(userId, null, null, null);
+          await firestore.updateUserTokens(req.user.id, null, null, null);
           
         }
 
@@ -113,11 +113,7 @@ class ExpressServer extends EventEmitter {
     );
     this.app.use(passport.initialize());
     this.app.use(passport.session());
-
-    this.app.use((req, res, next) => {
-      //console.log("SESSION:", req.session);
-      next();
-    });
+    
   }
 
   initializeRoutes() {
