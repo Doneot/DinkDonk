@@ -91,12 +91,14 @@ class ExpressServer extends EventEmitter {
     );
     this.app.use(express.static(path.join(__dirname, "../client/dist")));
     const firestoreSessionStore = new FirestoreSessionStore(this.firestore.db);
+    this.app.set("trust proxy", 1);
     this.app.use(
       session({
         store: firestoreSessionStore,
         secret: SESSION_SECRET,
         resave: false,
         saveUninitialized: false,
+        proxy: true,
         cookie: {
           secure: !SERVER_URL.includes("ngrok"), // should be true if using https in production
           sameSite: "lax", // or 'none' if cross-origin, but needs secure: true
@@ -251,6 +253,7 @@ class ExpressServer extends EventEmitter {
   }
 
   handleFailedLogin(req, res) {
+    console.log("Login failed, redirecting to home");
     res.redirect(
       SERVER_URL.includes("ngrok") ? "http://localhost:5000" : `${SERVER_URL}`
     ); // Redirect to home or login page
