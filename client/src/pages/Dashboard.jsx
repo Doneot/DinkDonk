@@ -4,7 +4,6 @@ import StreamersManager from "../components/StreamersManager";
 import DiscordInviteButton from "../components/DiscordInviteButton";
 import CheckDMButton from "../components/CheckDMButton";
 import { useAuth } from "../context/AuthContext";
-import { useState } from "react";
 import api from "../api";
 import { useEffect } from "react";
 import socket from "../socket";
