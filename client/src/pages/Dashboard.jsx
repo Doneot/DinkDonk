@@ -42,7 +42,7 @@ const Dashboard = () => {
           <StatusCard />
           <BotUsersCard />
           {!user?.canReceiveDM && (
-            <DiscordInviteButton inviteLink="https://discord.com/oauth2/authorize?client_id=1359899857971577124&permissions=0&integration_type=0&scope=bot" />
+            <DiscordInviteButton inviteLink={import.meta.env.INVITE_URL} />
           )}
           <CheckDMButton
             userId={user.id}
