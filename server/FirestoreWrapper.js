@@ -1,3 +1,4 @@
+// server/FirestoreWrapper.js
 const admin = require("firebase-admin");
 const { getFirestore } = require("firebase-admin/firestore");
 const EventEmitter = require("events");
@@ -155,11 +156,11 @@ class FirestoreWrapper extends EventEmitter {
 
   async subscribe(user_id, streamer_id, notification_message = "") {
     if (!isValidString(user_id) || !isValidString(streamer_id)) {
-      console.error(
-        `Invalid input in subscribe: user_id=[${user_id}], streamer_id=[${streamer_id}], message=[${notification_message}]`
-      );
-      return;
+      const msg = `Invalid input in subscribe: user_id=[${user_id}], streamer_id=[${streamer_id}]`;
+      console.error(msg);
+      return { success: false, reason: "invalid_input", message: msg };
     }
+
     try {
       const userRef = this._db.collection("users").doc(user_id);
       let userDoc = await userRef.get();
@@ -167,87 +168,88 @@ class FirestoreWrapper extends EventEmitter {
         await this.addUser(user_id);
         userDoc = await userRef.get();
       }
-      let streamerAlreadyRegisteredForUser = false;
-      for (const streamer of userDoc.data()["streamers"]) {
-        if (streamer["streamer_id"] === streamer_id) {
-          streamerAlreadyRegisteredForUser = true;
-          console.error(
-            `Error, the streamer [${streamer_id}] is already registered for user [${user_id}]`
-          );
-          break;
-        }
+
+      const streamers = userDoc.data()["streamers"];
+      const alreadySubscribed = streamers.some(s => s["streamer_id"] === streamer_id);
+
+      if (alreadySubscribed) {
+        const msg = `Streamer [${streamer_id}] is already registered for user [${user_id}]`;
+        console.warn(msg);
+        return { success: false, reason: "already_subscribed", message: msg };
       }
-      if (!streamerAlreadyRegisteredForUser) {
-        await userRef.update({
-          streamers: admin.firestore.FieldValue.arrayUnion({
-            streamer_id,
-            notification_message,
-          }),
-        });
-      }
+
+      await userRef.update({
+        streamers: admin.firestore.FieldValue.arrayUnion({ streamer_id, notification_message }),
+      });
+
       const streamerRef = this._db.collection("streamers").doc(streamer_id);
       let streamerDoc = await streamerRef.get();
+
       if (!streamerDoc.exists) {
         await this._addStreamer(streamer_id);
         streamerDoc = await streamerRef.get();
       }
-      let userAlreadyRegisteredForStreamer = false;
-      for (const user of streamerDoc.data()["users"]) {
-        if (user === user_id) {
-          userAlreadyRegisteredForStreamer = true;
-          console.error(
-            `Error, the streamer [${streamer_id}] is already registered for user [${user_id}]`
-          );
-          break;
-        }
-      }
-      if (!userAlreadyRegisteredForStreamer) {
+
+      const users = streamerDoc.data()["users"];
+      const alreadyHasUser = users.includes(user_id);
+
+      if (!alreadyHasUser) {
         await streamerRef.update({
           users: admin.firestore.FieldValue.arrayUnion(user_id),
         });
       }
+
+      return { success: true };
     } catch (error) {
-      console.error(
-        `Error subscribing user [${user_id}] to streamer [${streamer_id}]`,
-        error
-      );
+      console.error(`Error subscribing user [${user_id}] to streamer [${streamer_id}]`, error);
+      return { success: false, reason: "exception", error };
     }
   }
 
   async unsubscribe(user_id, streamer_id) {
     if (!isValidString(user_id) || !isValidString(streamer_id)) {
-      console.error(
-        `Invalid input in unsubscribe: user_id=[${user_id}], streamer_id=[${streamer_id}]`
-      );
-      return;
+      const msg = `Invalid input in unsubscribe: user_id=[${user_id}], streamer_id=[${streamer_id}]`;
+      console.error(msg);
+      return { success: false, reason: "invalid_input", message: msg };
     }
+
     try {
       const userRef = this._db.collection("users").doc(user_id);
       const userDoc = await userRef.get();
-      if (userDoc.exists) {
-        const streamers = userDoc.data()["streamers"];
-        await userRef.update({
-          streamers: streamers.filter(
-            (streamer) => streamer["streamer_id"] !== streamer_id
-          ),
-        });
-      } else {
-        console.error(`Error : no user found for id [${user_id}]`);
+
+      if (!userDoc.exists) {
+        const msg = `No user found for id [${user_id}]`;
+        console.warn(msg);
+        return { success: false, reason: "user_not_found", message: msg };
       }
+
+      const streamers = userDoc.data()["streamers"];
+      const wasSubscribed = streamers.some(s => s["streamer_id"] === streamer_id);
+
+      await userRef.update({
+        streamers: streamers.filter((s) => s["streamer_id"] !== streamer_id),
+      });
+
       const streamerRef = this._db.collection("streamers").doc(streamer_id);
       const streamerDoc = await streamerRef.get();
-      if (streamerDoc.exists) {
-        await streamerRef.update({
-          users: admin.firestore.FieldValue.arrayRemove(user_id),
-        });
-      } else {
-        console.error(`Error : no streamer found for id [${streamer_id}]`);
+
+      if (!streamerDoc.exists) {
+        const msg = `No streamer found for id [${streamer_id}]`;
+        console.warn(msg);
+        return { success: false, reason: "streamer_not_found", message: msg };
       }
+
+      await streamerRef.update({
+        users: admin.firestore.FieldValue.arrayRemove(user_id),
+      });
+
+      return { success: true, wasSubscribed };
     } catch (error) {
       console.error(
         `Error unsubscribing user [${user_id}] from streamer [${streamer_id}]`,
         error
       );
+      return { success: false, reason: "exception", error };
     }
   }
 
@@ -279,35 +281,51 @@ class FirestoreWrapper extends EventEmitter {
   }
 
   async setMessage(user_id, streamer_id, notification_message = "") {
-    if (typeof notification_message === "string") {
-      if (!isValidString(user_id) || !isValidString(streamer_id)) {
-        console.error(
-          `Invalid input in setMessage: user_id=[${user_id}], streamer_id=[${streamer_id}], notification_message=[${notification_message}]`
-        );
-        return null;
-      }
+    if (typeof notification_message !== "string") {
+      const msg = `Notification message must be a string. Received: ${typeof notification_message}`;
+      console.error(msg);
+      return { success: false, reason: "invalid_message_type", message: msg };
+    }
+
+    if (!isValidString(user_id) || !isValidString(streamer_id)) {
+      const msg = `Invalid input in setMessage: user_id=[${user_id}], streamer_id=[${streamer_id}], notification_message=[${notification_message}]`;
+      console.error(msg);
+      return { success: false, reason: "invalid_input", message: msg };
+    }
+
+    try {
       const userRef = this._db.collection("users").doc(user_id);
       const doc = await userRef.get();
-      if (doc.exists) {
-        const streamers = doc.data()["streamers"];
-        const index = streamers.findIndex((s) => s.streamer_id === streamer_id);
 
-        if (index === -1) {
-          console.error(
-            `Error : Streamer [${streamer_id}] not found for user [${user_id}]`
-          );
-          return;
-        }
-
-        streamers[index] = {
-          streamer_id,
-          notification_message,
-        };
-        await userRef.update({ streamers: streamers });
-      } else {
-        console.error(`Error : User [${user_id}] not found`);
+      if (!doc.exists) {
+        const msg = `User [${user_id}] not found`;
+        console.error(msg);
+        return { success: false, reason: "user_not_found", message: msg };
       }
+
+      const streamers = doc.data()["streamers"];
+      const index = streamers.findIndex((s) => s.streamer_id === streamer_id);
+
+      if (index === -1) {
+        const msg = `Streamer [${streamer_id}] not found for user [${user_id}]`;
+        console.error(msg);
+        return { success: false, reason: "streamer_not_found", message: msg };
+      }
+
+      // Update the notification message
+      streamers[index] = {
+        streamer_id,
+        notification_message,
+      };
+
+      await userRef.update({ streamers });
+
+      return { success: true };
+    } catch (error) {
+      console.error(`Error setting message for user [${user_id}] and streamer [${streamer_id}]`, error);
+      return { success: false, reason: "exception", error };
     }
   }
+
 }
 module.exports = { FirestoreWrapper };

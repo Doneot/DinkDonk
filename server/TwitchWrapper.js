@@ -1,3 +1,4 @@
+// server/TwitchWrapper.js
 const axios = require("axios");
 const EventEmitter = require("events");
 const {
@@ -77,12 +78,28 @@ class TwitchWrapper extends EventEmitter {
     return this._token;
   }
 
-  async fetchStreamer(streamerId) {
-    return this.makeApiCall("users", { id: streamerId });
+  async fetchStreamers(streamerIds) {
+  if (typeof streamerIds === "string") {
+    return this.makeApiCall("users", { id: streamerIds });
+  } else if (Array.isArray(streamerIds)) {
+    const params = new URLSearchParams();
+    for (const id of streamerIds) {
+      params.append("id", id);
+    }
+    return this.makeApiCall("users", params);
+  } else {
+    throw new Error("fetchStreamers expects a string or an array of strings");
   }
+}
+
 
   async getStreamer(streamerName) {
-    return this.makeApiCall("users", { login: streamerName.toLowerCase() });
+    const res = await this.makeApiCall("users", { login: streamerName.toLowerCase() });
+    if(res.length === 0) {
+      console.warn(`Streamer ${streamerName} not found.`);
+      return null;
+    }
+    return res[0];
   }
 
   async searchStreamers(query) {

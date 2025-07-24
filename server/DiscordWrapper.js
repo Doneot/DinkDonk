@@ -1,15 +1,19 @@
+// server/DiscordWrapper.js
 const {
   Client,
   GatewayIntentBits,
   Events,
   Partials,
+  Collection,
+  MessageFlags
 } = require("discord.js");
+const fs = require("node:fs");
 
 class DiscordWrapper {
-  constructor(discordToken, handleUserJoin, handleUserUpdateDMability) {
+  constructor(discordToken, handleUserUpdateDMability, context) {
     this.token = discordToken;
-    this.handleUserJoin = handleUserJoin;
     this.handleUserUpdateDMability = handleUserUpdateDMability;
+    this.context = context;
     this.bot = new Client({
       intents: [
         GatewayIntentBits.Guilds,
@@ -21,11 +25,31 @@ class DiscordWrapper {
       partials: [Partials.Channel], // Needed for DM handling
     });
 
+    this.bot.commands = new Collection();
+
+    const commandFiles = fs.readdirSync("./commands").filter(file => file.endsWith(".js"));
+    for (const file of commandFiles) {
+      const command = require(`./commands/${file}`);
+      this.bot.commands.set(command.data.name, command);
+    }
+
     this.bot.once(Events.ClientReady, () => {
       console.log(`🤖 Logged in as ${this.bot.user.tag}`);
     });
 
-    this.bot.on(Events.GuildMemberAdd, this.handleNewGuildMember);
+    this.bot.on(Events.InteractionCreate, async interaction => {
+      if (!interaction.isChatInputCommand()) return;
+
+      const command = this.bot.commands.get(interaction.commandName);
+      if (!command) return;
+
+      try {
+        await command.execute(interaction, this.context);
+      } catch (error) {
+        console.error(error);
+        await interaction.reply({ content: "There was an error!", flags: MessageFlags.Ephemeral });
+      }
+    });
 
     this.bot.login(discordToken);
   }
@@ -47,22 +71,6 @@ class DiscordWrapper {
       return false;
     }
   }
-
-  handleNewGuildMember = async (member) => {
-    const targetGuildId = "1396559352541745163";
-    if (member.guild.id !== targetGuildId) return;
-
-    console.log(`➡️ New member: ${member.user.tag}`);
-
-    try {
-      const dmChannel = await member.user.createDM();
-      await dmChannel.send("Welcome! You can now use the dashboard.");
-      console.log(`✅ DM sent to ${member.user.tag}`);
-      this.handleUserJoin(member.user.id);
-    } catch (err) {
-      console.error(`❌ Could not DM ${member.user.tag}: ${err.message}`);
-    }
-  };
 
   async handleStreamerOnLive(user_id, streamer, notification_message) {
     try {

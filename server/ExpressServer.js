@@ -1,3 +1,4 @@
+// server/ExpressServer.js
 const axios = require("axios");
 const querystring = require("querystring");
 const crypto = require("crypto");
@@ -14,6 +15,7 @@ const {
   BACKEND_PORT,
   DISCORD_CLIENT_ID,
   DISCORD_CLIENT_SECRET,
+  NODE_ENV,
 } = require("./config");
 require("./passport-setup");
 const FirestoreSessionStore = require("./FireSessionStore");
@@ -77,7 +79,7 @@ class ExpressServer extends EventEmitter {
           req.session.destroy(() => {
             res.clearCookie("connect.sid");
             return res.redirect(
-              SERVER_URL.includes("ngrok") ? "http://localhost:5000" : `${SERVER_URL}`
+              NODE_ENV === "production" ?  `${SERVER_URL}` : "http://localhost:5000"
           );
           });
         });
@@ -106,7 +108,7 @@ class ExpressServer extends EventEmitter {
         saveUninitialized: false,
         proxy: true,
         cookie: {
-          secure: !SERVER_URL.includes("ngrok"), // should be true if using https in production
+          secure: NODE_ENV === "production", // should be true if using https in production
           sameSite: "lax", // or 'none' if cross-origin, but needs secure: true
         },
       })
@@ -248,16 +250,16 @@ class ExpressServer extends EventEmitter {
       fetchTime
     );
     res.redirect(
-      SERVER_URL.includes("ngrok")
-        ? "http://localhost:5000/dashboard"
-        : `${SERVER_URL}/dashboard`
+      NODE_ENV
+        ? `${SERVER_URL}/dashboard`
+        : "http://localhost:5000/dashboard"
     );
   }
 
   handleFailedLogin(req, res) {
     console.log("Login failed, redirecting to home");
     res.redirect(
-      SERVER_URL.includes("ngrok") ? "http://localhost:5000" : `${SERVER_URL}`
+      NODE_ENV === "production" ? `${SERVER_URL}` : "http://localhost:5000"
     ); // Redirect to home or login page
   }
 
@@ -290,6 +292,7 @@ class ExpressServer extends EventEmitter {
   async canUserReceiveDM(req, res) {
     const canReceiveDM = await this.discord.canSendDM(req.user.id);
     await this.firestore.updateUserDMability(req.user.id, canReceiveDM);
+    req.session.canReceiveDM = canReceiveDM; // Update session
     res.json({ canReceiveDM });
   }
 
@@ -343,7 +346,7 @@ class ExpressServer extends EventEmitter {
 
   async getStreamerInfo({ query: { id } }, res) {
     const [{ display_name, profile_image_url }] =
-      await this.twitch.fetchStreamer(id);
+      await this.twitch.fetchsStreamer(id);
     res.json({ display_name, avatar: profile_image_url });
   }
 

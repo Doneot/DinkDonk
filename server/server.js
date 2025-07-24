@@ -1,10 +1,11 @@
+// server/server.js
 const http = require("http");
 const socketIo = require("socket.io");
 const { ExpressServer } = require("./ExpressServer");
 const { TwitchWrapper } = require("./TwitchWrapper");
 const { FirestoreWrapper } = require("./FirestoreWrapper");
 const { DiscordWrapper } = require("./DiscordWrapper");
-const { DISCORD_TOKEN, SERVER_URL, SOCKET_URL } = require("./config");
+const { DISCORD_TOKEN, SOCKET_URL, NODE_ENV } = require("./config");
 
 const twitch = new TwitchWrapper();
 const firestore = new FirestoreWrapper({
@@ -17,19 +18,20 @@ const firestore = new FirestoreWrapper({
     }
   },
 });
+const botContext = { twitch, firestore};
 const discord = new DiscordWrapper(
   DISCORD_TOKEN,
-  handleUserJoinGuild,
-  handleUserUpdateDMability
+  handleUserUpdateDMability,
+  botContext
 );
 const server = new ExpressServer(discord, twitch, firestore);
 
-const httpServer = http.createServer(); // no express attached, you're using Express separately
+const httpServer = http.createServer();
 const io = socketIo(httpServer, {
   cors: {
     origin: SOCKET_URL,
     methods: ["GET", "POST"],
-    credentials: false,//!SOCKET_URL.includes("localhost"),
+    credentials: NODE_ENV === "production", // true if using https in production
   },
 });
 
@@ -94,9 +96,6 @@ async function subscribeToStreamers() {
   }
 }
 
-async function handleUserJoinGuild(userId) {
-  await firestore.updateUserDMability(userId, { canReceiveDM: true });
-}
 async function handleUserUpdateDMability(userId, update) {
   await firestore.updateUserDMability(userId, update);
 }
@@ -109,9 +108,7 @@ async function handleStreamerAdded(streamer_id) {
 
 async function handleStreamOnline(event) {
   console.log("Stream is online:", event);
-  const streamer = (
-    await twitch.getStreamer(event.broadcaster_user_login.toLowerCase())
-  )[0];
+  const streamer = await twitch.getStreamer(event.broadcaster_user_login.toLowerCase());
   const usersIds = (await firestore.getStreamer(streamer.id))["users"];
   for (const userId of usersIds) {
     const user = await firestore.getUser(userId);

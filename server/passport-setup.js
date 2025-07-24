@@ -1,9 +1,11 @@
+// server/passport-setup.js
 const passport = require("passport");
 const DiscordStrategy = require("passport-discord").Strategy;
 const {
   DISCORD_CLIENT_ID,
   DISCORD_CLIENT_SECRET,
   SERVER_URL,
+  NODE_ENV,
 } = require("./config.js");
 
 passport.serializeUser((user, done) => {
@@ -19,9 +21,9 @@ passport.use(
     {
       clientID: DISCORD_CLIENT_ID,
       clientSecret: DISCORD_CLIENT_SECRET,
-      callbackURL: SERVER_URL.includes("ngrok")
-        ? `http://localhost:3000/api/auth/discord/callback`
-        : `${SERVER_URL}/api/auth/discord/callback`,
+      callbackURL: NODE_ENV === "production"
+        ?`${SERVER_URL}/api/auth/discord/callback`
+        : `http://localhost:3000/api/auth/discord/callback`,
       scope: ["identify"],
     },
     function (accessToken, refreshToken, profile, done) {

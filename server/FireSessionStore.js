@@ -1,3 +1,4 @@
+// server/FireSessionStore.js
 const session = require("express-session");
 
 class FirestoreSessionStore extends session.Store {
