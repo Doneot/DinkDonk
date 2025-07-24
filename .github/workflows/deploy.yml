@@ -2,8 +2,8 @@ name: Deploy Commands to Discord
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "deploy-discord-*"
 
 jobs:
   deploy-commands:
@@ -27,5 +27,5 @@ jobs:
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
-          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }} # Optional
+          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
         run: node deploy-commands.js
