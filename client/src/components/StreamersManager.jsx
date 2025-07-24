@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import api from "../api";
 import StreamerSearch from "./StreamerSearch";
 import SubscribedStreamersList from "./SubscribedStreamersList";
-import { useAuth } from "../context/AuthContext";
 
-const StreamersManager = ({ canReceiveDM , streamers }) => {
+const StreamersManager = ({ canReceiveDM, streamers }) => {
   const [subscribedIds, setSubscribedIds] = useState([]);
   const [streamerData, setStreamerData] = useState({});
   const [infoCache, setInfoCache] = useState({});

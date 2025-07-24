@@ -19,5 +19,5 @@ module.exports = {
   FIREBASE_CLIENT_X509_CERT_URL: process.env.FIREBASE_CLIENT_X509_CERT_URL,
   DISCORD_TOKEN: process.env.DISCORD_TOKEN,
   DISCORD_GUILD_ID: process.env.DISCORD_GUILD_ID,
-  NODE_ENV: process.env.NODE_ENV
+  NODE_ENV: process.env.NODE_ENV,
 };

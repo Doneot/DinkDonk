@@ -5,8 +5,11 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("unsubscribe")
     .setDescription("Unsubscribe from a Twitch streamer")
-    .addStringOption(option =>
-      option.setName("username").setDescription("Twitch username").setRequired(true)
+    .addStringOption((option) =>
+      option
+        .setName("username")
+        .setDescription("Twitch username")
+        .setRequired(true)
     ),
 
   async execute(interaction, context) {
@@ -21,7 +24,7 @@ module.exports = {
       });
     }
 
-    const user= await firestore.getUser(interaction.user.id);
+    const user = await firestore.getUser(interaction.user.id);
     const canReceiveDM = user?.canReceiveDM || false;
     if (!canReceiveDM) {
       return await interaction.reply({
@@ -32,6 +35,10 @@ module.exports = {
 
     const res = await firestore.unsubscribe(interaction.user.id, streamer.id);
 
-    await interaction.reply(res.success ? `✅ Unsubscribed from **${streamer.display_name}**.` : `❌ Cannot unsubscribe from **${streamer.display_name}**. Reason: ${res.reason}`);
+    await interaction.reply(
+      res.success
+        ? `✅ Unsubscribed from **${streamer.display_name}**.`
+        : `❌ Cannot unsubscribe from **${streamer.display_name}**. Reason: ${res.reason}`
+    );
   },
 };

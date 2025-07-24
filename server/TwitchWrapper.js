@@ -79,23 +79,24 @@ class TwitchWrapper extends EventEmitter {
   }
 
   async fetchStreamers(streamerIds) {
-  if (typeof streamerIds === "string") {
-    return this.makeApiCall("users", { id: streamerIds });
-  } else if (Array.isArray(streamerIds)) {
-    const params = new URLSearchParams();
-    for (const id of streamerIds) {
-      params.append("id", id);
+    if (typeof streamerIds === "string") {
+      return this.makeApiCall("users", { id: streamerIds });
+    } else if (Array.isArray(streamerIds)) {
+      const params = new URLSearchParams();
+      for (const id of streamerIds) {
+        params.append("id", id);
+      }
+      return this.makeApiCall("users", params);
+    } else {
+      throw new Error("fetchStreamers expects a string or an array of strings");
     }
-    return this.makeApiCall("users", params);
-  } else {
-    throw new Error("fetchStreamers expects a string or an array of strings");
   }
-}
-
 
   async getStreamer(streamerName) {
-    const res = await this.makeApiCall("users", { login: streamerName.toLowerCase() });
-    if(res.length === 0) {
+    const res = await this.makeApiCall("users", {
+      login: streamerName.toLowerCase(),
+    });
+    if (res.length === 0) {
       console.warn(`Streamer ${streamerName} not found.`);
       return null;
     }

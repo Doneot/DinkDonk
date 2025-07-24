@@ -16,7 +16,7 @@ function isValidString(str) {
 }
 
 class FirestoreWrapper extends EventEmitter {
-  constructor({handleUserChange}) {
+  constructor({ handleUserChange }) {
     super();
     const serviceAccount = {
       type: "service_account",
@@ -36,9 +36,9 @@ class FirestoreWrapper extends EventEmitter {
 
     admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
     this._db = getFirestore();
-    this._db.collection('users').onSnapshot((snapshot) => {
+    this._db.collection("users").onSnapshot((snapshot) => {
       snapshot.docChanges().forEach((change) => {
-        if (change.type === 'modified') {
+        if (change.type === "modified") {
           const updatedUser = change.doc.data();
           const userId = change.doc.id;
           this.handleUserChange(userId, updatedUser);
@@ -170,7 +170,9 @@ class FirestoreWrapper extends EventEmitter {
       }
 
       const streamers = userDoc.data()["streamers"];
-      const alreadySubscribed = streamers.some(s => s["streamer_id"] === streamer_id);
+      const alreadySubscribed = streamers.some(
+        (s) => s["streamer_id"] === streamer_id
+      );
 
       if (alreadySubscribed) {
         const msg = `Streamer [${streamer_id}] is already registered for user [${user_id}]`;
@@ -179,7 +181,10 @@ class FirestoreWrapper extends EventEmitter {
       }
 
       await userRef.update({
-        streamers: admin.firestore.FieldValue.arrayUnion({ streamer_id, notification_message }),
+        streamers: admin.firestore.FieldValue.arrayUnion({
+          streamer_id,
+          notification_message,
+        }),
       });
 
       const streamerRef = this._db.collection("streamers").doc(streamer_id);
@@ -201,7 +206,10 @@ class FirestoreWrapper extends EventEmitter {
 
       return { success: true };
     } catch (error) {
-      console.error(`Error subscribing user [${user_id}] to streamer [${streamer_id}]`, error);
+      console.error(
+        `Error subscribing user [${user_id}] to streamer [${streamer_id}]`,
+        error
+      );
       return { success: false, reason: "exception", error };
     }
   }
@@ -224,7 +232,9 @@ class FirestoreWrapper extends EventEmitter {
       }
 
       const streamers = userDoc.data()["streamers"];
-      const wasSubscribed = streamers.some(s => s["streamer_id"] === streamer_id);
+      const wasSubscribed = streamers.some(
+        (s) => s["streamer_id"] === streamer_id
+      );
 
       await userRef.update({
         streamers: streamers.filter((s) => s["streamer_id"] !== streamer_id),
@@ -322,10 +332,12 @@ class FirestoreWrapper extends EventEmitter {
 
       return { success: true };
     } catch (error) {
-      console.error(`Error setting message for user [${user_id}] and streamer [${streamer_id}]`, error);
+      console.error(
+        `Error setting message for user [${user_id}] and streamer [${streamer_id}]`,
+        error
+      );
       return { success: false, reason: "exception", error };
     }
   }
-
 }
 module.exports = { FirestoreWrapper };

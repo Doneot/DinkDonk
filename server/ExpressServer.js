@@ -68,10 +68,11 @@ class ExpressServer extends EventEmitter {
           err.response?.data || err.message
         );
 
-        if (err === 'invalid_grant') {
-          console.warn("Refresh token invalid or expired. User must re-authenticate.");
+        if (err === "invalid_grant") {
+          console.warn(
+            "Refresh token invalid or expired. User must re-authenticate."
+          );
           await firestore.updateUserTokens(req.user.id, null, null, null);
-          
         }
 
         // Cleanup session and force logout
@@ -79,8 +80,10 @@ class ExpressServer extends EventEmitter {
           req.session.destroy(() => {
             res.clearCookie("connect.sid");
             return res.redirect(
-              NODE_ENV === "production" ?  `${SERVER_URL}` : "http://localhost:5000"
-          );
+              NODE_ENV === "production"
+                ? `${SERVER_URL}`
+                : "http://localhost:5000"
+            );
           });
         });
         return;
@@ -115,7 +118,6 @@ class ExpressServer extends EventEmitter {
     );
     this.app.use(passport.initialize());
     this.app.use(passport.session());
-    
   }
 
   initializeRoutes() {

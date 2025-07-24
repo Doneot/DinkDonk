@@ -5,10 +5,13 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("set-message")
     .setDescription("Set a custom stream notification message")
-    .addStringOption(option =>
-      option.setName("username").setDescription("Twitch username").setRequired(true)
+    .addStringOption((option) =>
+      option
+        .setName("username")
+        .setDescription("Twitch username")
+        .setRequired(true)
     )
-    .addStringOption(option =>
+    .addStringOption((option) =>
       option
         .setName("message")
         .setDescription("Use placeholder like `%s` for streamer name")
@@ -28,7 +31,7 @@ module.exports = {
       });
     }
 
-    const user= await firestore.getUser(interaction.user.id);
+    const user = await firestore.getUser(interaction.user.id);
     const canReceiveDM = user?.canReceiveDM || false;
     if (!canReceiveDM) {
       return await interaction.reply({
@@ -37,8 +40,16 @@ module.exports = {
       });
     }
 
-    const res = await firestore.setMessage(interaction.user.id, streamer.id, notificationMessage);
+    const res = await firestore.setMessage(
+      interaction.user.id,
+      streamer.id,
+      notificationMessage
+    );
 
-    await interaction.reply(res.success ? `✅ Notification message updated for **${streamer.display_name}**.` : `❌ Cannot update message for **${streamer.display_name}**. Reason: ${res.reason}`);
+    await interaction.reply(
+      res.success
+        ? `✅ Notification message updated for **${streamer.display_name}**.`
+        : `❌ Cannot update message for **${streamer.display_name}**. Reason: ${res.reason}`
+    );
   },
 };

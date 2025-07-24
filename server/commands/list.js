@@ -9,7 +9,7 @@ module.exports = {
   async execute(interaction, context) {
     const { firestore, twitch } = context;
 
-    const user= await firestore.getUser(interaction.user.id);
+    const user = await firestore.getUser(interaction.user.id);
     const canReceiveDM = user?.canReceiveDM || false;
     if (!canReceiveDM) {
       return await interaction.reply({
@@ -18,14 +18,16 @@ module.exports = {
       });
     }
 
-    if(!user?.streamers?.length) {
+    if (!user?.streamers?.length) {
       await interaction.reply("📭 You have no subscriptions yet.");
       return;
     }
 
-    const streamers = await twitch.fetchStreamers(user.streamers.map(s => s.streamer_id));
+    const streamers = await twitch.fetchStreamers(
+      user.streamers.map((s) => s.streamer_id)
+    );
 
-    const list = streamers.map(s => s.display_name).join("\n");
+    const list = streamers.map((s) => s.display_name).join("\n");
     await interaction.reply(`📺 Subscribed streamers:\n${list}`);
   },
 };

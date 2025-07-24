@@ -5,11 +5,17 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("subscribe")
     .setDescription("Subscribe to a Twitch streamer")
-    .addStringOption(option =>
-      option.setName("username").setDescription("Twitch username").setRequired(true)
+    .addStringOption((option) =>
+      option
+        .setName("username")
+        .setDescription("Twitch username")
+        .setRequired(true)
     )
-    .addStringOption(option =>
-        option.setName("message").setDescription("Custom notification message").setRequired(false)
+    .addStringOption((option) =>
+      option
+        .setName("message")
+        .setDescription("Custom notification message")
+        .setRequired(false)
     ),
 
   async execute(interaction, context) {
@@ -25,7 +31,7 @@ module.exports = {
       });
     }
 
-    const user= await firestore.getUser(interaction.user.id);
+    const user = await firestore.getUser(interaction.user.id);
     const canReceiveDM = user?.canReceiveDM || false;
     if (!canReceiveDM) {
       return await interaction.reply({
@@ -34,8 +40,16 @@ module.exports = {
       });
     }
 
-    const res = await firestore.subscribe(interaction.user.id, streamer.id, notificationMessage);
+    const res = await firestore.subscribe(
+      interaction.user.id,
+      streamer.id,
+      notificationMessage
+    );
 
-    await interaction.reply(res.success ? `✅ Subscribed to **${streamer.display_name}**!` : `❌ Cannot subscribe to **${streamer.display_name}**. Reason: ${res.reason}`);
+    await interaction.reply(
+      res.success
+        ? `✅ Subscribed to **${streamer.display_name}**!`
+        : `❌ Cannot subscribe to **${streamer.display_name}**. Reason: ${res.reason}`
+    );
   },
 };

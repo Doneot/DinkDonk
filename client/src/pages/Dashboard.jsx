@@ -4,7 +4,6 @@ import StreamersManager from "../components/StreamersManager";
 import DiscordInviteButton from "../components/DiscordInviteButton";
 import CheckDMButton from "../components/CheckDMButton";
 import { useAuth } from "../context/AuthContext";
-import { useState } from "react";
 import api from "../api";
 import { useEffect } from "react";
 import socket from "../socket";
@@ -43,7 +42,7 @@ const Dashboard = () => {
           <StatusCard />
           <BotUsersCard />
           {!user?.canReceiveDM && (
-            <DiscordInviteButton inviteLink="https://discord.com/oauth2/authorize?client_id=1359899857971577124&permissions=0&integration_type=0&scope=bot" />
+            <DiscordInviteButton inviteLink={import.meta.env.VITE_INVITE_URL} />
           )}
           <CheckDMButton
             userId={user.id}
@@ -51,7 +50,10 @@ const Dashboard = () => {
           />
         </div>
         <div className="space-y-6 lg:col-span-2">
-          <StreamersManager canReceiveDM={user?.canReceiveDM} streamers={user?.streamers} />
+          <StreamersManager
+            canReceiveDM={user?.canReceiveDM}
+            streamers={user?.streamers}
+          />
         </div>
       </div>
     </div>
