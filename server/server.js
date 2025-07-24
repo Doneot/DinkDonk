@@ -18,7 +18,7 @@ const firestore = new FirestoreWrapper({
     }
   },
 });
-const botContext = { twitch, firestore};
+const botContext = { twitch, firestore };
 const discord = new DiscordWrapper(
   DISCORD_TOKEN,
   handleUserUpdateDMability,
@@ -108,12 +108,16 @@ async function handleStreamerAdded(streamer_id) {
 
 async function handleStreamOnline(event) {
   console.log("Stream is online:", event);
-  const streamer = await twitch.getStreamer(event.broadcaster_user_login.toLowerCase());
+  const streamer = await twitch.getStreamer(
+    event.broadcaster_user_login.toLowerCase()
+  );
   const usersIds = (await firestore.getStreamer(streamer.id))["users"];
   for (const userId of usersIds) {
     const user = await firestore.getUser(userId);
     if (!user.canReceiveDM) {
-      console.log(`❌ User ${userId} cannot receive DMs, skipping notification`);
+      console.log(
+        `❌ User ${userId} cannot receive DMs, skipping notification`
+      );
       continue;
     }
     const notification_message = await firestore.getMessage(

@@ -11,12 +11,13 @@ import Navbar from "./Navbar";
 import ScrollToTop from "./ScrollToTop";
 
 const Layout = () => {
-
   const location = useLocation();
 
   return (
     <div className="min-h-screen flex flex-col">
-      {location.pathname !== "/" && location.pathname !== "/login" && <Navbar />}
+      {location.pathname !== "/" && location.pathname !== "/login" && (
+        <Navbar />
+      )}
       <ScrollToTop />
 
       <main className="flex-grow">

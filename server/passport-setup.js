@@ -21,9 +21,10 @@ passport.use(
     {
       clientID: DISCORD_CLIENT_ID,
       clientSecret: DISCORD_CLIENT_SECRET,
-      callbackURL: NODE_ENV === "production"
-        ?`${SERVER_URL}/api/auth/discord/callback`
-        : `http://localhost:3000/api/auth/discord/callback`,
+      callbackURL:
+        NODE_ENV === "production"
+          ? `${SERVER_URL}/api/auth/discord/callback`
+          : `http://localhost:3000/api/auth/discord/callback`,
       scope: ["identify"],
     },
     function (accessToken, refreshToken, profile, done) {

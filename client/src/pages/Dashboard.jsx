@@ -51,11 +51,10 @@ const Dashboard = () => {
           />
         </div>
         <div className="space-y-6 lg:col-span-2">
-<<<<<<< Updated upstream
-          <StreamersManager canReceiveDM={user?.canReceiveDM} />
-=======
-          <StreamersManager canReceiveDM={user?.canReceiveDM} streamers={user?.streamers} />
->>>>>>> Stashed changes
+          <StreamersManager
+            canReceiveDM={user?.canReceiveDM}
+            streamers={user?.streamers}
+          />
         </div>
       </div>
     </div>

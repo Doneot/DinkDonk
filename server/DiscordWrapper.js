@@ -5,7 +5,7 @@ const {
   Events,
   Partials,
   Collection,
-  MessageFlags
+  MessageFlags,
 } = require("discord.js");
 const fs = require("node:fs");
 
@@ -27,7 +27,9 @@ class DiscordWrapper {
 
     this.bot.commands = new Collection();
 
-    const commandFiles = fs.readdirSync("./commands").filter(file => file.endsWith(".js"));
+    const commandFiles = fs
+      .readdirSync("./commands")
+      .filter((file) => file.endsWith(".js"));
     for (const file of commandFiles) {
       const command = require(`./commands/${file}`);
       this.bot.commands.set(command.data.name, command);
@@ -37,7 +39,7 @@ class DiscordWrapper {
       console.log(`🤖 Logged in as ${this.bot.user.tag}`);
     });
 
-    this.bot.on(Events.InteractionCreate, async interaction => {
+    this.bot.on(Events.InteractionCreate, async (interaction) => {
       if (!interaction.isChatInputCommand()) return;
 
       const command = this.bot.commands.get(interaction.commandName);
@@ -47,7 +49,10 @@ class DiscordWrapper {
         await command.execute(interaction, this.context);
       } catch (error) {
         console.error(error);
-        await interaction.reply({ content: "There was an error!", flags: MessageFlags.Ephemeral });
+        await interaction.reply({
+          content: "There was an error!",
+          flags: MessageFlags.Ephemeral,
+        });
       }
     });
 
@@ -78,14 +83,20 @@ class DiscordWrapper {
       const channel = await user.createDM();
 
       await channel.send({
-        content: `${notification_message.replace(/%s/g, streamer.display_name)}\nhttps://www.twitch.tv/${streamer.login}`
+        content: `${notification_message.replace(
+          /%s/g,
+          streamer.display_name
+        )}\nhttps://www.twitch.tv/${streamer.login}`,
       });
     } catch (err) {
       if (err.code === 50007) {
         this.handleUserUpdateDMability(user_id, false);
         return;
       }
-      console.error(`❌ Could not notify user ${user_id} about streamer ${streamer.display_name}:`, err);
+      console.error(
+        `❌ Could not notify user ${user_id} about streamer ${streamer.display_name}:`,
+        err
+      );
     }
   }
 }
