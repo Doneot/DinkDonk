@@ -4,7 +4,11 @@ import StreamerSearch from "./StreamerSearch";
 import SubscribedStreamersList from "./SubscribedStreamersList";
 import { useAuth } from "../context/AuthContext";
 
+<<<<<<< Updated upstream
 const StreamersManager = ({ canReceiveDM }) => {
+=======
+const StreamersManager = ({ canReceiveDM , streamers }) => {
+>>>>>>> Stashed changes
   const [subscribedIds, setSubscribedIds] = useState([]);
   const [streamerData, setStreamerData] = useState({});
   const [infoCache, setInfoCache] = useState({});
@@ -18,7 +22,11 @@ const StreamersManager = ({ canReceiveDM }) => {
         setSubscribedIds(res.data.map((streamer) => streamer.streamer_id));
       })
       .catch((err) => console.error("Failed to fetch subscriptions", err));
+<<<<<<< Updated upstream
   }, []);
+=======
+  }, [streamers]);
+>>>>>>> Stashed changes
 
   // Fetch info and messages for each subscribed streamer
   useEffect(() => {

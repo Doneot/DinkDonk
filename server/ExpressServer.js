@@ -250,7 +250,11 @@ class ExpressServer extends EventEmitter {
       fetchTime
     );
     res.redirect(
+<<<<<<< Updated upstream
       NODE_ENV
+=======
+      NODE_ENV === "production"
+>>>>>>> Stashed changes
         ? `${SERVER_URL}/dashboard`
         : "http://localhost:5000/dashboard"
     );
@@ -346,7 +350,11 @@ class ExpressServer extends EventEmitter {
 
   async getStreamerInfo({ query: { id } }, res) {
     const [{ display_name, profile_image_url }] =
+<<<<<<< Updated upstream
       await this.twitch.fetchsStreamer(id);
+=======
+      await this.twitch.fetchStreamers(id);
+>>>>>>> Stashed changes
     res.json({ display_name, avatar: profile_image_url });
   }
 
