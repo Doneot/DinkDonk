@@ -161,7 +161,10 @@ class TwitchWrapper extends EventEmitter {
   }
 
   async unsubscribeAllEvents() {
-    const subscriptions = await this.getSubscriptions();
+    const subscriptions = (await this.getSubscriptions()).filter((sub) =>
+      sub.transport.callback.includes(SERVER_URL)
+    );
+
     return Promise.all(
       subscriptions.map(
         async (subscription) => await this.unsubscribeEvent(subscription["id"])
