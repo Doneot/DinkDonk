@@ -5,26 +5,13 @@ import DiscordInviteButton from "../components/DiscordInviteButton";
 import CheckDMButton from "../components/CheckDMButton";
 import { useAuth } from "../context/AuthContext";
 import api from "../api";
-import { useEffect } from "react";
-import socket from "../socket";
+import { useSocket } from "../hooks/useSocket";
 
 const Dashboard = () => {
   const { user, setUser } = useAuth();
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    socket.emit("register_user", user.id);
-
-    socket.on("user_data_updated", (updatedUser) => {
-      console.log("🔁 Got updated user data:", updatedUser);
-      setUser((prev) => ({ ...prev, ...updatedUser }));
-    });
-
-    return () => {
-      socket.off("user_data_updated");
-    };
-  }, [user?.id]);
+  useSocket(user, (updatedUser) => {
+    setUser((prev) => ({ ...prev, ...updatedUser }));
+  });
 
   const checkIfUserCanReceiveDM = async () => {
     try {

@@ -40,21 +40,26 @@ const io = socketIo(httpServer, {
 const connectedClients = new Map(); // userId => Set<socket>
 
 io.on("connection", (socket) => {
-  console.log("⚡ Client connected");
+  console.log(socket.handshake.auth);
+  const userId = socket.handshake.auth.userId;
+  socket.userId = userId;
 
-  socket.on("register_user", (userId) => {
-    if (!connectedClients.has(userId)) {
-      connectedClients.set(userId, new Set());
-    }
-    connectedClients.get(userId).add(socket);
-    socket.userId = userId;
-    console.log(`📥 Registered user ${userId} to socket`);
-  });
+  if (!userId) {
+    console.log("⚠️ Connection rejected: no userId provided");
+    socket.disconnect(true); // force disconnect unregistered socket
+    return;
+  }
+
+  console.log(`⚡ Client connected as user ${userId}`);
+
+  if (!connectedClients.has(userId)) {
+    connectedClients.set(userId, new Set());
+  }
+  connectedClients.get(userId).add(socket);
 
   socket.on("disconnect", () => {
-    const userId = socket.userId;
-    if (userId && connectedClients.has(userId)) {
-      const userSockets = connectedClients.get(userId);
+    const userSockets = connectedClients.get(userId);
+    if (userSockets) {
       userSockets.delete(socket);
       if (userSockets.size === 0) {
         connectedClients.delete(userId);
