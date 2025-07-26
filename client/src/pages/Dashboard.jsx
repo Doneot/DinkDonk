@@ -4,14 +4,11 @@ import StreamersManager from "../components/StreamersManager";
 import DiscordInviteButton from "../components/DiscordInviteButton";
 import CheckDMButton from "../components/CheckDMButton";
 import { useAuth } from "../context/AuthContext";
+import { useSocket } from "../context/SocketContext";
 import api from "../api";
-import { useSocket } from "../hooks/useSocket";
 
 const Dashboard = () => {
-  const { user, setUser } = useAuth();
-  useSocket(user, (updatedUser) => {
-    setUser((prev) => ({ ...prev, ...updatedUser }));
-  });
+  const { user } = useAuth();
 
   const checkIfUserCanReceiveDM = async () => {
     try {
