@@ -4,7 +4,6 @@ import StreamersManager from "../components/StreamersManager";
 import DiscordInviteButton from "../components/DiscordInviteButton";
 import CheckDMButton from "../components/CheckDMButton";
 import { useAuth } from "../context/AuthContext";
-import { useSocket } from "../context/SocketContext";
 import api from "../api";
 
 const Dashboard = () => {
