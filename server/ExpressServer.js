@@ -6,6 +6,7 @@ const express = require("express");
 const session = require("express-session");
 const passport = require("passport");
 const DiscordStrategy = require("passport-discord").Strategy;
+const refresh = require("passport-oauth2-refresh");
 const cors = require("cors");
 const path = require("path");
 const EventEmitter = require("events");
@@ -19,7 +20,6 @@ const {
   NODE_ENV,
 } = require("./config");
 const FirestoreSessionStore = require("./FireSessionStore");
-const { access } = require("fs");
 
 class ExpressServer extends EventEmitter {
   constructor({ twitch, firestore, discord }) {
@@ -30,6 +30,7 @@ class ExpressServer extends EventEmitter {
     this.firestore = firestore;
     this.port = BACKEND_PORT;
     this.secret = TWITCH_WEBHOOK_SECRET;
+    this.tokenRefreshLocks = {}; // key: userId, value: Promise
 
     this.initializePassport();
     this.initializeMiddlewares();
@@ -45,7 +46,6 @@ class ExpressServer extends EventEmitter {
     res.redirect("/");
   }
 
-  // Middleware to ensure the Discord token is fresh
   async ensureFreshToken(req, res, next) {
     const userId = req.user?.id;
     if (!userId) return res.redirect("/");
@@ -54,22 +54,53 @@ class ExpressServer extends EventEmitter {
       const user = await this.firestore.getUser(userId);
       if (!user) return res.redirect("/api/auth/discord");
 
-      const { accessToken, refreshToken, fetchTime } = user;
+      let { accessToken, refreshToken, fetchTime } = user;
 
       if (!accessToken || !refreshToken) {
         return res.redirect("/api/auth/discord");
       }
 
       const tokenAge = Date.now() - (fetchTime || 0);
-      if (tokenAge > 55 * 60 * 1000) {
-        // Refresh
-        const newTokens = await this.refreshDiscordToken(refreshToken);
+      const MAX_TOKEN_AGE = 6 * 24 * 60 * 60 * 1000; // 6 days
+      if (tokenAge > MAX_TOKEN_AGE) {
+        if (!this.tokenRefreshLocks[userId]) {
+          this.tokenRefreshLocks[userId] = (async () => {
+            try {
+              const newTokens = await new Promise((resolve, reject) => {
+                refresh.requestNewAccessToken(
+                  "discord",
+                  refreshToken,
+                  (err, newAccessToken, newRefreshToken) => {
+                    if (err) return reject(err);
+                    resolve({
+                      accessToken: newAccessToken,
+                      refreshToken: newRefreshToken || refreshToken,
+                    });
+                  }
+                );
+              });
 
-        await this.firestore.addOrUpdateUser(userId, {
-          accessToken: newTokens.access_token,
-          refreshToken: newTokens.refresh_token || refreshToken,
-          fetchTime: Date.now(),
-        });
+              await this.firestore.addOrUpdateUser(userId, {
+                ...newTokens,
+                fetchTime: Date.now(),
+              });
+
+              console.log(`🔄 Refreshed tokens for ${userId}`);
+              return newTokens;
+            } catch (err) {
+              console.error("Error refreshing token:", err);
+              throw err;
+            } finally {
+              delete this.tokenRefreshLocks[userId]; // Cleanup lock
+            }
+          })();
+        }
+
+        try {
+          await this.tokenRefreshLocks[userId]; // Wait for refresh to finish
+        } catch (err) {
+          return res.redirect("/api/auth/discord");
+        }
       }
 
       next();
@@ -107,44 +138,43 @@ class ExpressServer extends EventEmitter {
         done(err, null);
       }
     });
+    const ctx = this; // Capture context for use in strategy callback
+    this.strategy = new DiscordStrategy(
+      {
+        clientID: DISCORD_CLIENT_ID,
+        clientSecret: DISCORD_CLIENT_SECRET,
+        callbackURL:
+          NODE_ENV === "production"
+            ? `${SERVER_URL}/api/auth/discord/callback`
+            : `http://localhost:3000/api/auth/discord/callback`,
+        scope: ["identify"],
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        const fetchTime = Date.now();
+        const userData = {
+          id: profile.id,
+          username: profile.username,
+          discriminator: profile.discriminator,
+          avatar: profile.avatar,
+          accessToken,
+          refreshToken,
+          fetchTime,
+        };
 
-    passport.use(
-      new DiscordStrategy(
-        {
-          clientID: DISCORD_CLIENT_ID,
-          clientSecret: DISCORD_CLIENT_SECRET,
-          callbackURL:
-            NODE_ENV === "production"
-              ? `${SERVER_URL}/api/auth/discord/callback`
-              : `http://localhost:3000/api/auth/discord/callback`,
-          scope: ["identify"],
-        },
-        // Use arrow function here to capture `this` from the class
-        async (accessToken, refreshToken, profile, done) => {
-          const fetchTime = Date.now();
-          const userData = {
-            id: profile.id,
-            username: profile.username,
-            discriminator: profile.discriminator,
-            avatar: profile.avatar,
-            accessToken,
-            refreshToken,
-            fetchTime,
-          };
-
-          try {
-            await this.firestore.addOrUpdateUser(profile.id, userData);
-            return done(null, userData);
-          } catch (error) {
-            console.error("Error in DiscordStrategy:", error);
-            return done(error);
-          }
+        try {
+          await ctx.firestore.addOrUpdateUser(profile.id, userData);
+          return done(null, userData);
+        } catch (error) {
+          console.error("Error in DiscordStrategy:", error);
+          return done(error);
         }
-      )
+      }
     );
+    passport.use(this.strategy);
     DiscordStrategy.prototype.authorizationParams = function (options) {
       return { prompt: "none" };
     };
+    refresh.use(this.strategy);
   }
 
   initializeMiddlewares() {
@@ -263,29 +293,6 @@ class ExpressServer extends EventEmitter {
       express.raw({ type: "application/json" }),
       this.handleRequest.bind(this)
     );
-  }
-
-  async refreshDiscordToken(refresh_token) {
-    const data = {
-      client_id: DISCORD_CLIENT_ID,
-      client_secret: DISCORD_CLIENT_SECRET,
-      grant_type: "refresh_token",
-      refresh_token,
-      redirect_uri: `${SERVER_URL}/api/auth/discord/callback`,
-      scope: "identify",
-    };
-
-    const response = await axios.post(
-      "https://discord.com/api/oauth2/token",
-      querystring.stringify(data),
-      {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      }
-    );
-
-    return response.data;
   }
 
   async handleDiscordCallback(req, res) {
