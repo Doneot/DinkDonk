@@ -40,7 +40,6 @@ const io = socketIo(httpServer, {
 const connectedClients = new Map(); // userId => Set<socket>
 
 io.on("connection", (socket) => {
-  console.log(socket.handshake.auth);
   const userId = socket.handshake.auth.userId;
   socket.userId = userId;
 
