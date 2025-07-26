@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const express = require("express");
 const session = require("express-session");
 const passport = require("passport");
+const DiscordStrategy = require("passport-discord").Strategy;
 const cors = require("cors");
 const path = require("path");
 const EventEmitter = require("events");
@@ -17,19 +18,20 @@ const {
   DISCORD_CLIENT_SECRET,
   NODE_ENV,
 } = require("./config");
-require("./passport-setup");
 const FirestoreSessionStore = require("./FireSessionStore");
+const { access } = require("fs");
 
 class ExpressServer extends EventEmitter {
-  constructor(discordClient, twitch, firestore) {
+  constructor({ twitch, firestore, discord }) {
     super();
     this.app = express();
-    this.discord = discordClient;
+    this.discord = discord;
     this.twitch = twitch;
     this.firestore = firestore;
     this.port = BACKEND_PORT;
     this.secret = TWITCH_WEBHOOK_SECRET;
 
+    this.initializePassport();
     this.initializeMiddlewares();
     this.initializeRoutes();
   }
@@ -45,52 +47,104 @@ class ExpressServer extends EventEmitter {
 
   // Middleware to ensure the Discord token is fresh
   async ensureFreshToken(req, res, next) {
-    const user = await this.firestore.getUser(req.user.id);
-    const tokenAge = Date.now() - user.fetchTime;
+    const userId = req.user?.id;
+    if (!userId) return res.redirect("/");
 
-    if (tokenAge > 55 * 60 * 1000) {
-      try {
-        const newTokens = await this.refreshDiscordToken(user.refreshToken);
+    try {
+      const user = await this.firestore.getUser(userId);
+      if (!user) return res.redirect("/api/auth/discord");
 
-        user.accessToken = newTokens.access_token;
-        user.refreshToken = newTokens.refresh_token || user.refreshToken;
-        user.fetchTime = Date.now();
+      const { accessToken, refreshToken, fetchTime } = user;
 
-        await this.firestore.updateUserTokens(
-          req.user.id,
-          user.accessToken,
-          user.refreshToken,
-          user.fetchTime
-        );
-      } catch (err) {
-        console.error(
-          "[OAuth2] Failed to refresh token:",
-          err.response?.data || err.message
-        );
-
-        if (err === "invalid_grant") {
-          console.warn(
-            "Refresh token invalid or expired. User must re-authenticate."
-          );
-          await firestore.updateUserTokens(req.user.id, null, null, null);
-        }
-
-        // Cleanup session and force logout
-        req.logout(() => {
-          req.session.destroy(() => {
-            res.clearCookie("connect.sid");
-            return res.redirect(
-              NODE_ENV === "production"
-                ? `${SERVER_URL}`
-                : "http://localhost:5000"
-            );
-          });
-        });
-        return;
+      if (!accessToken || !refreshToken) {
+        return res.redirect("/api/auth/discord");
       }
-    }
 
-    next();
+      const tokenAge = Date.now() - (fetchTime || 0);
+      if (tokenAge > 55 * 60 * 1000) {
+        // Refresh
+        const newTokens = await this.refreshDiscordToken(refreshToken);
+
+        await this.firestore.addOrUpdateUser(userId, {
+          accessToken: newTokens.access_token,
+          refreshToken: newTokens.refresh_token || refreshToken,
+          fetchTime: Date.now(),
+        });
+      }
+
+      next();
+    } catch (err) {
+      console.error("Token check/refresh failed:", err);
+
+      req.logout(() => {
+        req.session.destroy(() => {
+          res.clearCookie("connect.sid");
+          return res.redirect(
+            NODE_ENV === "production" ? SERVER_URL : "http://localhost:5000"
+          );
+        });
+      });
+    }
+  }
+
+  initializePassport() {
+    passport.serializeUser((user, done) => {
+      done(null, user);
+    });
+
+    passport.deserializeUser(async ({ id }, done) => {
+      try {
+        const user = await this.firestore.getUser(id);
+        if (!user) return done(null, null);
+
+        // Optionally check if token is still valid, or refresh it
+        done(null, {
+          ...user,
+          id,
+        });
+      } catch (err) {
+        console.error("Error in deserializeUser:", err);
+        done(err, null);
+      }
+    });
+
+    passport.use(
+      new DiscordStrategy(
+        {
+          clientID: DISCORD_CLIENT_ID,
+          clientSecret: DISCORD_CLIENT_SECRET,
+          callbackURL:
+            NODE_ENV === "production"
+              ? `${SERVER_URL}/api/auth/discord/callback`
+              : `http://localhost:3000/api/auth/discord/callback`,
+          scope: ["identify"],
+        },
+        // Use arrow function here to capture `this` from the class
+        async (accessToken, refreshToken, profile, done) => {
+          const fetchTime = Date.now();
+          const userData = {
+            id: profile.id,
+            username: profile.username,
+            discriminator: profile.discriminator,
+            avatar: profile.avatar,
+            accessToken,
+            refreshToken,
+            fetchTime,
+          };
+
+          try {
+            await this.firestore.addOrUpdateUser(profile.id, userData);
+            return done(null, userData);
+          } catch (error) {
+            console.error("Error in DiscordStrategy:", error);
+            return done(error);
+          }
+        }
+      )
+    );
+    DiscordStrategy.prototype.authorizationParams = function (options) {
+      return { prompt: "none" };
+    };
   }
 
   initializeMiddlewares() {
@@ -235,22 +289,15 @@ class ExpressServer extends EventEmitter {
   }
 
   async handleDiscordCallback(req, res) {
-    const { id, accessToken, refreshToken, fetchTime } = req.user;
-    let user = await this.firestore.getUser(id);
+    let user = await this.firestore.getUser(req.user.id);
     if (!user) {
-      await this.firestore.addUser(id);
-      const canReceiveDM = await this.discord.canSendDM(id);
-      await this.firestore.updateUserDMability(id, canReceiveDM);
+      const canReceiveDM = await this.discord.canSendDM(req.user.id);
+      await this.firestore.addOrUpdateUser(req.user.id, { canReceiveDM });
       req.session.canReceiveDM = canReceiveDM;
     } else {
       req.session.canReceiveDM = user.canReceiveDM;
     }
-    await this.firestore.updateUserTokens(
-      id,
-      accessToken,
-      refreshToken,
-      fetchTime
-    );
+
     res.redirect(
       NODE_ENV === "production"
         ? `${SERVER_URL}/dashboard`
@@ -293,7 +340,7 @@ class ExpressServer extends EventEmitter {
 
   async canUserReceiveDM(req, res) {
     const canReceiveDM = await this.discord.canSendDM(req.user.id);
-    await this.firestore.updateUserDMability(req.user.id, canReceiveDM);
+    await this.firestore.addOrUpdateUser(req.user.id, { canReceiveDM });
     req.session.canReceiveDM = canReceiveDM; // Update session
     res.json({ canReceiveDM });
   }

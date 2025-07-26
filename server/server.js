@@ -1,6 +1,7 @@
 // server/server.js
 const http = require("http");
 const socketIo = require("socket.io");
+const readline = require("readline");
 const { ExpressServer } = require("./ExpressServer");
 const { TwitchWrapper } = require("./TwitchWrapper");
 const { FirestoreWrapper } = require("./FirestoreWrapper");
@@ -18,13 +19,14 @@ const firestore = new FirestoreWrapper({
     }
   },
 });
-const botContext = { twitch, firestore };
+let botContext = { twitch, firestore };
 const discord = new DiscordWrapper(
   DISCORD_TOKEN,
   handleUserUpdateDMability,
   botContext
 );
-const server = new ExpressServer(discord, twitch, firestore);
+botContext.discord = discord;
+const server = new ExpressServer(botContext);
 
 const httpServer = http.createServer();
 const io = socketIo(httpServer, {
@@ -97,7 +99,7 @@ async function subscribeToStreamers() {
 }
 
 async function handleUserUpdateDMability(userId, update) {
-  await firestore.updateUserDMability(userId, update);
+  await firestore.addOrUpdateUser(userId, { canReceiveDM: update });
 }
 
 async function handleStreamerAdded(streamer_id) {
@@ -128,9 +130,13 @@ async function handleStreamOnline(event) {
   }
 }
 
-process.on("SIGINT", async () => {
-  console.log("Terminating script...");
-  await twitch.unsubscribeAllEvents();
-  await io.close();
-  process.exit();
+["SIGINT", "SIGTERM"].forEach((signal) => {
+  process.on(signal, async () => {
+    readline.clearLine(process.stdout, 0);
+    readline.cursorTo(process.stdout, 0);
+    console.log("Terminating script...");
+    await twitch.unsubscribeAllEvents();
+    await io.close();
+    process.exit();
+  });
 });

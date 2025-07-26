@@ -101,44 +101,31 @@ class FirestoreWrapper extends EventEmitter {
     }
   }
 
-  async addUser(user_id) {
+  async addOrUpdateUser(user_id, userData = {}) {
     if (!isValidString(user_id)) {
       console.error(`Invalid user_id: [${user_id}]`);
       return;
     }
-    try {
-      await this._db
-        .collection("users")
-        .doc(user_id)
-        .set({ user_id, canReceiveDM: false, streamers: [] });
-    } catch (error) {
-      console.error("Error adding user:", error);
-    }
-  }
 
-  async updateUserDMability(user_id, canReceiveDM) {
-    if (!isValidString(user_id)) {
-      console.error(`Invalid user_id: [${user_id}]`);
-      return;
-    }
     try {
       const userRef = this._db.collection("users").doc(user_id);
-      await userRef.update({ canReceiveDM });
-    } catch (error) {
-      console.error("Error updating user:", user_id, error);
-    }
-  }
+      const userDoc = await userRef.get();
 
-  async updateUserTokens(user_id, access_token, refresh_token, fetchTime) {
-    if (!isValidString(user_id)) {
-      console.error(`Invalid user_id: [${user_id}]`);
-      return;
-    }
-    try {
-      const userRef = this._db.collection("users").doc(user_id);
-      await userRef.update({ access_token, refresh_token, fetchTime });
+      if (userDoc.exists) {
+        await userRef.update(userData);
+      } else {
+        await userRef.set(
+          {
+            user_id,
+            canReceiveDM: false,
+            streamers: [],
+            ...userData,
+          },
+          { merge: true }
+        );
+      }
     } catch (error) {
-      console.error("Error updating user:", user_id, error);
+      console.error("Error adding/updating user:", error);
     }
   }
 
@@ -165,7 +152,7 @@ class FirestoreWrapper extends EventEmitter {
       const userRef = this._db.collection("users").doc(user_id);
       let userDoc = await userRef.get();
       if (!userDoc.exists) {
-        await this.addUser(user_id);
+        await this.addOrUpdateUser(user_id);
         userDoc = await userRef.get();
       }
 
