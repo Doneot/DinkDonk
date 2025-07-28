@@ -20,4 +20,5 @@ module.exports = {
   DISCORD_TOKEN: process.env.DISCORD_TOKEN,
   DISCORD_GUILD_ID: process.env.DISCORD_GUILD_ID,
   NODE_ENV: process.env.NODE_ENV,
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
 };
