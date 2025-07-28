@@ -17,22 +17,32 @@ class TwitchWrapper extends EventEmitter {
       "Content-Type": "application/json",
     };
     this._token = {};
-    this.initTokenInterval().then(() => {
-      this.emit("ready");
-      this.ready = true;
-    });
+    this.init();
   }
 
-  async initTokenInterval() {
+  async init() {
     await this._getAccessToken();
-    //  refresh token 5 minutes before it expires
-    this._tokenRefreshTime = Date.now() + (this._token.expires_in - 300) * 1000;
-    this._intervalId = setInterval(() => {
+    this.ready = true;
+    this.emit("ready");
+
+    this._startTokenRefreshLoop(); // Starts the refresh interval
+  }
+
+  _startTokenRefreshLoop() {
+    if (this._intervalId) clearInterval(this._intervalId);
+
+    const intervalTime = 60 * 1000; // check every 60 seconds
+    this._intervalId = setInterval(async () => {
       if (Date.now() >= this._tokenRefreshTime) {
-        clearInterval(this._intervalId);
-        this._getAccessToken();
+        try {
+          await this._getAccessToken();
+          console.log("🔄 Token refreshed — checking subscriptions...");
+          this.emit("tokenRefreshed");
+        } catch (err) {
+          console.error("Failed to refresh token or resubscribe:", err);
+        }
       }
-    }, 60 * 1000);
+    }, intervalTime);
   }
 
   async makeApiCall(endpoint, params = {}, headers = {}, method = "GET") {
@@ -75,6 +85,8 @@ class TwitchWrapper extends EventEmitter {
       expires_in: res.data.expires_in,
     };
     this._headers.Authorization = `Bearer ${this._token.access_token}`;
+
+    this._tokenRefreshTime = Date.now() + (this._token.expires_in - 300) * 1000;
     return this._token;
   }
 

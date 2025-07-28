@@ -91,6 +91,10 @@ async function handleServerReady() {
       await subscribeToStreamers();
     });
   }
+  twitch.on("tokenRefreshed", async () => {
+    await twitch.unsubscribeAllEvents();
+    await subscribeToStreamers();
+  });
 }
 
 async function subscribeToStreamers() {
