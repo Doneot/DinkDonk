@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../api";
 import StreamerSearch from "./StreamerSearch";
 import SubscribedStreamersList from "./SubscribedStreamersList";
@@ -8,6 +8,10 @@ const StreamersManager = ({ canReceiveDM, streamers }) => {
   const [streamerData, setStreamerData] = useState({});
   const [infoCache, setInfoCache] = useState({});
   const [dirtyMessages, setDirtyMessages] = useState({});
+  const [editingStreamerIds, setEditingStreamerIds] = useState(new Set());
+
+  const saveTimeouts = useRef({});
+  const stopEditTimeouts = useRef({});
 
   // Fetch subscribed streamer IDs on mount
   useEffect(() => {
@@ -37,7 +41,7 @@ const StreamersManager = ({ canReceiveDM, streamers }) => {
             [id]: {
               ...infoCache[id],
               isSubscribed: true,
-              message,
+              message: editingStreamerIds.has(id) ? prev[id]?.message : message,
             },
           }));
         } catch (err) {
@@ -74,21 +78,21 @@ const StreamersManager = ({ canReceiveDM, streamers }) => {
           [id]: {
             ...formattedInfo,
             isSubscribed: true,
-            message,
+            message: editingStreamerIds.has(id) ? prev[id]?.message : message,
           },
         }));
       } catch (err) {
         console.error(`Failed to fetch info or message for ${id}`, err);
       }
     });
-  }, [subscribedIds, infoCache]);
+  }, [subscribedIds, infoCache, editingStreamerIds]);
 
-  // Debounced syncing only for dirty messages
+  // Debounced syncing & editing cleanup
   useEffect(() => {
-    const timeouts = [];
-
     Object.entries(dirtyMessages).forEach(([id, message]) => {
-      const timeout = setTimeout(() => {
+      // Debounce save
+      clearTimeout(saveTimeouts.current[id]);
+      saveTimeouts.current[id] = setTimeout(() => {
         api
           .post("/streamers/set-message", {
             streamer_id: id,
@@ -106,14 +110,21 @@ const StreamersManager = ({ canReceiveDM, streamers }) => {
           });
       }, 600);
 
-      timeouts.push(timeout);
+      // Debounce stop-editing
+      clearTimeout(stopEditTimeouts.current[id]);
+      stopEditTimeouts.current[id] = setTimeout(() => {
+        setEditingStreamerIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 2000);
     });
-
-    return () => timeouts.forEach(clearTimeout);
   }, [dirtyMessages]);
 
   const handleMessageChange = (id, msg) => {
     setDirtyMessages((prev) => ({ ...prev, [id]: msg }));
+
     setStreamerData((prev) => ({
       ...prev,
       [id]: {
@@ -121,6 +132,12 @@ const StreamersManager = ({ canReceiveDM, streamers }) => {
         message: msg,
       },
     }));
+
+    setEditingStreamerIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
   };
 
   const handleUnsubscribe = (id) => {
