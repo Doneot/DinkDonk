@@ -46,7 +46,7 @@ const SubscribedStreamersList = ({
                   disabled={disabled}
                 />
                 <button
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-75 ${
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition duration-200 cursor-pointer focus:outline-none disabled:cursor-not-allowed disabled:opacity-75 ${
                     s.isSubscribed
                       ? disabled
                         ? "bg-gray-300 text-gray-700"
