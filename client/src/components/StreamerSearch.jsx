@@ -82,11 +82,13 @@ const StreamerSearch = ({ subscribedIds, setSubscribedIds, disabled }) => {
   return (
     <div
       ref={wrapperRef}
-      className="p-6 bg-white rounded-xl shadow-lg mt-6 w-full max-w-xl mx-auto relative"
+      className="p-4 sm:p-6 bg-white rounded-xl shadow-lg mt-6 w-full max-w-full sm:max-w-xl mx-auto relative"
     >
-      <h2 className="text-xl font-semibold mb-4 text-gray-700">
+      <h2 className="text-lg sm:text-xl font-semibold mb-4 text-gray-700">
         Search Streamers
       </h2>
+
+      {/* Search Input */}
       <input
         className={`border border-gray-300 rounded-lg p-3 w-full focus:ring-indigo-500 focus:border-indigo-500 transition duration-200 text-black ${
           disabled ? "bg-gray-200 cursor-not-allowed text-gray-500" : "bg-white"
@@ -103,23 +105,25 @@ const StreamerSearch = ({ subscribedIds, setSubscribedIds, disabled }) => {
         disabled={disabled}
       />
 
+      {/* Dropdown suggestions */}
       {isFocused && suggestions.length > 0 && (
-        <ul className="absolute z-50 left-0 mt-2 bg-white border rounded-lg shadow-md max-h-60 overflow-y-auto w-full">
+        <ul className="absolute z-50 left-0 mt-2 bg-white border rounded-lg shadow-md max-h-60 overflow-y-auto w-full max-w-full">
           {suggestions.map((s, index) => {
             const isSubscribed = subscribedIds.includes(s.streamer_id);
 
             return (
               <li
                 key={s.streamer_id}
-                className={`flex items-center justify-between gap-3 p-3 cursor-pointer transition ${
+                className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 cursor-pointer transition ${
                   highlightIndex === index
                     ? "bg-indigo-100"
                     : "hover:bg-gray-100"
                 }`}
                 onMouseEnter={() => setHighlightIndex(index)}
               >
+                {/* Streamer info */}
                 <div
-                  className="flex items-center gap-3"
+                  className="flex items-center gap-3 w-full sm:w-auto"
                   onClick={() => {
                     setSearch(s.name);
                     setSuggestions([]);
@@ -131,15 +135,17 @@ const StreamerSearch = ({ subscribedIds, setSubscribedIds, disabled }) => {
                     alt={s.name}
                     className="w-8 h-8 rounded-full"
                   />
-                  <span className="text-gray-700">{s.name}</span>
+                  <span className="text-gray-700 truncate">{s.name}</span>
                 </div>
+
+                {/* Subscribe/Status */}
                 {isSubscribed ? (
                   <span className="text-sm text-green-600 font-medium">
                     Subscribed
                   </span>
                 ) : (
                   <button
-                    className="text-sm bg-indigo-500 text-white px-3 py-1 cursor-pointer rounded hover:bg-indigo-400 transition"
+                    className="text-sm bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-400 transition w-full sm:w-auto"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleSubscribe(s);

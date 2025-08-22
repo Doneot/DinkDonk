@@ -19,9 +19,10 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="p-8 bg-gray-100 min-h-screen">
-      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        <div className="space-y-6 my-10 space-x-5">
+    <div className="p-4 sm:p-6 lg:p-8 bg-gray-100 min-h-screen">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        {/* Left column */}
+        <div className="space-y-6 my-6 lg:my-10">
           <StatusCard />
           <BotUsersCard />
           {!user?.canReceiveDM && (
@@ -32,6 +33,8 @@ const Dashboard = () => {
             checkDMFunction={checkIfUserCanReceiveDM}
           />
         </div>
+
+        {/* Right column */}
         <div className="space-y-6 lg:col-span-2">
           <StreamersManager
             canReceiveDM={user?.canReceiveDM}
