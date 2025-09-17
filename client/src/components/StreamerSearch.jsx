@@ -145,7 +145,7 @@ const StreamerSearch = ({ subscribedIds, setSubscribedIds, disabled }) => {
                   </span>
                 ) : (
                   <button
-                    className="text-sm bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-400 transition w-full sm:w-auto"
+                    className="text-sm bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-400 cursor-pointer transition w-full sm:w-auto"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleSubscribe(s);
