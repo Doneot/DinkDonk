@@ -141,6 +141,17 @@ class FirestoreWrapper extends EventEmitter {
     }
   }
 
+  async deleteStreamer(streamer_id) {
+    if (!isValidString(streamer_id)) return;
+
+    try {
+      await this._db.collection("streamers").doc(streamer_id).delete();
+      console.log(`🗑️ Deleted streamer doc [${streamer_id}]`);
+    } catch (err) {
+      console.error(`Failed to delete streamer [${streamer_id}]`, err);
+    }
+  }
+
   async subscribe(user_id, streamer_id, notification_message = "") {
     if (!isValidString(user_id) || !isValidString(streamer_id)) {
       const msg = `Invalid input in subscribe: user_id=[${user_id}], streamer_id=[${streamer_id}]`;
@@ -239,6 +250,13 @@ class FirestoreWrapper extends EventEmitter {
       await streamerRef.update({
         users: admin.firestore.FieldValue.arrayRemove(user_id),
       });
+
+      const updatedDoc = await streamerRef.get();
+        const usersLeft = updatedDoc.data()?.users?.length ?? 0;
+
+        if (usersLeft === 0) {
+          this.emit("streamerEmpty", streamer_id);
+        }
 
       return { success: true, wasSubscribed };
     } catch (error) {
