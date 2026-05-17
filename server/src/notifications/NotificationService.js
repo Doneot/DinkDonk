@@ -1,10 +1,11 @@
-const { logger } = require('../utils/logger');
+const { logger } = require("../utils/logger");
+const { buildStreamerLivePayload } = require("./NotificationPayload");
 
 class NotificationService {
-  constructor({ twitch, repository, discord }) {
+  constructor({ twitch, repository, notificationManager }) {
     this.twitch = twitch;
     this.repository = repository;
-    this.discord = discord;
+    this.notificationManager = notificationManager;
     this.gcRunning = false;
   }
 
@@ -16,38 +17,61 @@ class NotificationService {
 
     for (const streamer of streamers) {
       const streamerId = streamer.streamer_id || streamer.id;
-      const exists = subscriptions.some((sub) => sub.condition?.broadcaster_user_id === streamerId);
+      const exists = subscriptions.some(
+        (sub) => sub.condition?.broadcaster_user_id === streamerId,
+      );
       if (!exists) {
         logger.info(`Creating Twitch EventSub subscription for ${streamerId}`);
-        await this.twitch.subscribeToEvent('stream.online', { broadcaster_user_id: streamerId });
+        await this.twitch.subscribeToEvent("stream.online", {
+          broadcaster_user_id: streamerId,
+        });
       }
     }
   }
 
   async getStreamOnlineSubscriptions() {
     const subscriptions = await this.twitch.getEventSubSubscriptions();
-    return subscriptions.filter((subscription) => subscription.type === 'stream.online');
+    return subscriptions.filter(
+      (subscription) => subscription.type === "stream.online",
+    );
   }
 
   async handleStreamerAdded(streamerId) {
     const subscriptions = await this.getStreamOnlineSubscriptions();
-    const exists = subscriptions.some((sub) => sub.condition?.broadcaster_user_id === streamerId);
+    const exists = subscriptions.some(
+      (sub) => sub.condition?.broadcaster_user_id === streamerId,
+    );
     if (exists) return;
-    await this.twitch.subscribeToEvent('stream.online', { broadcaster_user_id: streamerId });
+    await this.twitch.subscribeToEvent("stream.online", {
+      broadcaster_user_id: streamerId,
+    });
   }
 
   async handleStreamOnline(event) {
-    const streamer = await this.twitch.getStreamerByLogin(event.broadcaster_user_login);
+    const streamer = await this.twitch.getStreamerByLogin(
+      event.broadcaster_user_login,
+    );
     if (!streamer) return;
 
     const streamerDocument = await this.repository.getStreamer(streamer.id);
     const userIds = streamerDocument?.users || [];
-    for (const userId of userIds) {
-      const user = await this.repository.getUser(userId);
-      if (!user?.canReceiveDM) continue;
-      const message = await this.repository.getNotificationMessage(userId, streamer.id);
-      await this.discord.notifyStreamerLive(userId, streamer, message);
-    }
+
+    await Promise.all(
+      userIds.map((userId) => this.notifyUserForStreamer(userId, streamer)),
+    );
+  }
+
+  async notifyUserForStreamer(userId, streamer) {
+    const user = await this.repository.getUser(userId);
+    if (!user) return;
+
+    const message = await this.repository.getNotificationMessage(
+      userId,
+      streamer.id,
+    );
+    const notification = buildStreamerLivePayload({ streamer, message });
+
+    await this.notificationManager.notify(user, notification);
   }
 
   async garbageCollectSubscriptions() {
@@ -73,8 +97,12 @@ class NotificationService {
     if ((streamer?.users || []).length > 0) return;
 
     const subscriptions = await this.getStreamOnlineSubscriptions();
-    const matching = subscriptions.filter((sub) => sub.condition?.broadcaster_user_id === streamerId);
-    await Promise.all(matching.map((sub) => this.twitch.unsubscribeFromEvent(sub.id)));
+    const matching = subscriptions.filter(
+      (sub) => sub.condition?.broadcaster_user_id === streamerId,
+    );
+    await Promise.all(
+      matching.map((sub) => this.twitch.unsubscribeFromEvent(sub.id)),
+    );
     await this.repository.deleteStreamer(streamerId);
   }
 }

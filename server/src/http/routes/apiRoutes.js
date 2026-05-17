@@ -1,10 +1,35 @@
 const express = require('express');
 
-function createApiRouter({ repository, twitch, discord, ensureFreshToken }) {
+function createApiRouter({ repository, twitch, discord, ensureFreshToken, webPushPublicKey }) {
   const router = express.Router();
   router.use(ensureFreshToken);
 
   router.get('/status', (_req, res) => res.json({ online: discord.isReady }));
+
+  router.get('/notifications/web-push/public-key', (_req, res) => {
+    if (!webPushPublicKey) return res.status(503).json({ error: 'Web Push is not configured' });
+    res.json({ publicKey: webPushPublicKey });
+  });
+
+  router.get('/notifications/channels', async (req, res) => {
+    const pushSubscriptions = await repository.listPushSubscriptions(req.user.id);
+    res.json({
+      discord: { enabled: Boolean(req.user.canReceiveDM) },
+      webPush: { enabled: pushSubscriptions.length > 0, subscriptions: pushSubscriptions.length },
+    });
+  });
+
+  router.post('/notifications/web-push/subscriptions', express.json(), async (req, res) => {
+    const result = await repository.savePushSubscription(req.user.id, req.body.subscription, {
+      userAgent: req.get('user-agent'),
+    });
+    res.status(result.success ? 200 : 400).json(result);
+  });
+
+  router.delete('/notifications/web-push/subscriptions', express.json(), async (req, res) => {
+    const result = await repository.deletePushSubscription(req.user.id, req.body.subscription);
+    res.status(result.success ? 200 : 400).json(result);
+  });
 
   router.get('/user-count', async (_req, res) => {
     const users = await repository.listUsers();

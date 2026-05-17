@@ -71,6 +71,11 @@ const env = {
     clientX509CertUrl: process.env.FIREBASE_CLIENT_X509_CERT_URL,
   },
   adminPassword: envOrSecret("ADMIN_PASSWORD", "admin_password"),
+  webPush: {
+    publicKey: process.env.WEB_PUSH_PUBLIC_KEY,
+    privateKey: envOrSecret("WEB_PUSH_PRIVATE_KEY", "web_push_private_key"),
+    subject: process.env.WEB_PUSH_SUBJECT || `mailto:${process.env.WEB_PUSH_CONTACT_EMAIL || "admin@example.com"}`,
+  },
 };
 
 function hasRequiredValue(key) {

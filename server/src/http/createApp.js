@@ -49,7 +49,7 @@ function createApp({
   app.use(
     "/api",
     requireAuthenticated,
-    createApiRouter({ repository, twitch, discord, ensureFreshToken }),
+    createApiRouter({ repository, twitch, discord, ensureFreshToken, webPushPublicKey: env.webPush.publicKey }),
   );
   app.use(
     createEventSubRouter({

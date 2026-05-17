@@ -68,12 +68,16 @@ class DiscordBot {
     }
   }
 
+  async notifyUser(userId, content) {
+    const user = await this.client.users.fetch(userId);
+    const channel = await user.createDM();
+    await channel.send(content);
+  }
+
   async notifyStreamerLive(userId, streamer, template) {
     try {
-      const user = await this.client.users.fetch(userId);
-      const channel = await user.createDM();
       const message = (template || '%s is live!').replace(/%s/g, streamer.display_name);
-      await channel.send(`${message}\nhttps://www.twitch.tv/${streamer.login}`);
+      await this.notifyUser(userId, `${message}\nhttps://www.twitch.tv/${streamer.login}`);
     } catch (error) {
       if (error.code === 50007 && this.onDmCapabilityChanged) {
         await this.onDmCapabilityChanged(userId, false);

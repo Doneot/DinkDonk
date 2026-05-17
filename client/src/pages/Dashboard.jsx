@@ -3,6 +3,7 @@ import BotUsersCard from "../components/BotUsersCard";
 import StreamersManager from "../components/StreamersManager";
 import DiscordInviteButton from "../components/DiscordInviteButton";
 import CheckDMButton from "../components/CheckDMButton";
+import WebPushCard from "../components/WebPushCard";
 import { useAuth } from "../context/authContextValue";
 import api from "../services/api";
 import { env } from "../config/env";
@@ -26,6 +27,7 @@ const Dashboard = () => {
         <div className="space-y-6 my-6 lg:my-10">
           <StatusCard />
           <BotUsersCard />
+          <WebPushCard />
           {!user?.canReceiveDM && (
             <DiscordInviteButton inviteLink={env.inviteUrl} />
           )}

@@ -61,6 +61,57 @@ class FirestoreRepository extends EventEmitter {
     });
   }
 
+  getPushSubscriptionsRef(userId) {
+    return this.users.doc(userId).collection("pushSubscriptions");
+  }
+
+  getPushSubscriptionId(subscription) {
+    return Buffer.from(subscription.endpoint).toString("base64url");
+  }
+
+  async listPushSubscriptions(userId) {
+    if (!isNonEmptyString(userId)) return [];
+    const snapshot = await this.getPushSubscriptionsRef(userId).get();
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  }
+
+  async savePushSubscription(userId, subscription, metadata = {}) {
+    if (!isNonEmptyString(userId) || !subscription?.endpoint) {
+      return { success: false, reason: "invalid_push_subscription" };
+    }
+
+    const id = this.getPushSubscriptionId(subscription);
+    await this.getPushSubscriptionsRef(userId).doc(id).set(
+      {
+        subscription,
+        userAgent: metadata.userAgent || "",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+    return { success: true, id };
+  }
+
+  async markPushSubscriptionSeen(userId, subscriptionId) {
+    if (!isNonEmptyString(userId) || !isNonEmptyString(subscriptionId)) return;
+    await this.getPushSubscriptionsRef(userId).doc(subscriptionId).set(
+      { lastSeenAt: admin.firestore.FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+  }
+
+  async deletePushSubscription(userId, subscriptionIdOrSubscription) {
+    if (!isNonEmptyString(userId)) return { success: false, reason: "invalid_user" };
+    const id = typeof subscriptionIdOrSubscription === "string"
+      ? subscriptionIdOrSubscription
+      : this.getPushSubscriptionId(subscriptionIdOrSubscription);
+    if (!isNonEmptyString(id)) return { success: false, reason: "invalid_push_subscription" };
+    await this.getPushSubscriptionsRef(userId).doc(id).delete();
+    return { success: true };
+  }
+
   async listStreamers() {
     const snapshot = await this.streamers.get();
     return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
