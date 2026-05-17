@@ -1,6 +1,6 @@
 // server/commands/set-message.js
 const { SlashCommandBuilder, AttachmentBuilder } = require("discord.js");
-const { ADMIN_PASSWORD } = require("../config");
+const { env } = require("../src/config/env");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -17,7 +17,7 @@ module.exports = {
     const password = interaction.options.getString("password");
     const { twitch } = context;
 
-    if (password !== ADMIN_PASSWORD) {
+    if (password !== env.adminPassword) {
       await interaction.reply("❌ Wrong password, you cannot use this command");
       return;
     }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import api from "../api";
+import api from "../services/api";
 
 const StreamerSearch = ({ subscribedIds, setSubscribedIds, disabled }) => {
   const [search, setSearch] = useState("");

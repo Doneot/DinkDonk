@@ -1,5 +1,5 @@
 // src/components/Navbar.jsx
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/authContextValue";
 import HomeButton from "./HomeButton";
 import UserMenu from "./UserMenu";
 

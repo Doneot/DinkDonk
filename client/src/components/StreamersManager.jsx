@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import api from "../api";
+import api from "../services/api";
 import StreamerSearch from "./StreamerSearch";
 import SubscribedStreamersList from "./SubscribedStreamersList";
 

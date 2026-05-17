@@ -1,44 +1,29 @@
-// server/deploy-commands.js
-const { REST, Routes } = require("discord.js");
-const {
-  DISCORD_CLIENT_ID,
-  DISCORD_GUILD_ID,
-  DISCORD_TOKEN,
-  NODE_ENV,
-} = require("./config");
-const fs = require("node:fs");
+const fs = require('node:fs');
+const path = require('node:path');
+const { REST, Routes } = require('discord.js');
+const { env, assertRequiredEnv } = require('./src/config/env');
 
-const commands = [];
-const commandFiles = fs
-  .readdirSync("./commands")
-  .filter((file) => file.endsWith(".js"));
+assertRequiredEnv();
 
-for (const file of commandFiles) {
-  const command = require(`./commands/${file}`);
-  commands.push(command.data.toJSON());
+const commandsDirectory = path.join(__dirname, 'commands');
+const commands = fs
+  .readdirSync(commandsDirectory)
+  .filter((file) => file.endsWith('.js'))
+  .map((file) => require(path.join(commandsDirectory, file)).data.toJSON());
+
+async function registerCommands() {
+  const rest = new REST({ version: '10' }).setToken(env.discord.token);
+  const route = env.isProduction
+    ? Routes.applicationCommands(env.discord.clientId)
+    : Routes.applicationGuildCommands(env.discord.clientId, env.discord.guildId);
+
+  await rest.put(route, { body: commands });
+
+  const scope = env.isProduction ? 'globally' : `for guild ${env.discord.guildId}`;
+  console.log(`Registered ${commands.length} Discord slash commands ${scope}.`);
 }
 
-const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
-
-(async () => {
-  try {
-    console.log("Registering slash commands...");
-
-    if (NODE_ENV === "production") {
-      // Register commands globally
-      await rest.put(Routes.applicationCommands(DISCORD_CLIENT_ID), {
-        body: commands,
-      });
-    } else {
-      // Register commands for a specific guild (development)
-      await rest.put(
-        Routes.applicationGuildCommands(DISCORD_CLIENT_ID, DISCORD_GUILD_ID),
-        { body: commands }
-      );
-    }
-
-    console.log("Successfully registered commands.");
-  } catch (error) {
-    console.error(error);
-  }
-})();
+registerCommands().catch((error) => {
+  console.error('Failed to register Discord slash commands:', error);
+  process.exit(1);
+});

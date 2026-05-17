@@ -1,59 +1,32 @@
-// src/context/SocketContext.jsx
-import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { io } from "socket.io-client";
-import { useAuth } from "./AuthContext";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createSocket } from '../services/socket';
+import { useAuth } from './authContextValue';
+import { SocketContext } from './socketContextValue';
 
-const SocketContext = createContext();
-
-export const SocketProvider = ({ children }) => {
+export function SocketProvider({ children }) {
   const { user, setUser } = useAuth();
   const socketRef = useRef(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    if (!user?.id || socketRef.current) return;
+    if (!user?.id || socketRef.current) return undefined;
 
-    const socket = io(import.meta.env.VITE_SOCKET_URL, {
-      transports: ["websocket"],
-      withCredentials: import.meta.env.VITE_ENV === "production",
-      auth: {
-        userId: user.id,
-      },
-    });
-
+    const socket = createSocket(user.id);
     socketRef.current = socket;
 
-    socket.on("connect", () => {
-      console.log("⚡ Socket connected as", user.id);
-      setConnected(true);
-    });
-
-    socket.on("disconnect", () => {
-      console.log("🔌 Socket disconnected");
-      setConnected(false);
-    });
-
-    socket.on("user_data_updated", (updatedUser) => {
-      console.log("🔁 Updated user data from socket:", updatedUser);
-      setUser((prev) => ({ ...prev, ...updatedUser }));
+    socket.on('connect', () => setConnected(true));
+    socket.on('disconnect', () => setConnected(false));
+    socket.on('user_data_updated', (updatedUser) => {
+      setUser((previousUser) => ({ ...previousUser, ...updatedUser }));
     });
 
     return () => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [user?.id]);
+  }, [setUser, user?.id]);
 
-  return (
-    <SocketContext.Provider
-      value={{
-        socket: socketRef.current,
-        connected,
-      }}
-    >
-      {children}
-    </SocketContext.Provider>
-  );
-};
+  const value = useMemo(() => ({ socket: socketRef.current, connected }), [connected]);
 
-export const useSocket = () => useContext(SocketContext);
+  return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;
+}

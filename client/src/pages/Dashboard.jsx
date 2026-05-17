@@ -3,15 +3,16 @@ import BotUsersCard from "../components/BotUsersCard";
 import StreamersManager from "../components/StreamersManager";
 import DiscordInviteButton from "../components/DiscordInviteButton";
 import CheckDMButton from "../components/CheckDMButton";
-import { useAuth } from "../context/AuthContext";
-import api from "../api";
+import { useAuth } from "../context/authContextValue";
+import api from "../services/api";
+import { env } from "../config/env";
 
 const Dashboard = () => {
   const { user } = useAuth();
 
   const checkIfUserCanReceiveDM = async () => {
     try {
-      const canDM = (await api.get("/can-receive-DM")).data.canReceiveDM;
+      const canDM = (await api.get("/can-receive-dm")).data.canReceiveDM;
       return canDM;
     } catch (err) {
       console.error("Failed to check DM permission", err);
@@ -26,7 +27,7 @@ const Dashboard = () => {
           <StatusCard />
           <BotUsersCard />
           {!user?.canReceiveDM && (
-            <DiscordInviteButton inviteLink={import.meta.env.VITE_INVITE_URL} />
+            <DiscordInviteButton inviteLink={env.inviteUrl} />
           )}
           <CheckDMButton
             userId={user.id}

@@ -1,7 +1,7 @@
 // src/components/RedirectIfAuthenticated.jsx
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/authContextValue";
 
 const RedirectIfAuthenticated = ({ children }) => {
   const { user, loading } = useAuth();

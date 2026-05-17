@@ -1,6 +1,6 @@
 // server/commands/dashboard.js
 const { SlashCommandBuilder, MessageFlags } = require("discord.js");
-const { SERVER_URL } = require("../config");
+const { env } = require("../src/config/env");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -8,7 +8,7 @@ module.exports = {
     .setDescription("Get the link to your dashboard"),
 
   async execute(interaction) {
-    const url = `${SERVER_URL}/dashboard`;
+    const url = `${env.serverUrl}/dashboard`;
     await interaction.reply({
       content: `🔧 Your dashboard: ${url}`,
       flags: MessageFlags.Ephemeral,

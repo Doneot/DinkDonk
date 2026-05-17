@@ -1,0 +1,83 @@
+name: dinkdonk
+
+services:
+  caddy:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.caddy
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - public
+      - private
+
+  backend:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    secrets:
+      - firebase_service_account
+      - discord_token
+      - discord_client_secret
+      - twitch_client_secret
+      - twitch_webhook_secret
+      - session_secret
+      - admin_password
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase_service_account
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://127.0.0.1:3000/api/health'').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"',
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - public
+      - private
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  public:
+  private:
+    internal: true
+
+secrets:
+  firebase_service_account:
+    file: ./secrets/firebase-service-account.json
+  discord_token:
+    file: ./secrets/discord-token
+  discord_client_secret:
+    file: ./secrets/discord-client-secret
+  twitch_client_secret:
+    file: ./secrets/twitch-client-secret
+  twitch_webhook_secret:
+    file: ./secrets/twitch-webhook-secret
+  session_secret:
+    file: ./secrets/session-secret
+  admin_password:
+    file: ./secrets/admin-password
