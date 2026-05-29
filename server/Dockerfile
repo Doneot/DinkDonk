@@ -11,7 +11,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
 COPY commands ./commands
 COPY src ./src
-COPY deploy-commands.js ./deploy-commands.js
+COPY deploy-commands.ts ./deploy-commands.ts
 
 USER node
 EXPOSE 3000

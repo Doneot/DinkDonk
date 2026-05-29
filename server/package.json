@@ -2,12 +2,16 @@
   "name": "server",
   "version": "1.0.0",
   "description": "",
-  "main": "src/index.js",
+  "main": "src/index.ts",
+  "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "dev:ngrok": "node scripts/start-dev-with-ngrok.js",
-    "deploy:commands": "node deploy-commands.js"
+    "dev": "tsx watch src/index.ts",
+    "start": "node src/index.ts",
+    "dev:ngrok": "tsx watch scripts/start-dev-with-ngrok.ts",
+    "build": "tsc",
+    "deploy:commands": "tsx deploy-commands.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "author": "",
   "license": "ISC",
@@ -26,6 +30,17 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "@eslint/js": "^10.0.1",
+    "@types/express-session": "^1.19.0",
+    "@types/node": "^25.9.1",
+    "@types/passport": "^1.0.17",
+    "@types/passport-discord": "^0.1.15",
+    "@types/passport-oauth2-refresh": "^1.1.4",
+    "@types/web-push": "^3.6.4",
+    "eslint": "^10.4.0",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.0"
   }
 }

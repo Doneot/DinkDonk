@@ -55,7 +55,7 @@ const StreamerSearch = ({ subscribedIds, setSubscribedIds, disabled }) => {
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setHighlightIndex((prev) =>
-        prev <= 0 ? suggestions.length - 1 : prev - 1
+        prev <= 0 ? suggestions.length - 1 : prev - 1,
       );
     } else if (e.key === "Enter") {
       e.preventDefault();
@@ -68,11 +68,11 @@ const StreamerSearch = ({ subscribedIds, setSubscribedIds, disabled }) => {
     }
   };
 
-  const handleSubscribe = ({ streamer_id }) => {
+  const handleSubscribe = ({ id }) => {
     api
-      .post("/streamers/subscribe", { streamer_id })
+      .post("/streamers/subscribe", { streamer_id: id })
       .then(() => {
-        setSubscribedIds((prev) => [...prev, streamer_id]);
+        setSubscribedIds((prev) => [...prev, id]);
       })
       .catch((err) => {
         console.error("Subscription failed", err);
@@ -109,11 +109,11 @@ const StreamerSearch = ({ subscribedIds, setSubscribedIds, disabled }) => {
       {isFocused && suggestions.length > 0 && (
         <ul className="absolute z-50 left-0 mt-2 bg-white border rounded-lg shadow-md max-h-60 overflow-y-auto w-full max-w-full">
           {suggestions.map((s, index) => {
-            const isSubscribed = subscribedIds.includes(s.streamer_id);
+            const isSubscribed = subscribedIds.includes(s.id);
 
             return (
               <li
-                key={s.streamer_id}
+                key={s.id}
                 className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 cursor-pointer transition ${
                   highlightIndex === index
                     ? "bg-indigo-100"

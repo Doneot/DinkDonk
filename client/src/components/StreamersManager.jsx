@@ -18,7 +18,7 @@ const StreamersManager = ({ canReceiveDM, streamers }) => {
     api
       .get("/streamers/subscribed-streamers")
       .then((res) => {
-        setSubscribedIds(res.data.map((streamer) => streamer.streamer_id));
+        setSubscribedIds(res.data.map((streamer) => streamer.id));
       })
       .catch((err) => console.error("Failed to fetch subscriptions", err));
   }, [streamers]);
@@ -47,7 +47,7 @@ const StreamersManager = ({ canReceiveDM, streamers }) => {
         } catch (err) {
           console.error(
             `Failed to fetch message for cached streamer ${id}`,
-            err
+            err,
           );
         }
         return;
@@ -95,7 +95,7 @@ const StreamersManager = ({ canReceiveDM, streamers }) => {
       saveTimeouts.current[id] = setTimeout(() => {
         api
           .post("/streamers/set-message", {
-            streamer_id: id,
+            id: id,
             message,
           })
           .then(() => {
