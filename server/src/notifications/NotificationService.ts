@@ -84,6 +84,7 @@ export class NotificationService {
     if (exists) {
       return;
     }
+    logger.info(`Creating Twitch EventSub subscription for ${streamerId}`);
 
     await this.twitch.subscribeToEvent("stream.online", {
       broadcaster_user_id: streamerId,
