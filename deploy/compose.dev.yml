@@ -28,3 +28,4 @@ services:
       - "3000:3000"
     depends_on:
       - ngrok
+    stop_grace_period: 30s

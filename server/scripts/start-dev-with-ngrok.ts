@@ -68,18 +68,20 @@ void (async (): Promise<void> => {
     shell: true,
   });
 
-  function shutdown(signal: NodeJS.Signals | number | undefined): never {
+  function shutdown(signal: NodeJS.Signals): void {
     console.log(`Received ${signal}, stopping backend...`);
 
     if (child && !child.killed) {
       child.kill(signal);
     }
-
-    process.exit(0);
   }
 
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT", () => shutdown("SIGINT"));
+  child.on("exit", (code, _) => {
+    process.exit(code ?? 0);
+  });
+
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  process.on("SIGINT", () => void shutdown("SIGINT"));
 
   child.on("exit", (code, signal) => {
     if (signal === "SIGTERM" || signal === "SIGINT") {
