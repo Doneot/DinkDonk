@@ -1,8 +1,6 @@
 import type { TwitchStreamer, TwitchEventSubSubscription } from "../twitch.js";
 
 export interface TwitchStreamerService {
-  getStreamer(username: string): Promise<TwitchStreamer | null>;
-
   getStreamer(login: string): Promise<TwitchStreamer | null>;
 
   fetchStreamers(streamerIds: string | string[]): Promise<TwitchStreamer[]>;
