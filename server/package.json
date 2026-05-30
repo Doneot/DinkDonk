@@ -9,7 +9,7 @@
     "start": "node src/index.ts",
     "dev:ngrok": "tsx watch scripts/start-dev-with-ngrok.ts",
     "build": "tsc",
-    "deploy:commands": "tsx deploy-commands.ts",
+    "deploy:commands": "node --env-file=.env.development --import tsx deploy-commands.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
