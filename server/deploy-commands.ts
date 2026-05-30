@@ -21,7 +21,7 @@ const commandsDirectory = path.join(__dirname, "commands");
 
 const commandFiles = fs
   .readdirSync(commandsDirectory)
-  .filter((file) => file.endsWith(".js"));
+  .filter((file) => file.endsWith(".ts"));
 
 async function registerCommands(): Promise<void> {
   const commands = await Promise.all(

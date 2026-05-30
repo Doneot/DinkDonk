@@ -111,7 +111,7 @@ export class DiscordBot {
 
   private loadCommands(commandDirectory: string): void {
     fs.readdirSync(commandDirectory)
-      .filter((file) => file.endsWith(".js"))
+      .filter((file) => file.endsWith(".ts"))
 
       .forEach(async (file): Promise<void> => {
         const modulePath = path.join(commandDirectory, file);
