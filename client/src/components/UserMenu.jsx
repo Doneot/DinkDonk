@@ -1,6 +1,7 @@
 // src/components/UserMenu.jsx
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/authContextValue";
+import { api } from "../services/api";
 
 const UserMenu = () => {
   const { user } = useAuth();
@@ -18,7 +19,7 @@ const UserMenu = () => {
   }, []);
 
   const handleLogout = () => {
-    window.location.href = "/api/auth/logout";
+    api.post("/auth/logout");
   };
 
   return (

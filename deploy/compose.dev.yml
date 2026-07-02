@@ -10,7 +10,7 @@ services:
   backend:
     build:
       context: ../server
-      dockerfile: Dockerfile
+      dockerfile: ../server/Dockerfile.dev
     restart: unless-stopped
     user: root
     working_dir: /app
@@ -22,10 +22,13 @@ services:
       NGROK_API_URL: http://ngrok:4040/api/tunnels
     volumes:
       - ../server:/app
-      - /app/node_modules
+      - node_modules:/app/node_modules
     command: npm run dev:ngrok
     ports:
       - "3000:3000"
     depends_on:
       - ngrok
     stop_grace_period: 30s
+
+volumes:
+  node_modules:

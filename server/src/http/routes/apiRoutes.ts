@@ -1,90 +1,67 @@
 import express from "express";
 import type { Request, Response, Router } from "express";
-import type { User } from "../../types/user.js";
-import type { DiscordService } from "../../types/services/discord.js";
-import type { TwitchStreamerService } from "../../types/services/twitch.js";
-import { assertAuthenticated } from "../../utils/assertAuthenticated.js";
-
-type Repository = {
-  listPushSubscriptions(userId: string): Promise<unknown[]>;
-
-  savePushSubscription(
-    userId: string,
-    subscription: unknown,
-    metadata?: {
-      userAgent?: string;
-    },
-  ): Promise<{
-    success: boolean;
-
-    reason?: string;
-  }>;
-
-  deletePushSubscription(
-    userId: string,
-    subscription: unknown,
-  ): Promise<{
-    success: boolean;
-
-    reason?: string;
-  }>;
-
-  listUsers(): Promise<User[]>;
-
-  saveUser(userId: string, data: Partial<User>): Promise<void>;
-
-  getUser(userId: string): Promise<User | null>;
-
-  subscribeUserToStreamer(
-    userId: string,
-    streamerId: string,
-    notificationMessage?: string,
-  ): Promise<{
-    success: boolean;
-
-    reason?: string;
-  }>;
-
-  unsubscribeUserFromStreamer(
-    userId: string,
-    streamerId: string,
-  ): Promise<{
-    success: boolean;
-
-    reason?: string;
-  }>;
-
-  getNotificationMessage(userId: string, streamerId: string): Promise<string>;
-
-  setNotificationMessage(
-    userId: string,
-    streamerId: string,
-    message: string,
-  ): Promise<{
-    success: boolean;
-
-    reason?: string;
-  }>;
-};
+import type { DiscordService } from "../../modules/discord/ports/DiscordService.js";
+import type { TwitchStreamerProvider } from "../../modules/twitch/ports/TwitchGateway.js";
+import type { Repositories } from "../../app/container/repositories.js";
+import { requireUser } from "../middleware/auth.js";
+import {
+  validatedBody,
+  validatedQuery,
+  validateBody,
+  validateQuery,
+} from "../middleware/validate.js";
+import {
+  deletePushSubscriptionSchema,
+  savePushSubscriptionSchema,
+  type SavePushSubscriptionRequest,
+  type DeletePushSubscriptionRequest,
+} from "../schemas/notifications.js";
+import {
+  searchStreamersQuerySchema,
+  batchStreamerInfoSchema,
+  type BatchStreamerInfoRequest,
+  type SearchStreamerRequest,
+} from "../schemas/streamers.js";
+import {
+  subscribeSchema,
+  setMessageSchema,
+  type SubscribeRequest,
+  type UnsubscribeRequest,
+  type SetMessageRequest,
+} from "../schemas/subscriptions.js";
+import { NotFoundError } from "../errors/NotFoundError.js";
+import type {
+  CanReceiveDmResponse,
+  NotificationChannelsResponse,
+  PublicKeyResponse,
+  StatusResponse,
+  StreamerSummaryResponse,
+  UserCountResponse,
+} from "../schemas/responses.js";
+import { verifyCsrf } from "../middleware/csrf.js";
+import { discordDmChecksTotal } from "../../infrastructure/metrics/prometheus.js";
 
 type CreateApiRouterOptions = {
-  repository: Repository;
+  repositories: Repositories;
 
-  twitch: TwitchStreamerService;
+  twitch: TwitchStreamerProvider;
 
   discord: DiscordService;
 
   ensureFreshToken: express.RequestHandler;
 
   webPushPublicKey?: string;
+
+  csrfEnabled?: boolean;
 };
 
 export function createApiRouter({
-  repository,
+  repositories,
   twitch,
   discord,
   ensureFreshToken,
   webPushPublicKey,
+  csrfEnabled = true,
 }: CreateApiRouterOptions): Router {
   const router = express.Router();
 
@@ -94,9 +71,11 @@ export function createApiRouter({
     "/status",
 
     (_req: Request, res: Response): void => {
-      res.json({
+      const payload = {
         online: discord.isReady,
-      });
+      } satisfies StatusResponse;
+
+      res.json(payload);
     },
   );
 
@@ -112,24 +91,27 @@ export function createApiRouter({
         return;
       }
 
-      res.json({
+      const payload = {
         publicKey: webPushPublicKey,
-      });
+      } satisfies PublicKeyResponse;
+
+      res.json(payload);
     },
   );
 
   router.get(
     "/notifications/channels",
 
-    async (req: Request, res: Response): Promise<void> => {
-      assertAuthenticated(req);
-      const pushSubscriptions = await repository.listPushSubscriptions(
-        req.user.id,
-      );
+    async (req, res) => {
+      const authUser = requireUser(req);
+      const pushSubscriptions =
+        await repositories.pushSubscriptions.getPushSubscriptions(authUser.id);
 
-      res.json({
+      const user = await repositories.users.getUser(authUser.id);
+
+      const payload = {
         discord: {
-          enabled: Boolean(req.user.canReceiveDM),
+          enabled: Boolean(user?.canReceiveDM),
         },
 
         webPush: {
@@ -137,22 +119,133 @@ export function createApiRouter({
 
           subscriptions: pushSubscriptions.length,
         },
-      });
+      } satisfies NotificationChannelsResponse;
+
+      res.json(payload);
     },
   );
+
+  router.get(
+    "/user-count",
+
+    async (_req: Request, res: Response): Promise<void> => {
+      const users = await repositories.users.getUsers();
+
+      const payload = {
+        count: users.filter((user) => user.canReceiveDM).length,
+      } satisfies UserCountResponse;
+
+      res.json(payload);
+    },
+  );
+
+  router.get(
+    "/can-receive-dm",
+
+    async (req, res) => {
+      const user = requireUser(req);
+      const canReceiveDM = await discord.canSendDirectMessage(user.id);
+
+      discordDmChecksTotal.inc();
+
+      await repositories.users.updateUser(user.id, {
+        canReceiveDM,
+      });
+
+      req.session.canReceiveDM = canReceiveDM;
+
+      const payload = {
+        canReceiveDM,
+      } satisfies CanReceiveDmResponse;
+
+      res.json(payload);
+    },
+  );
+
+  router.get(
+    "/streamers/search",
+
+    validateQuery(searchStreamersQuerySchema),
+
+    async (req, res) => {
+      const { query } = validatedQuery<SearchStreamerRequest>(req);
+
+      const streamers = await twitch.searchStreamers(query);
+
+      const payload = streamers.map(
+        ({
+          display_name: name,
+
+          profile_image_url: avatar,
+
+          id,
+        }) => ({
+          name,
+
+          avatar,
+
+          id: id,
+        }),
+      ) satisfies StreamerSummaryResponse[];
+
+      res.json(payload);
+    },
+  );
+
+  router.post(
+    "/streamers/info",
+
+    express.json(),
+
+    validateBody(batchStreamerInfoSchema),
+
+    async (req, res) => {
+      const { ids } = validatedBody<BatchStreamerInfoRequest>(req);
+
+      const streamers = await twitch.fetchStreamers(ids);
+
+      if (!streamers.length) {
+        throw new NotFoundError("streamer");
+      }
+
+      const payload = streamers.map(
+        ({
+          display_name: name,
+
+          profile_image_url: avatar,
+
+          id,
+        }) => ({
+          name,
+
+          avatar,
+
+          id: id,
+        }),
+      ) satisfies StreamerSummaryResponse[];
+
+      res.json(payload);
+    },
+  );
+  if (csrfEnabled) {
+    router.use(verifyCsrf);
+  }
 
   router.post(
     "/notifications/web-push/subscriptions",
 
     express.json(),
 
-    async (req: Request, res: Response): Promise<void> => {
-      assertAuthenticated(req);
-      const userAgent = req.get("user-agent");
-      const result = await repository.savePushSubscription(
-        req.user.id,
+    validateBody(savePushSubscriptionSchema),
 
-        req.body.subscription,
+    async (req, res) => {
+      const user = requireUser(req);
+      const userAgent = req.get("user-agent");
+      const { subscription } = validatedBody<SavePushSubscriptionRequest>(req);
+      const result = await repositories.pushSubscriptions.savePushSubscription(
+        user.id,
+
+        subscription,
 
         userAgent ? { userAgent } : {},
       );
@@ -166,133 +259,38 @@ export function createApiRouter({
 
     express.json(),
 
-    async (req: Request, res: Response): Promise<void> => {
-      assertAuthenticated(req);
+    validateBody(deletePushSubscriptionSchema),
 
-      const result = await repository.deletePushSubscription(
-        req.user.id,
-        req.body.subscription,
-      );
+    async (req, res) => {
+      const user = requireUser(req);
+      const { subscriptionId } =
+        validatedBody<DeletePushSubscriptionRequest>(req);
+
+      const result =
+        await repositories.pushSubscriptions.deletePushSubscription(
+          user.id,
+          subscriptionId,
+        );
 
       res.status(result.success ? 200 : 400).json(result);
     },
   );
 
-  router.get(
-    "/user-count",
-
-    async (_req: Request, res: Response): Promise<void> => {
-      const users = await repository.listUsers();
-
-      res.json({
-        count: users.filter((user) => user.canReceiveDM).length,
-      });
-    },
-  );
-
-  router.get(
-    "/can-receive-dm",
-
-    async (req: Request, res: Response): Promise<void> => {
-      assertAuthenticated(req);
-
-      const canReceiveDM = await discord.canSendDirectMessage(req.user.id);
-
-      await repository.saveUser(req.user.id, {
-        canReceiveDM,
-      });
-
-      req.session.canReceiveDM = canReceiveDM;
-
-      res.json({
-        canReceiveDM,
-      });
-    },
-  );
-
-  router.get(
-    "/streamers/search",
-
-    async (req: Request, res: Response): Promise<void> => {
-      const query = typeof req.query.query === "string" ? req.query.query : "";
-
-      const streamers = await twitch.searchStreamers(query);
-
-      res.json(
-        streamers.map(
-          ({
-            display_name: name,
-
-            thumbnail_url: avatar,
-
-            id,
-          }) => ({
-            name,
-
-            avatar,
-
-            id: id,
-          }),
-        ),
-      );
-    },
-  );
-
-  router.get(
-    "/streamers/info",
-
-    async (req: Request, res: Response): Promise<void> => {
-      const streamerId = typeof req.query.id === "string" ? req.query.id : "";
-
-      const [streamer] = await twitch.fetchStreamers(streamerId);
-
-      if (!streamer) {
-        res.status(404).json({
-          error: "Streamer not found",
-        });
-
-        return;
-      }
-
-      res.json({
-        display_name: streamer.display_name,
-
-        avatar: streamer.profile_image_url,
-      });
-    },
-  );
-
-  router.get(
-    "/streamers/subscribed-streamers",
-
-    async (req: Request, res: Response): Promise<void> => {
-      assertAuthenticated(req);
-      const user = await repository.getUser(req.user.id);
-
-      if (!user) {
-        res.status(404).json({
-          error: "User not found",
-        });
-
-        return;
-      }
-
-      res.json(user.streamers || []);
-    },
-  );
-
   router.post(
-    "/streamers/subscribe",
+    "/subscriptions",
 
     express.json(),
 
-    async (req: Request, res: Response): Promise<void> => {
-      assertAuthenticated(req);
+    validateBody(subscribeSchema),
 
-      const result = await repository.subscribeUserToStreamer(
-        req.user.id,
+    async (req, res) => {
+      const user = requireUser(req);
+      const { streamerId } = validatedBody<SubscribeRequest>(req);
 
-        req.body.streamer_id,
+      const result = await repositories.subscriptions.subscribe(
+        user.id,
+
+        streamerId,
 
         "",
       );
@@ -301,56 +299,45 @@ export function createApiRouter({
     },
   );
 
-  router.post(
-    "/streamers/unsubscribe",
+  router.delete(
+    "/subscriptions",
 
     express.json(),
 
-    async (req: Request, res: Response): Promise<void> => {
-      assertAuthenticated(req);
+    validateBody(subscribeSchema),
 
-      const result = await repository.unsubscribeUserFromStreamer(
-        req.user.id,
-        req.body.streamer_id,
+    async (req, res) => {
+      const user = requireUser(req);
+      const { streamerId } = validatedBody<UnsubscribeRequest>(req);
+
+      const result = await repositories.subscriptions.unsubscribe(
+        user.id,
+        streamerId,
       );
 
       res.status(result.success ? 200 : 400).json(result);
     },
   );
 
-  router.get(
-    "/streamers/get-message",
-
-    async (req: Request, res: Response): Promise<void> => {
-      assertAuthenticated(req);
-
-      const streamerId = typeof req.query.id === "string" ? req.query.id : "";
-
-      const message = await repository.getNotificationMessage(
-        req.user.id,
-        streamerId,
-      );
-
-      res.json({
-        notification_message: message,
-      });
-    },
-  );
-
   router.post(
-    "/streamers/set-message",
+    "/subscriptions/set-message",
 
     express.json(),
 
-    async (req: Request, res: Response): Promise<void> => {
-      assertAuthenticated(req);
+    validateBody(setMessageSchema),
 
-      const result = await repository.setNotificationMessage(
-        req.user.id,
+    async (req, res) => {
+      const user = requireUser(req);
+      const { id: streamerId, message } = validatedBody<SetMessageRequest>(req);
 
-        req.body.id,
+      const result = await repositories.subscriptions.updateSubscription(
+        user.id,
 
-        req.body.message,
+        streamerId,
+
+        {
+          notification_message: message,
+        },
       );
 
       res.status(result.success ? 200 : 400).json(result);

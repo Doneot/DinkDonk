@@ -1,19 +1,14 @@
 import passport from "passport";
 import { Strategy as DiscordStrategy, type Profile } from "passport-discord";
 import refresh from "passport-oauth2-refresh";
-import { env } from "../config/env.js";
-import { assertDefined } from "../utils/assert.js";
-import type { User } from "../types/user.js";
+import { env } from "../shared/config/env.js";
+import { assertDefined } from "../shared/utils/assert.js";
+import type { AuthUser } from "../modules/auth/domain/AuthUser.js";
+import type { AuthUserRepository } from "../modules/auth/ports/AuthUserRepository.js";
 import type { VerifyCallback } from "passport-oauth2";
 
-type PassportRepository = {
-  getUser(id: string): Promise<User | null>;
-
-  saveUser(id: string, user: Partial<Omit<User, "id">>): Promise<void>;
-};
-
 export function configurePassport(
-  repository: PassportRepository,
+  repository: AuthUserRepository,
 ): typeof passport {
   passport.serializeUser((user: Express.User, done): void => {
     const sessionUser = user as {
@@ -27,7 +22,7 @@ export function configurePassport(
   passport.deserializeUser(
     async ({ id }: { id: string }, done): Promise<void> => {
       try {
-        const user = await repository.getUser(id);
+        const user = await repository.getAuthUser(id);
 
         done(
           null,
@@ -70,7 +65,7 @@ export function configurePassport(
       done: VerifyCallback,
     ): Promise<void> => {
       try {
-        const user: User = {
+        const user: AuthUser = {
           id: profile.id,
 
           username: profile.username,
@@ -87,7 +82,7 @@ export function configurePassport(
         };
         const { id, ...userData } = user;
 
-        await repository.saveUser(id, userData);
+        await repository.updateAuthUser(id, userData);
 
         done(null, user);
       } catch (error) {

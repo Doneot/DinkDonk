@@ -25,7 +25,7 @@ services:
   backend:
     build:
       context: ../server
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     restart: unless-stopped
     env_file:
       - .env.staging

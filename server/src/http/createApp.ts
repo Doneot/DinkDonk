@@ -1,214 +1,52 @@
-import cors from "cors";
 import express from "express";
-import session from "express-session";
-import type { Express, Request, Response } from "express";
-import type { Firestore } from "firebase-admin/firestore";
-import { env } from "../config/env.js";
-import { FirestoreSessionRepository } from "../repositories/FirestoreSessionRepository.js";
-import { configurePassport } from "./passport.js";
-import {
-  createFreshTokenMiddleware,
-  requireAuthenticated,
-} from "./middleware/auth.js";
-import { createAuthRouter } from "./routes/authRoutes.js";
-import { createApiRouter } from "./routes/apiRoutes.js";
-import { createEventSubRouter } from "./routes/eventSubRoutes.js";
-import type { User } from "../types/user.js";
-import type { TwitchStreamerService } from "../types/services/twitch.js";
-import type { DiscordService } from "../types/services/discord.js";
-import { assertDefined } from "../utils/assert.js";
 
-type Repository = {
-  getUser(userId: string): Promise<User | null>;
+import type { Express, RequestHandler } from "express";
 
-  saveUser(userId: string, data: Partial<User>): Promise<void>;
+import type { TwitchStreamerProvider } from "../modules/twitch/ports/TwitchGateway.js";
+import type { DiscordService } from "../modules/discord/ports/DiscordService.js";
 
-  listUsers(): Promise<User[]>;
+import type { Repositories } from "../app/container/repositories.js";
+import type { StreamNotificationService } from "../modules/notifications/application/StreamNotificationService.js";
 
-  listPushSubscriptions(userId: string): Promise<unknown[]>;
-
-  savePushSubscription(
-    userId: string,
-    subscription: unknown,
-    metadata?: {
-      userAgent?: string;
-    },
-  ): Promise<{
-    success: boolean;
-
-    reason?: string;
-  }>;
-
-  deletePushSubscription(
-    userId: string,
-    subscription: unknown,
-  ): Promise<{
-    success: boolean;
-
-    reason?: string;
-  }>;
-
-  subscribeUserToStreamer(
-    userId: string,
-    streamerId: string,
-    notificationMessage?: string,
-  ): Promise<{
-    success: boolean;
-
-    reason?: string;
-  }>;
-
-  unsubscribeUserFromStreamer(
-    userId: string,
-    streamerId: string,
-  ): Promise<{
-    success: boolean;
-
-    reason?: string;
-  }>;
-
-  getNotificationMessage(userId: string, streamerId: string): Promise<string>;
-
-  setNotificationMessage(
-    userId: string,
-    streamerId: string,
-    message: string,
-  ): Promise<{
-    success: boolean;
-
-    reason?: string;
-  }>;
-};
-
-type NotificationService = {
-  handleStreamOnline(event: unknown): Promise<void>;
-};
+import { configureRoutes } from "./configureRoutes.js";
+import { configureMiddleware } from "./configureMiddleware.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 
 type CreateAppOptions = {
-  firestore: Firestore;
+  sessionMiddleware: RequestHandler;
 
-  repository: Repository;
+  repositories: Repositories;
 
-  twitch: TwitchStreamerService;
+  twitch: TwitchStreamerProvider;
 
   discord: DiscordService;
 
-  notificationService: NotificationService;
+  services: {
+    streamNotification: StreamNotificationService;
+  };
 };
 
 export function createApp({
-  firestore,
-  repository,
+  sessionMiddleware,
+  repositories,
   twitch,
   discord,
-  notificationService,
+  services,
 }: CreateAppOptions): Express {
   const app = express();
 
-  const configuredPassport = configurePassport(repository);
-
-  const ensureFreshToken = createFreshTokenMiddleware(repository);
-
   app.set("trust proxy", 1);
 
-  app.use(
-    cors({
-      origin: env.clientOrigin,
+  configureMiddleware({
+    app,
+    sessionMiddleware,
+    authUserRepository: repositories.authUsers,
+    services,
+  });
 
-      credentials: true,
-    }),
-  );
+  configureRoutes({ app, repositories, twitch, discord });
 
-  app.use(
-    session({
-      store: new FirestoreSessionRepository(firestore),
-
-      secret: assertDefined(env.sessionSecret, "Session Secret"),
-
-      resave: false,
-
-      saveUninitialized: false,
-
-      proxy: true,
-
-      cookie: {
-        secure: env.isProduction,
-
-        httpOnly: true,
-
-        sameSite: "lax",
-      },
-    }),
-  );
-
-  app.use(configuredPassport.initialize());
-
-  app.use(configuredPassport.session());
-
-  app.get(
-    "/api/health",
-
-    (_req: Request, res: Response): void => {
-      res.status(200).json({
-        status: "ok",
-      });
-    },
-  );
-
-  app.use(
-    "/api/auth",
-
-    createAuthRouter({
-      repository,
-
-      discord,
-
-      ensureFreshToken,
-    }),
-  );
-
-  app.use(
-    "/api",
-
-    requireAuthenticated,
-
-    createApiRouter({
-      repository,
-
-      twitch,
-
-      discord,
-
-      ensureFreshToken,
-
-      webPushPublicKey: assertDefined(
-        env.webPush.publicKey,
-        "Web Push Public Key",
-      ),
-    }),
-  );
-
-  app.use(
-    createEventSubRouter({
-      secret: assertDefined(env.twitch.webhookSecret, "Twitch Webhook Secret"),
-
-      onNotification: (type, event) => {
-        if (type === "stream.online") {
-          return notificationService.handleStreamOnline(event);
-        }
-
-        return Promise.resolve();
-      },
-    }),
-  );
-
-  app.get(
-    "/login-failed",
-
-    (_req: Request, res: Response): void => {
-      res.redirect(env.clientOrigin);
-    },
-  );
+  app.use(errorHandler);
 
   return app;
 }

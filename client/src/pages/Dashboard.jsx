@@ -1,6 +1,6 @@
 import StatusCard from "../components/StatusCard";
 import BotUsersCard from "../components/BotUsersCard";
-import StreamersManager from "../components/StreamersManager";
+import SubscriptionsManager from "../components/SubscriptionsManager";
 import DiscordInviteButton from "../components/DiscordInviteButton";
 import CheckDMButton from "../components/CheckDMButton";
 import WebPushCard from "../components/WebPushCard";
@@ -39,9 +39,9 @@ const Dashboard = () => {
 
         {/* Right column */}
         <div className="space-y-6 lg:col-span-2">
-          <StreamersManager
+          <SubscriptionsManager
             canReceiveDM={user?.canReceiveDM}
-            streamers={user?.streamers}
+            subscriptions={user?.streamers}
           />
         </div>
       </div>

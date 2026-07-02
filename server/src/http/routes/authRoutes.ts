@@ -1,20 +1,20 @@
 import express from "express";
 import passport from "passport";
-import type { Request, Response, Router } from "express";
-import { env } from "../../config/env.js";
-import { requireAuthenticated } from "../middleware/auth.js";
-import { assertAuthenticated } from "../../utils/assertAuthenticated.js";
-import type { User } from "../../types/user.js";
-import type { DiscordService } from "../../types/services/discord.js";
+import type { RequestHandler, Router } from "express";
+import { env } from "../../shared/config/env.js";
+import { requireUser } from "../middleware/auth.js";
+import type { DiscordService } from "../../modules/discord/ports/DiscordService.js";
+import type { UserRepository } from "../../modules/users/ports/UserRepository.js";
+import type { UserResponse } from "../schemas/responses.js";
 
-type Repository = {
-  getUser(userId: string): Promise<User | null>;
+export const discordAuth = passport.authenticate("discord") as RequestHandler;
 
-  saveUser(userId: string, data: Partial<User>): Promise<void>;
-};
+export const discordAuthCallback = passport.authenticate("discord", {
+  failureRedirect: "/login-failed",
+}) as RequestHandler;
 
 type CreateAuthRouterOptions = {
-  repository: Repository;
+  repository: UserRepository;
 
   discord: DiscordService;
 
@@ -28,28 +28,27 @@ export function createAuthRouter({
 }: CreateAuthRouterOptions): Router {
   const router = express.Router();
 
-  router.get(
-    "/discord",
-
-    passport.authenticate("discord"),
-  );
+  router.get("/discord", discordAuth);
 
   router.get(
     "/discord/callback",
 
-    passport.authenticate("discord", {
-      failureRedirect: "/login-failed",
-    }),
+    discordAuthCallback,
 
-    async (req: Request, res: Response): Promise<void> => {
-      assertAuthenticated(req);
+    async (req, res) => {
+      const authUser = requireUser(req);
+      const user = await repository.getUser(authUser.id);
 
-      const user = await repository.getUser(req.user.id);
+      if (!user) {
+        res.status(500).send("Failed retrieving user");
+
+        return;
+      }
 
       const canReceiveDM =
-        user?.canReceiveDM ?? (await discord.canSendDirectMessage(req.user.id));
+        user?.canReceiveDM ?? (await discord.canSendDirectMessage(user.id));
 
-      await repository.saveUser(req.user.id, {
+      await repository.updateUser(user.id, {
         canReceiveDM,
       });
 
@@ -66,28 +65,30 @@ export function createAuthRouter({
   router.get(
     "/user",
 
-    (req: Request, res: Response): void => {
-      assertAuthenticated(req);
+    async (req, res) => {
+      const authUser = requireUser(req);
+      const user = await repository.getUser(authUser.id);
+
+      if (!user) {
+        res.status(500).send("Failed retrieving user");
+
+        return;
+      }
 
       res.json({
         ...req.user,
 
-        canReceiveDM:
-          req.session.canReceiveDM ?? req.user.canReceiveDM ?? false,
-      });
+        ...user,
+      } satisfies UserResponse);
     },
   );
 
-  router.get(
+  router.post(
     "/logout",
-
-    requireAuthenticated,
 
     ensureFreshToken,
 
-    (req: Request, res: Response): void => {
-      assertAuthenticated(req);
-
+    (req, res) => {
       req.logout((error) => {
         if (error) {
           res.status(500).send("Logout failed");

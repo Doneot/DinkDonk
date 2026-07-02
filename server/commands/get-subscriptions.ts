@@ -1,11 +1,9 @@
+import { Buffer } from "node:buffer";
+
 import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder, AttachmentBuilder } from "discord.js";
-import { env } from "../src/config/env.js";
-import type { TwitchSubscriptionService } from "../src/types/services/twitch.js";
-
-type Context = {
-  twitch: TwitchSubscriptionService;
-};
+import { env } from "../src/shared/config/env.js";
+import type { CommandContext } from "../src/modules/discord/domain/CommandContext.js";
 
 export const data = new SlashCommandBuilder()
   .setName("get-subscriptions")
@@ -19,7 +17,7 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(
   interaction: ChatInputCommandInteraction,
-  context: Context,
+  context: CommandContext,
 ): Promise<void> {
   const password = interaction.options.getString("password");
   const { twitch } = context;
@@ -29,7 +27,7 @@ export async function execute(
     return;
   }
 
-  const res = await twitch.getSubscriptions();
+  const res = await twitch.getEventSubSubscriptions();
 
   if (res.length === 0) {
     await interaction.reply("No current subscription");

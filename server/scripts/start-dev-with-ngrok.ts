@@ -12,7 +12,9 @@ async function getNgrokUrl(): Promise<string> {
   while (true) {
     try {
       const res = await fetch("http://ngrok:4040/api/tunnels");
-      const data = await res.json();
+      const data = (await res.json()) as {
+        tunnels?: Array<{ proto: string; public_url: string }>;
+      };
 
       const url = data.tunnels?.find(
         (t: { proto: string }) => t.proto === "https",

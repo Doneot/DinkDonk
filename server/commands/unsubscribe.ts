@@ -1,15 +1,6 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import type {
-  UserReaderService,
-  SubscriptionService,
-} from "../src/types/services/firestore.js";
-import type { TwitchStreamerService } from "../src/types/services/twitch.js";
-
-type Context = {
-  firestore: UserReaderService & SubscriptionService;
-  twitch: TwitchStreamerService;
-};
+import type { CommandContext } from "../src/modules/discord/domain/CommandContext.js";
 
 export const data = new SlashCommandBuilder()
   .setName("unsubscribe")
@@ -23,11 +14,11 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(
   interaction: ChatInputCommandInteraction,
-  context: Context,
+  context: CommandContext,
 ): Promise<void> {
   const username = interaction.options.getString("username", true);
 
-  const { firestore, twitch } = context;
+  const { userRepository, subscriptionRepository, twitch } = context;
 
   const streamer = await twitch.getStreamer(username);
 
@@ -39,7 +30,7 @@ export async function execute(
     return;
   }
 
-  const user = await firestore.getUser(interaction.user.id);
+  const user = await userRepository.getUser(interaction.user.id);
 
   const canReceiveDM = user?.canReceiveDM || false;
 
@@ -51,7 +42,10 @@ export async function execute(
     return;
   }
 
-  const res = await firestore.unsubscribe(interaction.user.id, streamer.id);
+  const res = await subscriptionRepository.unsubscribe(
+    interaction.user.id,
+    streamer.id,
+  );
 
   await interaction.reply(
     res.success

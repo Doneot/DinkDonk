@@ -1,39 +1,21 @@
-import crypto from "node:crypto";
 import express from "express";
-import type { Request, Response, Router } from "express";
-
-type EventSubNotification = {
-  subscription: {
-    type: string;
-  };
-
-  event: Record<string, unknown>;
-
-  challenge?: string;
-};
-
-type EventSubRequest = Request & {
-  body: Buffer;
-
-  headers: {
-    [key: string]: string | string[] | undefined;
-
-    "twitch-eventsub-message-id"?: string;
-
-    "twitch-eventsub-message-timestamp"?: string;
-
-    "twitch-eventsub-message-signature"?: string;
-
-    "twitch-eventsub-message-type"?: string;
-  };
-};
+import type { Router } from "express";
+import { createEventSubHandlerRegistry } from "../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
+import type { TwitchEventSubStreamOnlineEvent } from "../../modules/twitch/domain/Twitch.js";
+import { eventSubHeadersSchema } from "../schemas/eventSub.js";
+import { verifyEventSubSignature } from "../../modules/twitch/eventsub/EventSubSignatureVerifier.js";
+import { dispatchEventSubNotification } from "../../modules/twitch/eventsub/EventSubDispatcher.js";
+import {
+  eventSubRequestsTotal,
+  eventSubSignatureFailuresTotal,
+} from "../../infrastructure/metrics/prometheus.js";
 
 type CreateEventSubRouterOptions = {
   secret: string;
 
   onNotification: (
     type: string,
-    event: Record<string, unknown>,
+    event: TwitchEventSubStreamOnlineEvent,
   ) => Promise<void>;
 };
 
@@ -43,61 +25,63 @@ export function createEventSubRouter({
 }: CreateEventSubRouterOptions): Router {
   const router = express.Router();
 
+  const handlers = createEventSubHandlerRegistry(onNotification);
+
   router.post(
     "/eventsub",
+    express.raw({ type: "application/json" }),
+    async (req, res): Promise<void> => {
+      const raw = (req.body as Buffer).toString();
 
-    express.raw({
-      type: "application/json",
-    }),
+      const headers = eventSubHeadersSchema.safeParse(req.headers);
 
-    async (req: EventSubRequest, res: Response): Promise<void> => {
-      const signature = req.headers["twitch-eventsub-message-signature"];
+      if (!headers.success) {
+        res.sendStatus(400);
+        return;
+      }
 
-      const messageId = req.headers["twitch-eventsub-message-id"];
+      eventSubRequestsTotal.inc();
 
-      const timestamp = req.headers["twitch-eventsub-message-timestamp"];
-
-      const message = `${messageId}${timestamp}${req.body.toString()}`;
-
-      const expected = `sha256=${crypto
-        .createHmac("sha256", secret)
-        .update(message)
-        .digest("hex")}`;
+      const {
+        "twitch-eventsub-message-id": messageId,
+        "twitch-eventsub-message-signature": signature,
+        "twitch-eventsub-message-timestamp": timestamp,
+        "twitch-eventsub-message-type": messageType,
+      } = headers.data;
 
       if (
-        !signature ||
-        !crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature))
+        !verifyEventSubSignature({
+          secret,
+          messageId,
+          timestamp,
+          signature,
+          body: raw,
+        })
       ) {
+        eventSubSignatureFailuresTotal.inc();
         res.sendStatus(403);
-
         return;
       }
 
-      const notification = JSON.parse(
-        req.body.toString(),
-      ) as EventSubNotification;
+      const result = await dispatchEventSubNotification(
+        raw,
+        messageType,
+        handlers,
+      );
 
-      const messageType = req.headers["twitch-eventsub-message-type"];
+      switch (result.status) {
+        case 200:
+          res.type("text/plain").status(200).send(result.challenge);
+          return;
 
-      if (messageType === "webhook_callback_verification") {
-        res.type("text/plain").status(200).send(notification.challenge);
+        case 204:
+          res.sendStatus(204);
+          return;
 
-        return;
+        default:
+          res.sendStatus(400);
+          return;
       }
-
-      if (messageType === "notification") {
-        await onNotification(
-          notification.subscription.type,
-
-          notification.event,
-        );
-
-        res.sendStatus(204);
-
-        return;
-      }
-
-      res.sendStatus(204);
     },
   );
 

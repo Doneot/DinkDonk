@@ -1,8 +1,10 @@
 import type express from "express";
 import refresh from "passport-oauth2-refresh";
-import { env } from "../../config/env.js";
-import { logger } from "../../utils/logger.js";
-import type { User } from "../../types/user.js";
+import { env } from "../../shared/config/env.js";
+import { logger } from "../../shared/logger/logger.js";
+import type { AuthUserRepository } from "../../modules/auth/ports/AuthUserRepository.js";
+
+import { UnauthorizedError } from "../errors/UnauthorizedError.js";
 
 const MAX_TOKEN_AGE_MS = 6 * 24 * 60 * 60 * 1000;
 
@@ -12,33 +14,28 @@ type TokenRefreshResult = {
   refreshToken: string;
 };
 
-type AuthRepository = {
-  getUser(userId: string): Promise<User | null>;
+export function requireUser(req: express.Request): Express.User {
+  if (!req.user) {
+    throw new UnauthorizedError();
+  }
 
-  saveUser(
-    userId: string,
-    data: Partial<Pick<User, "accessToken" | "refreshToken" | "fetchTime">>,
-  ): Promise<void>;
-};
+  return req.user;
+}
 
 export function requireAuthenticated(
   req: express.Request,
   res: express.Response,
   next: express.NextFunction,
 ): void {
-  if (req.user) {
-    next();
-
-    return;
+  if (!req.user) {
+    throw new UnauthorizedError();
   }
 
-  res.status(401).json({
-    error: "Not authenticated",
-  });
+  next();
 }
 
 export function createFreshTokenMiddleware(
-  repository: AuthRepository,
+  repository: AuthUserRepository,
 ): (
   req: express.Request,
   res: express.Response,
@@ -51,18 +48,10 @@ export function createFreshTokenMiddleware(
     res: express.Response,
     next: express.NextFunction,
   ): Promise<void> {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      res.status(401).json({
-        error: "Not authenticated",
-      });
-
-      return;
-    }
+    const { id: userId } = requireUser(req);
 
     try {
-      const user = await repository.getUser(userId);
+      const user = await repository.getAuthUser(userId);
 
       if (!user?.accessToken || !user?.refreshToken) {
         res.redirect("/api/auth/discord");
@@ -85,7 +74,7 @@ export function createFreshTokenMiddleware(
 
           refreshDiscordToken(user.refreshToken)
             .then(async (tokens): Promise<TokenRefreshResult> => {
-              await repository.saveUser(userId, {
+              await repository.updateAuthUser(userId, {
                 ...tokens,
 
                 fetchTime: Date.now(),
@@ -106,11 +95,16 @@ export function createFreshTokenMiddleware(
     } catch (error) {
       const err = error as Error;
 
-      logger.error("Discord token refresh failed", {
-        userId,
+      logger.error(
+        {
+          requestId: req.requestId,
 
-        message: err.message,
-      });
+          userId,
+
+          message: err.message,
+        },
+        "Discord token refresh failed",
+      );
 
       req.logout(() => {
         req.session.destroy(() => {
@@ -135,12 +129,16 @@ function refreshDiscordToken(
       refreshToken,
 
       (
-        error: unknown,
+        error: Error | { statusCode: number; data?: unknown },
         accessToken: string | undefined,
         newRefreshToken?: string,
       ): void => {
         if (error) {
-          reject(error);
+          reject(
+            error instanceof Error
+              ? error
+              : new Error(`Discord refresh error: ${JSON.stringify(error)}`),
+          );
 
           return;
         }

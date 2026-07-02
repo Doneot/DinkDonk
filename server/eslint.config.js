@@ -2,14 +2,19 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default [
+  {
+    ignores: ["dist/**", "node_modules/**", "eslint.config.js", "coverage/**"],
+  },
+
   js.configs.recommended,
-  ...tseslint.configs.recommended,
+  ...tseslint.configs.recommendedTypeChecked,
 
   {
     files: ["**/*.ts"],
     languageOptions: {
       parserOptions: {
-        project: true,
+        project: "./tsconfig.json",
+        tsconfigRootDir: import.meta.dirname,
       },
     },
     rules: {
@@ -23,7 +28,7 @@ export default [
 
       "@typescript-eslint/no-explicit-any": "warn",
 
-      "@typescript-eslint/explicit-function-return-type": "warn",
+      "@typescript-eslint/explicit-function-return-type": "off",
 
       "@typescript-eslint/no-floating-promises": "error",
 

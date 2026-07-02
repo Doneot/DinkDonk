@@ -2,10 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { REST, Routes } from "discord.js";
-import { assertDefined } from "./src/utils/assert.js";
-import { env, assertRequiredEnv } from "./src/config/env.js";
-
-assertRequiredEnv();
+import { assertDefined } from "./src/shared/utils/assert.js";
+import { env } from "./src/shared/config/env.js";
 
 const __filename = fileURLToPath(import.meta.url);
 
