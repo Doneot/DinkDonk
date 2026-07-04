@@ -1,12 +1,13 @@
 // src/components/UserMenu.jsx
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/authContextValue";
-import { api } from "../services/api";
+import { useNavigate } from "react-router-dom";
 
 const UserMenu = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -18,8 +19,9 @@ const UserMenu = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    api.post("/auth/logout");
+  const handleLogout = async () => {
+    await logout();
+    navigate("/");
   };
 
   return (
