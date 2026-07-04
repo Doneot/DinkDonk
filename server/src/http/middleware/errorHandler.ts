@@ -1,6 +1,11 @@
 import { logger } from "../../shared/logger/logger.js";
 
-import type { Request, Response, NextFunction } from "express";
+import type {
+  Request,
+  Response,
+  NextFunction,
+  ErrorRequestHandler,
+} from "express";
 
 import { AppError } from "../errors/AppError.js";
 import { env } from "../../shared/config/env.js";
@@ -17,12 +22,12 @@ function errorLogContext(error: Error, req: Request): Record<string, unknown> {
   };
 }
 
-export function errorHandler(
+export const errorHandler: ErrorRequestHandler = (
   error: Error,
   req: Request,
   res: Response,
   _: NextFunction,
-) {
+) => {
   if (error instanceof AppError) {
     logger.warn(errorLogContext(error, req), "Handled request error");
 
@@ -44,4 +49,4 @@ export function errorHandler(
     error: "internal_server_error",
     message: "Unexpected error",
   });
-}
+};

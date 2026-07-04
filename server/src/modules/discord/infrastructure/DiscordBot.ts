@@ -53,6 +53,8 @@ type DiscordClient = Client & {
 export class DiscordBot {
   private readonly token: string;
 
+  private readonly commandDirectory: string;
+
   private readonly context: CommandContext;
 
   private readonly onDmCapabilityChanged:
@@ -68,6 +70,8 @@ export class DiscordBot {
     onDmCapabilityChanged,
   }: DiscordBotOptions) {
     this.token = token;
+
+    this.commandDirectory = commandDirectory;
 
     this.context = context;
 
@@ -85,8 +89,6 @@ export class DiscordBot {
 
     this.client.commands = new Collection<string, Command>();
 
-    this.loadCommands(commandDirectory);
-
     this.registerEventHandlers();
   }
 
@@ -95,6 +97,7 @@ export class DiscordBot {
   }
 
   async start(): Promise<void> {
+    await this.loadCommands(this.commandDirectory);
     await this.client.login(this.token);
   }
 
@@ -102,19 +105,20 @@ export class DiscordBot {
     await this.client.destroy();
   }
 
-  private loadCommands(commandDirectory: string): void {
-    fs.readdirSync(commandDirectory)
-      .filter((file) => file.endsWith(".ts"))
+  private async loadCommands(commandDirectory: string): Promise<void> {
+    const files = fs
+      .readdirSync(commandDirectory)
+      .filter((file) => file.endsWith(".ts"));
 
-      .forEach(async (file): Promise<void> => {
-        const modulePath = path.join(commandDirectory, file);
+    for (const file of files) {
+      const modulePath = path.join(commandDirectory, file);
 
-        const commandModule = (await import(
-          pathToFileURL(modulePath).href
-        )) as Command;
+      const commandModule = (await import(
+        pathToFileURL(modulePath).href
+      )) as Command;
 
-        this.client.commands.set(commandModule.data.name, commandModule);
-      });
+      this.client.commands.set(commandModule.data.name, commandModule);
+    }
   }
 
   private registerEventHandlers(): void {

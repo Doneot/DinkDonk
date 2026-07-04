@@ -1,11 +1,11 @@
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-import { createTestApp } from "../../../test/helpers/createTestApp.js";
+import { createTestApp } from "../../../helpers/createTestApp.js";
 
 describe("api routes", () => {
   it("passes validated subscription bodies to repositories", async () => {
-    const ctx = createTestApp({ csrf: false });
+    const ctx = await createTestApp();
 
     const subscribeSpy = vi.spyOn(ctx.repositories.subscriptions, "subscribe");
 

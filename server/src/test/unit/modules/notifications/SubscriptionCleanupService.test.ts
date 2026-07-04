@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { SubscriptionCleanupService } from "../application/SubscriptionCleanupService.js";
+import { SubscriptionCleanupService } from "../../../../modules/notifications/application/SubscriptionCleanupService.js";
 
 function streamOnlineSubscription(id: string, streamerId: string) {
   return {

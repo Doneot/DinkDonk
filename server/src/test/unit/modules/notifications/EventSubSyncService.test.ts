@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { EventSubSyncService } from "../application/EventSubSyncService.js";
+import { EventSubSyncService } from "../../../../modules/notifications/application/EventSubSyncService.js";
 
 function createTwitch() {
   return {

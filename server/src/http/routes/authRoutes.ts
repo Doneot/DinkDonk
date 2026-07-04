@@ -6,6 +6,7 @@ import { requireUser } from "../middleware/auth.js";
 import type { DiscordService } from "../../modules/discord/ports/DiscordService.js";
 import type { UserRepository } from "../../modules/users/ports/UserRepository.js";
 import type { UserResponse } from "../schemas/responses.js";
+import { logger } from "../../shared/logger/logger.js";
 
 export const discordAuth = passport.authenticate("discord") as RequestHandler;
 
@@ -36,23 +37,26 @@ export function createAuthRouter({
     discordAuthCallback,
 
     async (req, res) => {
+      logger.info("Callback reached");
       const authUser = requireUser(req);
+      logger.info({ authUser }, "Authenticated");
       const user = await repository.getUser(authUser.id);
-
-      if (!user) {
-        res.status(500).send("Failed retrieving user");
-
-        return;
-      }
+      logger.info({ user }, "Fetched user");
 
       const canReceiveDM =
-        user?.canReceiveDM ?? (await discord.canSendDirectMessage(user.id));
+        user?.canReceiveDM ?? (await discord.canSendDirectMessage(authUser.id));
 
-      await repository.updateUser(user.id, {
+      logger.info({ canReceiveDM }, "DM capability");
+
+      await repository.updateUser(authUser.id, {
         canReceiveDM,
       });
 
+      logger.info("User updated");
+
       req.session.canReceiveDM = canReceiveDM;
+
+      logger.info("Redirecting");
 
       res.redirect(
         env.isProduction
@@ -99,7 +103,7 @@ export function createAuthRouter({
         req.session.destroy(() => {
           res.clearCookie("connect.sid");
 
-          res.redirect("/");
+          res.json({ ok: true });
         });
       });
     },

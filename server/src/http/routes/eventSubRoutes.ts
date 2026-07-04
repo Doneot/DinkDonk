@@ -9,9 +9,13 @@ import {
   eventSubRequestsTotal,
   eventSubSignatureFailuresTotal,
 } from "../../infrastructure/metrics/prometheus.js";
+import type { InMemoryReplayStore } from "../../modules/notifications/infrastructure/InMemoryReplayStore.js";
+import { eventSubDuplicateMessagesTotal } from "../../infrastructure/metrics/prometheus.js";
 
 type CreateEventSubRouterOptions = {
   secret: string;
+
+  replayStore: InMemoryReplayStore;
 
   onNotification: (
     type: string,
@@ -21,6 +25,7 @@ type CreateEventSubRouterOptions = {
 
 export function createEventSubRouter({
   secret,
+  replayStore,
   onNotification,
 }: CreateEventSubRouterOptions): Router {
   const router = express.Router();
@@ -40,8 +45,6 @@ export function createEventSubRouter({
         return;
       }
 
-      eventSubRequestsTotal.inc();
-
       const {
         "twitch-eventsub-message-id": messageId,
         "twitch-eventsub-message-signature": signature,
@@ -60,6 +63,14 @@ export function createEventSubRouter({
       ) {
         eventSubSignatureFailuresTotal.inc();
         res.sendStatus(403);
+        return;
+      }
+
+      eventSubRequestsTotal.inc();
+
+      if (!(await replayStore.rememberIfNew(messageId))) {
+        eventSubDuplicateMessagesTotal.inc();
+        res.sendStatus(204);
         return;
       }
 

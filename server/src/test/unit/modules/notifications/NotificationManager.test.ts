@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { NotificationManager } from "../application/NotificationManager.js";
+import { NotificationManager } from "../../../../modules/notifications/application/NotificationManager.js";
 import type {
   Notification,
   NotificationChannel,
-} from "../domain/Notification.js";
-import type { User } from "../../users/domain/User.js";
+} from "../../../../modules/notifications/domain/Notification.js";
+import type { User } from "../../../../modules/users/domain/User.js";
 
 const user: User = {
   id: "user-1",

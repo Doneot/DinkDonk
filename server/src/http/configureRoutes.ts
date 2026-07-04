@@ -23,8 +23,6 @@ import type { DiscordService } from "../modules/discord/ports/DiscordService.js"
 import { assertDefined } from "../shared/utils/assert.js";
 import { createHealthRouter } from "./routes/healthRoutes.js";
 
-import { ensureCsrfCookie } from "./middleware/csrf.js";
-
 type ConfigureRoutesOptions = {
   app: Express;
 
@@ -68,8 +66,6 @@ export function configureRoutes({
 
   app.use(
     "/api",
-
-    ensureCsrfCookie,
 
     requireAuthenticated,
 

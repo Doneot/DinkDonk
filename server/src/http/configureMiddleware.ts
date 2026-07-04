@@ -12,7 +12,6 @@ import cookieParser from "cookie-parser";
 import { env } from "../shared/config/env.js";
 
 import { createEventSubRouter } from "./routes/eventSubRoutes.js";
-import { createEventSubReplayProtection } from "./middleware/eventSubReplayProtection.js";
 import { InMemoryReplayStore } from "../modules/notifications/infrastructure/InMemoryReplayStore.js";
 
 import { FirestoreSessionRepository } from "../modules/auth/infrastructure/firestore/FirestoreSessionRepository.js";
@@ -72,8 +71,9 @@ export function configureMiddleware({
   services,
 }: ConfigureMiddlewareOptions) {
   const configuredPassport = configurePassport(authUserRepository);
-
-  const replayStore = new InMemoryReplayStore({ ttlMs: 10 * 60_000 });
+  const replayStore = new InMemoryReplayStore({
+    ttlMs: 10 * 60_000,
+  });
 
   app.use(
     cors({
@@ -101,6 +101,8 @@ export function configureMiddleware({
     createEventSubRouter({
       secret: assertDefined(env.twitch.webhookSecret, "Twitch Webhook Secret"),
 
+      replayStore,
+
       onNotification: (type, event) => {
         if (type === "stream.online") {
           return services.streamNotification.handleStreamOnline(event);
@@ -110,8 +112,6 @@ export function configureMiddleware({
       },
     }),
   );
-
-  app.use(createEventSubReplayProtection(replayStore));
 
   app.use(helmet());
 

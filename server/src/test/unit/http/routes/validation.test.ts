@@ -1,12 +1,12 @@
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-import { errorResponseSchema } from "../../schemas/responses.js";
-import { createTestApp } from "../../../test/helpers/createTestApp.js";
+import { errorResponseSchema } from "../../../../http/schemas/responses.js";
+import { createTestApp } from "../../../helpers/createTestApp.js";
 
 describe("api routes", () => {
   it("returns a validation error before calling route dependencies", async () => {
-    const ctx = createTestApp();
+    const ctx = await createTestApp();
 
     const searchSpy = vi.spyOn(ctx.twitch, "searchStreamers");
 

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { StreamNotificationService } from "../application/StreamNotificationService.js";
-import type { TwitchEventSubStreamOnlineEvent } from "../../twitch/domain/Twitch.js";
-import type { NotificationManager } from "../application/NotificationManager.js";
+import { StreamNotificationService } from "../../../../modules/notifications/application/StreamNotificationService.js";
+import type { TwitchEventSubStreamOnlineEvent } from "../../../../modules/twitch/domain/Twitch.js";
+import type { NotificationManager } from "../../../../modules/notifications/application/NotificationManager.js";
 
 const event: TwitchEventSubStreamOnlineEvent = {
   broadcaster_user_id: "streamer-1",
@@ -52,9 +52,7 @@ describe("StreamNotificationService", () => {
       unsubscribe: vi.fn(),
       updateSubscription: vi.fn(),
     };
-    const notify = vi
-      .fn<NotificationManager["notify"]>()
-      .mockResolvedValue([]);
+    const notify = vi.fn<NotificationManager["notify"]>().mockResolvedValue([]);
     const notificationManager = {
       notify,
     } as unknown as NotificationManager;

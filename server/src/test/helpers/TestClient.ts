@@ -4,15 +4,9 @@ import type { Express, NextFunction, Request, Response } from "express";
 import type { AuthUser } from "../../modules/auth/domain/AuthUser.js";
 import type { Repositories } from "../../app/container/repositories.js";
 
-import { getCookie } from "./cookies.js";
-
-const CSRF_COOKIE = "__Host-csrf";
-const CSRF_HEADER = "x-csrf-token";
-
 export class TestClient {
   public readonly agent;
 
-  private csrfToken?: string;
   private initialized = false;
 
   private authUser?: AuthUser | undefined;
@@ -54,35 +48,18 @@ export class TestClient {
   }
 
   public async post(path: string) {
-    await this.initialize();
-    return this.agent.post(path).set(CSRF_HEADER, this.csrfToken!);
+    return this.agent.post(path);
   }
 
   public async put(path: string) {
-    await this.initialize();
-    return this.agent.put(path).set(CSRF_HEADER, this.csrfToken!);
+    return this.agent.put(path);
   }
 
   public async patch(path: string) {
-    await this.initialize();
-    return this.agent.patch(path).set(CSRF_HEADER, this.csrfToken!);
+    return this.agent.patch(path);
   }
 
   public async delete(path: string) {
-    await this.initialize();
-    return this.agent.delete(path).set(CSRF_HEADER, this.csrfToken!);
-  }
-
-  // -------------------------
-  // CSRF INITIALIZATION
-  // -------------------------
-  private async initialize(): Promise<void> {
-    if (this.initialized) return;
-
-    const response = await this.agent.get("/api/status");
-
-    this.csrfToken = getCookie(response, CSRF_COOKIE);
-
-    this.initialized = true;
+    return this.agent.delete(path);
   }
 }

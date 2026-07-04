@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { streamerSummaryResponseSchema } from "../../schemas/responses.js";
-import { createTestApp } from "../../../test/helpers/createTestApp.js";
-import { TestClient } from "../../../test/helpers/TestClient.js";
+import { streamerSummaryResponseSchema } from "../../../../http/schemas/responses.js";
+import { createTestApp } from "../../../helpers/createTestApp.js";
+import { TestClient } from "../../../helpers/TestClient.js";
 
 describe("api routes", () => {
   it("returns typed streamer search results from validated query data", async () => {
-    const ctx = createTestApp({ csrf: false });
+    const ctx = await createTestApp();
 
     const searchSpy = vi.spyOn(ctx.twitch, "searchStreamers");
 

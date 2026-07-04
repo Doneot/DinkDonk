@@ -1,7 +1,7 @@
 import type { AxiosInstance, AxiosRequestConfig } from "axios";
 import { describe, expect, it, vi } from "vitest";
 
-import { TwitchClient } from "../infrastructure/TwitchClient.js";
+import { TwitchClient } from "../../../../modules/twitch/infrastructure/TwitchClient.js";
 
 function createHttpMock() {
   const request = vi

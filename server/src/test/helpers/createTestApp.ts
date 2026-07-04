@@ -1,27 +1,20 @@
+import cookieParser from "cookie-parser";
 import express from "express";
 import session from "express-session";
-import cookieParser from "cookie-parser";
 
 import type { Express, NextFunction, Request, Response } from "express";
 
-import type { Repositories } from "../../app/container/repositories.js";
-import type { DiscordService } from "../../modules/discord/ports/DiscordService.js";
-import type { TwitchStreamerProvider } from "../../modules/twitch/ports/TwitchGateway.js";
-
 import { createApiRouter } from "../../http/routes/apiRoutes.js";
-import { requestId } from "../../http/middleware/requestId.js";
-import { initializeValidatedRequest } from "../../http/middleware/validate.js";
 import { requireAuthenticated } from "../../http/middleware/auth.js";
 import { errorHandler } from "../../http/middleware/errorHandler.js";
-import { ensureCsrfCookie } from "../../http/middleware/csrf.js";
+import { requestId } from "../../http/middleware/requestId.js";
+import { initializeValidatedRequest } from "../../http/middleware/validate.js";
 
-import { InMemoryUserRepository } from "../repositories/inMemory/InMemoryUserRepository.js";
-import { InMemoryAuthUserRepository } from "../repositories/inMemory/InMemoryAuthUserRepository.js";
-import { InMemoryStreamerRepository } from "../repositories/inMemory/InMemoryStreamerRepository.js";
-import { InMemorySubscriptionRepository } from "../repositories/inMemory/InMemorySubscriptionRepository.js";
-import { InMemoryPushSubscriptionRepository } from "../repositories/inMemory/InMemoryPushSubscriptionRepository.js";
+import { seedState } from "../fixtures/seedState.js";
+import { createTestContainer } from "./createTestContainer.js";
+import type { TestState } from "../fixtures/seedState.js";
 
-const authUser = {
+const DEFAULT_AUTH_USER = Object.freeze({
   id: "user-1",
   username: "tester",
   discriminator: "0",
@@ -29,55 +22,34 @@ const authUser = {
   accessToken: "access-token",
   refreshToken: "refresh-token",
   fetchTime: Date.now(),
-};
-
-function createRepositories(): Repositories {
-  return {
-    users: new InMemoryUserRepository(),
-    authUsers: new InMemoryAuthUserRepository(),
-    streamers: new InMemoryStreamerRepository(),
-    subscriptions: new InMemorySubscriptionRepository(),
-    pushSubscriptions: new InMemoryPushSubscriptionRepository(),
-  };
-}
-
-function createTwitch(): TwitchStreamerProvider {
-  return {
-    getStreamer: async () => await Promise.resolve(null),
-    fetchStreamers: async () => await Promise.resolve([]),
-    searchStreamers: async () =>
-      await Promise.resolve([
-        {
-          id: "streamer-1",
-          login: "streamer",
-          display_name: "Streamer",
-          profile_image_url: "https://example.com/avatar.png",
-        },
-      ]),
-  };
-}
-
-function createDiscord(): DiscordService {
-  return {
-    isReady: true,
-    canSendDirectMessage: async () => await Promise.resolve(true),
-  };
-}
+});
 
 export interface TestContext {
   app: Express;
-  repositories: Repositories;
-  twitch: TwitchStreamerProvider;
-  discord: DiscordService;
+  repositories: ReturnType<typeof createTestContainer>["repositories"];
+  twitch: ReturnType<typeof createTestContainer>["twitch"];
+  discord: ReturnType<typeof createTestContainer>["discord"];
 }
 
-export function createTestApp(options?: {
+export type CreateTestAppOptions = {
   authenticated?: boolean;
-  csrf?: boolean;
-}): TestContext {
-  const repositories = createRepositories();
-  const twitch = createTwitch();
-  const discord = createDiscord();
+  authUser?: typeof DEFAULT_AUTH_USER;
+  state?: TestState;
+};
+
+function mockAuthenticatedUser(user = DEFAULT_AUTH_USER) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    req.user = user;
+    next();
+  };
+}
+
+export async function createTestApp(
+  options: CreateTestAppOptions = {},
+): Promise<TestContext> {
+  const container = createTestContainer();
+
+  await seedState(container, options.state);
 
   const app = express();
 
@@ -97,27 +69,19 @@ export function createTestApp(options?: {
     }),
   );
 
-  if (options?.authenticated !== false) {
-    app.use((req: Request, _res: Response, next: NextFunction) => {
-      req.user = authUser;
-      next();
-    });
-  }
-
-  if (options?.csrf) {
-    app.use(ensureCsrfCookie);
+  if (options.authenticated !== false) {
+    app.use(mockAuthenticatedUser(options.authUser));
   }
 
   app.use(
     "/api",
     requireAuthenticated,
     createApiRouter({
-      repositories,
-      twitch,
-      discord,
+      repositories: container.repositories,
+      twitch: container.twitch,
+      discord: container.discord,
       ensureFreshToken: (_req, _res, next) => next(),
       webPushPublicKey: "test-public-key",
-      csrfEnabled: Boolean(options?.csrf),
     }),
   );
 
@@ -125,8 +89,8 @@ export function createTestApp(options?: {
 
   return {
     app,
-    repositories,
-    twitch,
-    discord,
+    repositories: container.repositories,
+    twitch: container.twitch,
+    discord: container.discord,
   };
 }

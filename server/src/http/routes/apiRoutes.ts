@@ -38,7 +38,6 @@ import type {
   StreamerSummaryResponse,
   UserCountResponse,
 } from "../schemas/responses.js";
-import { verifyCsrf } from "../middleware/csrf.js";
 import { discordDmChecksTotal } from "../../infrastructure/metrics/prometheus.js";
 
 type CreateApiRouterOptions = {
@@ -51,8 +50,6 @@ type CreateApiRouterOptions = {
   ensureFreshToken: express.RequestHandler;
 
   webPushPublicKey?: string;
-
-  csrfEnabled?: boolean;
 };
 
 export function createApiRouter({
@@ -61,7 +58,6 @@ export function createApiRouter({
   discord,
   ensureFreshToken,
   webPushPublicKey,
-  csrfEnabled = true,
 }: CreateApiRouterOptions): Router {
   const router = express.Router();
 
@@ -227,9 +223,6 @@ export function createApiRouter({
       res.json(payload);
     },
   );
-  if (csrfEnabled) {
-    router.use(verifyCsrf);
-  }
 
   router.post(
     "/notifications/web-push/subscriptions",
