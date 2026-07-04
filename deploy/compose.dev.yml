@@ -23,7 +23,6 @@ services:
     volumes:
       - ../server:/app
       - node_modules:/app/node_modules
-    command: npm run dev:ngrok
     ports:
       - "3000:3000"
     depends_on:
