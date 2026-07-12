@@ -4,6 +4,16 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 import { EnvSchema } from "./envSchema.js";
 
+const envFile =
+  process.env.NODE_ENV === "production"
+    ? ".env"
+    : ".env.development";
+
+dotenv.config({
+  path: path.resolve(process.cwd(), envFile),
+});
+
+
 const parsedEnv = EnvSchema.parse(process.env);
 
 export const env = {
