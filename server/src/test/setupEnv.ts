@@ -16,3 +16,4 @@ process.env.FIREBASE_CLIENT_ID = "firebase-client-id";
 process.env.ADMIN_PASSWORD = "admin-password";
 process.env.WEB_PUSH_PUBLIC_KEY = "web-push-public-key";
 process.env.WEB_PUSH_PRIVATE_KEY = "web-push-private-key";
+process.env.WEB_PUSH_SUBJECT = "mailto:test@example.com";

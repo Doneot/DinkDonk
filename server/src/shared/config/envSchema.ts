@@ -50,6 +50,8 @@ const BaseEnvSchema = z.object({
 
   WEB_PUSH_PRIVATE_KEY: z.string().min(1),
 
+  WEB_PUSH_SUBJECT: z.string().min(1),
+
   PROMETHEUS_ENABLED: booleanFromEnv,
 });
 
