@@ -20,6 +20,8 @@ const BaseEnvSchema = z.object({
 
   DISCORD_CLIENT_SECRET: z.string().min(1),
 
+  DISCORD_TOKEN: z.string().min(1),
+
   DISCORD_GUILD_ID: z.string().optional(),
 
   TWITCH_CLIENT_ID: z.string().min(1),

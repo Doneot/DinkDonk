@@ -4,6 +4,7 @@ process.env.CLIENT_ORIGIN = "http://localhost:5000";
 process.env.SESSION_SECRET = "test-session-secret";
 process.env.DISCORD_CLIENT_ID = "discord-client-id";
 process.env.DISCORD_CLIENT_SECRET = "discord-client-secret";
+process.env.DISCORD_TOKEN = "discord-token";
 process.env.TWITCH_CLIENT_ID = "twitch-client-id";
 process.env.TWITCH_CLIENT_SECRET = "twitch-client-secret";
 process.env.TWITCH_WEBHOOK_SECRET = "twitch-webhook-secret";
