@@ -46,7 +46,6 @@ export const env = {
   webPush: {
     publicKey: parsedEnv.WEB_PUSH_PUBLIC_KEY,
     privateKey: parsedEnv.WEB_PUSH_PRIVATE_KEY,
-    subject: parsedEnv.WEB_PUSH_SUBJECT,
   },
   prometheus: {
     enabled: parsedEnv.PROMETHEUS_ENABLED,
