@@ -31,7 +31,6 @@ services:
       - .env.production
     secrets:
       - firebase_service_account
-      - discord_token
       - discord_client_secret
       - twitch_client_secret
       - twitch_webhook_secret
@@ -69,8 +68,6 @@ networks:
 secrets:
   firebase_service_account:
     file: ./secrets/firebase-service-account.json
-  discord_token:
-    file: ./secrets/discord-token
   discord_client_secret:
     file: ./secrets/discord-client-secret
   twitch_client_secret:

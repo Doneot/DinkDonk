@@ -29,7 +29,6 @@ export const env = {
     webhookSecret: parsedEnv.TWITCH_WEBHOOK_SECRET,
   },
   discord: {
-    token: parsedEnv.DISCORD_TOKEN,
     clientId: parsedEnv.DISCORD_CLIENT_ID,
     clientSecret: parsedEnv.DISCORD_CLIENT_SECRET,
     guildId: parsedEnv.DISCORD_GUILD_ID,

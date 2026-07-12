@@ -31,7 +31,6 @@ services:
       - .env.staging
     secrets:
       - firebase_service_account
-      - discord_token
       - discord_client_secret
       - twitch_client_secret
       - twitch_webhook_secret
@@ -69,8 +68,6 @@ networks:
 secrets:
   firebase_service_account:
     file: ./secrets-staging/firebase-service-account.json
-  discord_token:
-    file: ./secrets-staging/discord-token
   discord_client_secret:
     file: ./secrets-staging/discord-client-secret
   twitch_client_secret:
