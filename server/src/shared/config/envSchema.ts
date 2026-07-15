@@ -55,6 +55,12 @@ const BaseEnvSchema = z.object({
   WEB_PUSH_SUBJECT: z.string().min(1),
 
   PROMETHEUS_ENABLED: booleanFromEnv,
+
+  NGROK_AUTH_TOKEN: z.string().optional(),
+
+  SSH_TUNNEL_URL: z.string().optional(),
+
+  TUNNEL_PROVIDER: z.enum(["ngrok", "ssh"]).optional(),
 });
 
 export const EnvSchema = BaseEnvSchema.superRefine((env, ctx) => {

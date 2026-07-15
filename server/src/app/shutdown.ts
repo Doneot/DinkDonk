@@ -4,8 +4,11 @@ import type { SubscriptionCleanupScheduler } from "./SubscriptionCleanupSchedule
 import type { UserChangeBroadcaster } from "../modules/users/application/UserChangeBroadcaster.js";
 import { env } from "../shared/config/env.js";
 import { logger } from "../shared/logger/logger.js";
+import type { Runtime } from "./runtime/Runtime.js";
+import { closeHttpServer } from "../shared/utils/http.js";
 
 export function registerShutdownHooks(
+  runtime: Runtime,
   { twitch, discord }: Container,
   { httpServer, sockets }: Server,
   userChangeBroadCaster: UserChangeBroadcaster,
@@ -26,9 +29,11 @@ export function registerShutdownHooks(
 
     cleanScheduler.stop();
 
-    httpServer.close();
-
     try {
+      await runtime.dispose();
+
+      await closeHttpServer(httpServer);
+
       await sockets.close();
 
       await discord.stop();
@@ -38,6 +43,10 @@ export function registerShutdownHooks(
       });
 
       logger.info("Shutdown complete");
+
+      await new Promise<void>((resolve) => {
+        logger.flush(() => resolve());
+      });
 
       process.exit(0);
     } catch (error) {
@@ -54,6 +63,11 @@ export function registerShutdownHooks(
       process.exit(1);
     }
   };
+
+  if (process.platform === "win32") {
+    logger.info("registering SIGBREAK");
+    process.on("SIGBREAK", shutdown);
+  }
 
   process.on("SIGINT", shutdown);
 

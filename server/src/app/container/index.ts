@@ -11,6 +11,7 @@ import type { NotificationManager } from "../../modules/notifications/applicatio
 import type { EventSubSyncService } from "../../modules/notifications/application/EventSubSyncService.js";
 import type { StreamNotificationService } from "../../modules/notifications/application/StreamNotificationService.js";
 import type { SubscriptionCleanupService } from "../../modules/notifications/application/SubscriptionCleanupService.js";
+import type { Runtime } from "../runtime/Runtime.js";
 
 export interface Container {
   firestore: FirebaseFirestore.Firestore;
@@ -28,12 +29,12 @@ export interface Container {
   notificationManager: NotificationManager;
 }
 
-export function createContainer(): Container {
+export function createContainer(runtime: Runtime): Container {
   const firestore = createFirestore();
 
   const repositories = createRepositories(firestore);
 
-  const { twitch, discord } = createProviders(repositories);
+  const { twitch, discord } = createProviders(repositories, runtime);
 
   const notificationManager = createNotificationManager(discord, repositories);
 

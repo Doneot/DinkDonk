@@ -1,3 +1,4 @@
+import { createRuntime } from "./runtime/createRuntime.js";
 import { createContainer } from "./container/index.js";
 import { createServer } from "./server.js";
 import { UserChangeBroadcaster } from "../modules/users/application/UserChangeBroadcaster.js";
@@ -9,7 +10,9 @@ import { env } from "../shared/config/env.js";
 import { logger } from "../shared/logger/logger.js";
 
 export async function bootstrap() {
-  const container = createContainer();
+  const runtime = await createRuntime();
+
+  const container = createContainer(runtime);
 
   const server = createServer(container);
 
@@ -40,6 +43,7 @@ export async function bootstrap() {
   cleanupScheduler.start();
 
   registerShutdownHooks(
+    runtime,
     container,
     server,
     userChangeBroadcaster,

@@ -18,3 +18,6 @@ process.env.ADMIN_PASSWORD = "admin-password";
 process.env.WEB_PUSH_PUBLIC_KEY = "web-push-public-key";
 process.env.WEB_PUSH_PRIVATE_KEY = "web-push-private-key";
 process.env.WEB_PUSH_SUBJECT = "mailto:test@example.com";
+process.env.NGROK_AUTH_TOKEN = "ngrok-auth-token";
+process.env.SSH_TUNNEL_URL = "http://localhost:4000";
+process.env.TUNNEL_PROVIDER = "ngrok";

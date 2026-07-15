@@ -5,14 +5,11 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 import { EnvSchema } from "./envSchema.js";
 
 const envFile =
-  process.env.NODE_ENV === "production"
-    ? ".env"
-    : ".env.development";
+  process.env.NODE_ENV === "production" ? ".env" : ".env.development";
 
 dotenv.config({
   path: path.resolve(process.cwd(), envFile),
 });
-
 
 const parsedEnv = EnvSchema.parse(process.env);
 
@@ -61,5 +58,14 @@ export const env = {
   },
   prometheus: {
     enabled: parsedEnv.PROMETHEUS_ENABLED,
+  },
+  tunneling: {
+    provider: parsedEnv.TUNNEL_PROVIDER,
+    ngrok: {
+      authToken: parsedEnv.NGROK_AUTH_TOKEN,
+    },
+    ssh: {
+      tunnelUrl: parsedEnv.SSH_TUNNEL_URL,
+    },
   },
 };

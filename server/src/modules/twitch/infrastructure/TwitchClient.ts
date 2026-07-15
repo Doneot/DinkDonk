@@ -26,6 +26,8 @@ export type TwitchRequestOptions = {
 };
 
 export type TwitchClientOptions = {
+  publicUrl: string;
+
   http?: AxiosInstance;
 
   clientId?: string;
@@ -50,19 +52,24 @@ export class TwitchClient {
 
   private readonly clientId: string;
 
+  readonly callbackUrl: string;
+
   private accessToken?: string;
 
   constructor({
+    publicUrl,
     http = axios.create(),
     clientId = assertDefined(
       env.twitch.clientId,
       "Twitch Client ID is not defined",
     ),
     accessToken,
-  }: TwitchClientOptions = {}) {
+  }: TwitchClientOptions) {
     this.http = http;
 
     this.clientId = clientId;
+
+    this.callbackUrl = `${publicUrl}/eventsub`;
 
     if (accessToken) {
       this.accessToken = accessToken;
@@ -226,7 +233,7 @@ export class TwitchClient {
         transport: {
           method: "webhook",
 
-          callback: `${env.serverUrl}/eventsub`,
+          callback: this.callbackUrl,
 
           secret: env.twitch.webhookSecret,
         },

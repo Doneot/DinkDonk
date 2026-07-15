@@ -1,15 +1,14 @@
 import { EventEmitter } from "node:events";
 
 import { logger } from "../../../shared/logger/logger.js";
-import { env } from "../../../shared/config/env.js";
 
-import { TwitchClient } from "../infrastructure/TwitchClient.js";
+import type { TwitchClient } from "../infrastructure/TwitchClient.js";
 import { TwitchAuthenticator } from "../infrastructure/TwitchAuthenticator.js";
 
 import { subscriptionsDeletedTotal } from "../../../infrastructure/metrics/prometheus.js";
 
 export type TwitchProviderOptions = {
-  client?: TwitchClient;
+  client: TwitchClient;
 
   authenticator?: TwitchAuthenticator;
 
@@ -28,10 +27,10 @@ export class TwitchProvider extends EventEmitter {
   private tokenRefreshAt = 0;
 
   constructor({
-    client = new TwitchClient(),
+    client,
     authenticator = new TwitchAuthenticator(),
     refreshIntervalMs = 60_000,
-  }: TwitchProviderOptions = {}) {
+  }: TwitchProviderOptions) {
     super();
 
     this.client = client;
@@ -100,7 +99,7 @@ export class TwitchProvider extends EventEmitter {
 
     const matchingSubscriptions = subscriptions.filter(
       (subscription) =>
-        subscription.transport?.callback === `${env.serverUrl}/eventsub`,
+        subscription.transport?.callback === this.client.callbackUrl,
     );
 
     await Promise.all(

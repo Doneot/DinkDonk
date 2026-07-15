@@ -28,7 +28,10 @@ function createHttpMock() {
 describe("TwitchClient", () => {
   it("requests streamer records by batching id query params", async () => {
     const { http, request: httpRequest } = createHttpMock();
-    const client = new TwitchClient({ http });
+    const client = new TwitchClient({
+      publicUrl: "http://localhost:3000",
+      http,
+    });
 
     await client.fetchStreamers(["streamer-1", "streamer-2"]);
 
@@ -41,7 +44,10 @@ describe("TwitchClient", () => {
 
   it("builds EventSub webhook subscription requests", async () => {
     const { http, request: httpRequest } = createHttpMock();
-    const client = new TwitchClient({ http });
+    const client = new TwitchClient({
+      publicUrl: "http://localhost:3000",
+      http,
+    });
 
     await client.subscribeToEvent("stream.online", {
       broadcaster_user_id: "streamer-1",

@@ -7,18 +7,21 @@ import { DiscordBot } from "../../modules/discord/infrastructure/DiscordBot.js";
 import { env } from "../../shared/config/env.js";
 import { assertDefined } from "../../shared/utils/assert.js";
 
-import type { TwitchClient } from "../../modules/twitch/infrastructure/TwitchClient.js";
+import { TwitchClient } from "../../modules/twitch/infrastructure/TwitchClient.js";
 
 import type { Repositories } from "./repositories.js";
 import type { UserRepository } from "../../modules/users/ports/UserRepository.js";
 import type { StreamerRepository } from "../../modules/streamers/ports/StreamerRepository.js";
 import type { SubscriptionRepository } from "../../modules/subscriptions/ports/SubscriptionRepository.js";
+import type { Runtime } from "../runtime/Runtime.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export function createProviders(repositories: Repositories) {
-  const twitch = new TwitchProvider();
+export function createProviders(repositories: Repositories, runtime: Runtime) {
+  const twitch = new TwitchProvider({
+    client: new TwitchClient({ publicUrl: runtime.publicUrl }),
+  });
 
   const context: {
     twitch: TwitchClient;
