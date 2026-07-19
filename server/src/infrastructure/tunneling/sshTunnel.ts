@@ -20,6 +20,13 @@ export async function startSshTunnel(): Promise<Tunnel> {
     },
   );
 
+  let exited = false;
+
+  process.once("exit", () => {
+    console.log(`process ${process.pid} exited`);
+    exited = true;
+  });
+
   await new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, 750);
 
@@ -35,7 +42,8 @@ export async function startSshTunnel(): Promise<Tunnel> {
     url: assertDefined(env.tunneling.ssh.tunnelUrl, "SSH Tunnel Url"),
 
     async stop() {
-      if (process.pid) {
+      if (!exited && process.pid) {
+        console.log("killing ssh");
         await killProcessTree(process.pid);
       }
     },

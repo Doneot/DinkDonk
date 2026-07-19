@@ -65,7 +65,6 @@ export function registerShutdownHooks(
   };
 
   if (process.platform === "win32") {
-    logger.info("registering SIGBREAK");
     process.on("SIGBREAK", shutdown);
   }
 

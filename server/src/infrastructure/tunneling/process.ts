@@ -11,12 +11,21 @@ export function killProcessTree(
     }
 
     kill(pid, signal, (error) => {
-      if (error) {
-        reject(error);
+      if (!error) {
+        resolve();
         return;
       }
 
-      resolve();
+      if (
+        process.platform === "win32" &&
+        "code" in error &&
+        error.code === 128
+      ) {
+        resolve();
+        return;
+      }
+
+      reject(error);
     });
   });
 }
