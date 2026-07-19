@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { UserRepository } from "../../../modules/users/ports/UserRepository.js";
 
 import { buildUser } from "../../builders/user.js";
-import { SeededRepositoryFactory } from "./SeededRepository.js";
-import { User } from "../../../modules/users/domain/User.js";
+import type { SeededRepositoryFactory } from "./SeededRepository.js";
+import type { User } from "../../../modules/users/domain/User.js";
 
 export function userRepositoryBehavior(
   name: string,

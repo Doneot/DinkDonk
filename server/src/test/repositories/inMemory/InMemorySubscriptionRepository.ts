@@ -28,36 +28,38 @@ export class InMemorySubscriptionRepository
     return super.on(event, listener);
   }
 
-  async getSubscription(
+  getSubscription(
     userId: string,
     streamerId: string,
   ): Promise<Subscription | null> {
     if (!isNonEmptyString(userId) || !isNonEmptyString(streamerId)) {
-      return null;
+      return Promise.resolve(null);
     }
 
-    return this.userSubscriptions.get(userId)?.get(streamerId) ?? null;
+    return Promise.resolve(
+      this.userSubscriptions.get(userId)?.get(streamerId) ?? null,
+    );
   }
 
-  async subscribe(
+  subscribe(
     userId: string,
     streamerId: string,
     notificationMessage = "",
   ): Promise<SubscribeResult> {
     if (!isNonEmptyString(userId) || !isNonEmptyString(streamerId)) {
-      return {
+      return Promise.resolve({
         success: false,
         reason: "invalid_input",
-      };
+      });
     }
 
     const subscriptions = this.ensureUser(userId);
 
     if (subscriptions.has(streamerId)) {
-      return {
+      return Promise.resolve({
         success: false,
         reason: "already_subscribed",
-      };
+      });
     }
 
     subscriptions.set(streamerId, {
@@ -80,30 +82,27 @@ export class InMemorySubscriptionRepository
       this.emit("streamerAdded", streamerId);
     }
 
-    return {
+    return Promise.resolve({
       success: true,
       createdStreamer,
-    };
+    });
   }
 
-  async unsubscribe(
-    userId: string,
-    streamerId: string,
-  ): Promise<UnsubscribeResult> {
+  unsubscribe(userId: string, streamerId: string): Promise<UnsubscribeResult> {
     if (!isNonEmptyString(userId) || !isNonEmptyString(streamerId)) {
-      return {
+      return Promise.resolve({
         success: false,
         reason: "invalid_input",
-      };
+      });
     }
 
     const subscriptions = this.userSubscriptions.get(userId);
 
     if (!subscriptions) {
-      return {
+      return Promise.resolve({
         success: false,
         reason: "user_not_found",
-      };
+      });
     }
 
     subscriptions.delete(streamerId);
@@ -119,13 +118,13 @@ export class InMemorySubscriptionRepository
       }
     }
 
-    return {
+    return Promise.resolve({
       success: true,
       usersLeft: users?.size ?? 0,
-    };
+    });
   }
 
-  async updateSubscription(
+  updateSubscription(
     userId: string,
     streamerId: string,
     data: Partial<Subscription>,
@@ -133,19 +132,19 @@ export class InMemorySubscriptionRepository
     const subscriptions = this.userSubscriptions.get(userId);
 
     if (!subscriptions) {
-      return {
+      return Promise.resolve({
         success: false,
         reason: "user_not_found",
-      };
+      });
     }
 
     const existing = subscriptions.get(streamerId);
 
     if (!existing) {
-      return {
+      return Promise.resolve({
         success: false,
         reason: "subscription_not_found",
-      };
+      });
     }
 
     subscriptions.set(streamerId, {
@@ -153,9 +152,9 @@ export class InMemorySubscriptionRepository
       ...data,
     });
 
-    return {
+    return Promise.resolve({
       success: true,
-    };
+    });
   }
 
   seed(userId: string, subscription: Subscription): void {

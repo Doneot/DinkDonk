@@ -11,19 +11,19 @@ export class InMemoryStreamerRepository
 {
   private readonly streamers = new Map<string, Streamer>();
 
-  async getStreamers(): Promise<Streamer[]> {
-    return [...this.streamers.values()];
+  getStreamers(): Promise<Streamer[]> {
+    return Promise.resolve([...this.streamers.values()]);
   }
 
-  async getStreamer(id: string): Promise<Streamer | null> {
+  getStreamer(id: string): Promise<Streamer | null> {
     if (!isNonEmptyString(id)) {
-      return null;
+      return Promise.resolve(null);
     }
 
-    return this.streamers.get(id) ?? null;
+    return Promise.resolve(this.streamers.get(id) ?? null);
   }
 
-  async createStreamer(id: string): Promise<void> {
+  createStreamer(id: string): Promise<void> {
     const existing = this.streamers.get(id);
 
     this.streamers.set(id, {
@@ -32,14 +32,18 @@ export class InMemoryStreamerRepository
     });
 
     this.emit("streamerAdded", id);
+
+    return Promise.resolve();
   }
 
-  async deleteStreamer(id: string): Promise<void> {
+  deleteStreamer(id: string): Promise<void> {
     if (!isNonEmptyString(id)) {
-      return;
+      return Promise.resolve();
     }
 
     this.streamers.delete(id);
+
+    return Promise.resolve();
   }
 
   seed(streamer: Streamer): void {

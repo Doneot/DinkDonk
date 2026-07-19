@@ -47,12 +47,13 @@ export async function seedState(
   }
 
   for (const pushSubscription of state.pushSubscriptions ?? []) {
-    const { endpoint } = pushSubscription.subscription.subscription;
+    const { endpoint, keys } = pushSubscription.subscription.subscription;
 
     await repositories.pushSubscriptions.savePushSubscription(
       pushSubscription.userId,
       {
         endpoint,
+        keys,
       },
       pushSubscription.subscription.userAgent
         ? {

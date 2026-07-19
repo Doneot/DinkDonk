@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { PushSubscriptionRepository } from "../../../modules/notifications/ports/PushSubscriptionRepository.js";
 import { buildPushSubscription } from "../../builders/pushSubscription.js";
 
-import { SeededRepositoryFactory } from "./SeededRepository.js";
+import type { SeededRepositoryFactory } from "./SeededRepository.js";
 import type { PushSubscription } from "../../../modules/notifications/domain/PushSubscription.js";
 
 export function pushSubscriptionRepositoryBehavior(

@@ -10,26 +10,28 @@ import { isNonEmptyString } from "../../../shared/utils/validators.js";
 export class InMemoryPushSubscriptionRepository implements PushSubscriptionRepository {
   private readonly store = new Map<string, Map<string, PushSubscription>>();
 
-  async getPushSubscriptions(userId: string): Promise<PushSubscription[]> {
+  getPushSubscriptions(userId: string): Promise<PushSubscription[]> {
     if (!isNonEmptyString(userId)) {
-      return [];
+      return Promise.resolve([]);
     }
 
-    return [...(this.store.get(userId)?.values() ?? [])].map((subscription) =>
-      structuredClone(subscription),
+    return Promise.resolve(
+      [...(this.store.get(userId)?.values() ?? [])].map((subscription) =>
+        structuredClone(subscription),
+      ),
     );
   }
 
-  async savePushSubscription(
+  savePushSubscription(
     userId: string,
     subscription: PushSubscription["subscription"],
     metadata: { userAgent?: string } = {},
   ): Promise<SavePushSubscribeResult> {
     if (!isNonEmptyString(userId) || !subscription?.endpoint) {
-      return {
+      return Promise.resolve({
         success: false,
         reason: "invalid_push_subscription",
-      };
+      });
     }
 
     const id = this.getId(subscription.endpoint);
@@ -44,33 +46,35 @@ export class InMemoryPushSubscriptionRepository implements PushSubscriptionRepos
 
     userMap.set(id, pushSubscription);
 
-    return {
+    return Promise.resolve({
       success: true,
       id,
-    };
+    });
   }
 
-  async markPushSubscriptionSeen(
+  markPushSubscriptionSeen(
     userId: string,
     subscriptionId: string,
   ): Promise<void> {
     if (!isNonEmptyString(userId) || !isNonEmptyString(subscriptionId)) {
-      return;
+      return Promise.resolve();
     }
 
     // Firestore only updates lastSeenAt.
     // We intentionally keep this as a no-op.
+
+    return Promise.resolve();
   }
 
-  async deletePushSubscription(
+  deletePushSubscription(
     userId: string,
     subscription: string | { endpoint: string },
   ): Promise<DeletePushSubscribeResult> {
     if (!isNonEmptyString(userId)) {
-      return {
+      return Promise.resolve({
         success: false,
         reason: "invalid_user",
-      };
+      });
     }
 
     const id =
@@ -79,17 +83,17 @@ export class InMemoryPushSubscriptionRepository implements PushSubscriptionRepos
         : this.getId(subscription.endpoint);
 
     if (!isNonEmptyString(id)) {
-      return {
+      return Promise.resolve({
         success: false,
         reason: "invalid_push_subscription",
-      };
+      });
     }
 
     this.store.get(userId)?.delete(id);
 
-    return {
+    return Promise.resolve({
       success: true,
-    };
+    });
   }
 
   seed(userId: string, subscription: PushSubscription): void {

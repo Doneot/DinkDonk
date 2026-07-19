@@ -3,9 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { SubscriptionRepository } from "../../../modules/subscriptions/ports/SubscriptionRepository.js";
 import { buildSubscription } from "../../builders/subscription.js";
 
-import type { RepositoryFactory } from "./TestRepository.js";
-import { SeededRepositoryFactory } from "./SeededRepository.js";
-import { Subscription } from "../../../modules/subscriptions/domain/Subscription.js";
+import type { SeededRepositoryFactory } from "./SeededRepository.js";
+import type { Subscription } from "../../../modules/subscriptions/domain/Subscription.js";
 
 export function subscriptionRepositoryBehavior(
   name: string,

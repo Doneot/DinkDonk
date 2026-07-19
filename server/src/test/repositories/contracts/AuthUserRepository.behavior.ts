@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AuthUserRepository } from "../../../modules/auth/ports/AuthUserRepository.js";
 import { buildAuthUser } from "../../builders/auth.js";
-import { SeededRepositoryFactory } from "./SeededRepository.js";
+import type { SeededRepositoryFactory } from "./SeededRepository.js";
 import type { AuthUser } from "../../../modules/auth/domain/AuthUser.js";
 
 export function authUserRepositoryBehavior(

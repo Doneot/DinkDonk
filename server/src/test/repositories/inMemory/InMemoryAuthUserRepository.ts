@@ -12,13 +12,13 @@ export class InMemoryAuthUserRepository implements AuthUserRepository {
     // Memory implementation is always reachable.
   }
 
-  async getAuthUser(userId: string): Promise<AuthUser | null> {
-    return structuredClone(this.users.get(userId) ?? null);
+  getAuthUser(userId: string): Promise<AuthUser | null> {
+    return Promise.resolve(structuredClone(this.users.get(userId) ?? null));
   }
 
-  async updateAuthUser(userId: string, data: AuthUserUpdate): Promise<void> {
+  updateAuthUser(userId: string, data: AuthUserUpdate): Promise<void> {
     if (!isNonEmptyString(userId)) {
-      throw new Error("Invalid user id");
+      return Promise.reject(new Error("Invalid user id"));
     }
 
     const existing = this.users.get(userId);
@@ -33,6 +33,8 @@ export class InMemoryAuthUserRepository implements AuthUserRepository {
       fetchTime: existing?.fetchTime ?? 0,
       ...data,
     });
+
+    return Promise.resolve();
   }
 
   seed(user: AuthUser): void {

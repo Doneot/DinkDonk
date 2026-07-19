@@ -7,17 +7,19 @@ import { isNonEmptyString } from "../../../shared/utils/validators.js";
 export class InMemoryUserRepository implements UserRepository {
   private readonly users = new Map<string, User>();
 
-  async getUser(userId: string): Promise<User | null> {
-    return structuredClone(this.users.get(userId) ?? null);
+  getUser(userId: string): Promise<User | null> {
+    return Promise.resolve(structuredClone(this.users.get(userId) ?? null));
   }
 
-  async getUsers(): Promise<User[]> {
-    return [...this.users.values()].map((user) => structuredClone(user));
+  getUsers(): Promise<User[]> {
+    return Promise.resolve(
+      [...this.users.values()].map((user) => structuredClone(user)),
+    );
   }
 
-  async updateUser(userId: string, data: UserUpdate): Promise<void> {
+  updateUser(userId: string, data: UserUpdate): Promise<void> {
     if (!isNonEmptyString(userId)) {
-      throw new Error("Invalid user id");
+      return Promise.reject(new Error("Invalid user id"));
     }
 
     let existing = this.users.get(userId);
@@ -31,6 +33,8 @@ export class InMemoryUserRepository implements UserRepository {
     }
 
     this.users.set(userId, { ...existing, ...data });
+
+    return Promise.resolve();
   }
 
   seed(user: User): void {

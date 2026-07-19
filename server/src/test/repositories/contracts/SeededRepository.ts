@@ -1,4 +1,4 @@
-import { TestRepository } from "./TestRepository.js";
+import type { TestRepository } from "./TestRepository.js";
 
 export type SeededRepositoryFactory<T, TArgs extends unknown[]> = () => T &
   TestRepository & {
