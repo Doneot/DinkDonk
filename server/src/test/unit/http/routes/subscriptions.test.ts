@@ -14,7 +14,7 @@ describe("api routes", () => {
       .send({ streamerId: "streamer-1" })
       .expect(200, {
         success: true,
-        createdStreamer: false,
+        createdStreamer: true,
       });
 
     expect(subscribeSpy).toHaveBeenCalledWith("user-1", "streamer-1", "");

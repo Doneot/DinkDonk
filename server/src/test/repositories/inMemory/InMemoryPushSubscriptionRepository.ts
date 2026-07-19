@@ -5,23 +5,31 @@ import type {
   DeletePushSubscribeResult,
 } from "../../../modules/notifications/types/PushSubscribeResult.js";
 
+import { isNonEmptyString } from "../../../shared/utils/validators.js";
+
 export class InMemoryPushSubscriptionRepository implements PushSubscriptionRepository {
   private readonly store = new Map<string, Map<string, PushSubscription>>();
 
   async getPushSubscriptions(userId: string): Promise<PushSubscription[]> {
-    return await Promise.resolve([...(this.store.get(userId)?.values() ?? [])]);
+    if (!isNonEmptyString(userId)) {
+      return [];
+    }
+
+    return [...(this.store.get(userId)?.values() ?? [])].map((subscription) =>
+      structuredClone(subscription),
+    );
   }
 
   async savePushSubscription(
     userId: string,
-    subscription: { endpoint: string },
+    subscription: PushSubscription["subscription"],
     metadata: { userAgent?: string } = {},
   ): Promise<SavePushSubscribeResult> {
-    if (!subscription?.endpoint) {
-      return await Promise.resolve({
+    if (!isNonEmptyString(userId) || !subscription?.endpoint) {
+      return {
         success: false,
         reason: "invalid_push_subscription",
-      });
+      };
     }
 
     const id = this.getId(subscription.endpoint);
@@ -30,56 +38,67 @@ export class InMemoryPushSubscriptionRepository implements PushSubscriptionRepos
 
     const pushSubscription: PushSubscription = {
       id,
-      subscription: {
-        endpoint: subscription.endpoint,
-        keys: {
-          p256dh: "",
-          auth: "",
-        },
-      },
+      subscription: structuredClone(subscription),
+      userAgent: metadata.userAgent ?? "",
     };
-
-    if (metadata.userAgent !== undefined) {
-      pushSubscription.userAgent = metadata.userAgent;
-    }
 
     userMap.set(id, pushSubscription);
 
-    return await Promise.resolve({ success: true, id });
+    return {
+      success: true,
+      id,
+    };
   }
 
   async markPushSubscriptionSeen(
     userId: string,
     subscriptionId: string,
   ): Promise<void> {
-    const sub = this.store.get(userId)?.get(subscriptionId);
+    if (!isNonEmptyString(userId) || !isNonEmptyString(subscriptionId)) {
+      return;
+    }
 
-    if (!sub) return await Promise.resolve();
-
-    // no-op in memory (you could track lastSeenAt if needed)
+    // Firestore only updates lastSeenAt.
+    // We intentionally keep this as a no-op.
   }
 
   async deletePushSubscription(
     userId: string,
     subscription: string | { endpoint: string },
   ): Promise<DeletePushSubscribeResult> {
+    if (!isNonEmptyString(userId)) {
+      return {
+        success: false,
+        reason: "invalid_user",
+      };
+    }
+
     const id =
       typeof subscription === "string"
         ? subscription
         : this.getId(subscription.endpoint);
 
-    const userMap = this.store.get(userId);
-
-    if (!userMap || !userMap.has(id)) {
-      return { success: false, reason: "invalid_push_subscription" };
+    if (!isNonEmptyString(id)) {
+      return {
+        success: false,
+        reason: "invalid_push_subscription",
+      };
     }
 
-    userMap.delete(id);
+    this.store.get(userId)?.delete(id);
 
-    return await Promise.resolve({ success: true, id });
+    return {
+      success: true,
+    };
   }
 
-  // ---------- helpers ----------
+  seed(userId: string, subscription: PushSubscription): void {
+    this.ensureUser(userId).set(subscription.id, structuredClone(subscription));
+  }
+
+  clear(): void {
+    this.store.clear();
+  }
 
   private ensureUser(userId: string): Map<string, PushSubscription> {
     let map = this.store.get(userId);
@@ -94,9 +113,5 @@ export class InMemoryPushSubscriptionRepository implements PushSubscriptionRepos
 
   private getId(endpoint: string): string {
     return Buffer.from(endpoint).toString("base64url");
-  }
-
-  clear(): void {
-    this.store.clear();
   }
 }

@@ -2,46 +2,41 @@ import type { AuthUserRepository } from "../../../modules/auth/ports/AuthUserRep
 import type { AuthUser } from "../../../modules/auth/domain/AuthUser.js";
 import type { AuthUserUpdate } from "../../../modules/auth/domain/AuthUserUpdate.js";
 
+import { isNonEmptyString } from "../../../shared/utils/validators.js";
+
 export class InMemoryAuthUserRepository implements AuthUserRepository {
   private readonly users = new Map<string, AuthUser>();
 
   async checkConnection(): Promise<void> {
-    return await Promise.resolve();
+    // Firestore checks that the collection is reachable.
+    // Memory implementation is always reachable.
   }
 
   async getAuthUser(userId: string): Promise<AuthUser | null> {
-    return await Promise.resolve(this.users.get(userId) ?? null);
+    return structuredClone(this.users.get(userId) ?? null);
   }
 
   async updateAuthUser(userId: string, data: AuthUserUpdate): Promise<void> {
-    const existing = this.users.get(userId);
-
-    if (!existing) {
-      const newUser: AuthUser = {
-        id: userId,
-        username: data.username ?? "",
-        discriminator: data.discriminator ?? "",
-        avatar: data.avatar ?? "",
-        accessToken: data.accessToken ?? "",
-        refreshToken: data.refreshToken ?? "",
-        fetchTime: data.fetchTime ?? Date.now(),
-      };
-
-      this.users.set(userId, newUser);
-      return await Promise.resolve();
+    if (!isNonEmptyString(userId)) {
+      throw new Error("Invalid user id");
     }
 
-    await Promise.resolve(
-      this.users.set(userId, {
-        ...existing,
-        ...data,
-      }),
-    );
+    const existing = this.users.get(userId);
+
+    this.users.set(userId, {
+      id: userId,
+      username: existing?.username ?? "",
+      discriminator: existing?.discriminator ?? "",
+      avatar: existing?.avatar ?? "",
+      accessToken: existing?.accessToken ?? "",
+      refreshToken: existing?.refreshToken ?? "",
+      fetchTime: existing?.fetchTime ?? 0,
+      ...data,
+    });
   }
 
-  // test helper
   seed(user: AuthUser): void {
-    this.users.set(user.id, user);
+    this.users.set(user.id, structuredClone(user));
   }
 
   clear(): void {

@@ -44,7 +44,7 @@ export class FirestorePushSubscriptionRepository {
 
   async savePushSubscription(
     userId: string,
-    subscription: { endpoint: string },
+    subscription: PushSubscription["subscription"],
     metadata: { userAgent?: string } = {},
   ): Promise<SavePushSubscribeResult> {
     if (!isNonEmptyString(userId) || !subscription?.endpoint) {

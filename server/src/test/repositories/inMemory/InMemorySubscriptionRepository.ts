@@ -8,13 +8,20 @@ import type {
   UpdateSubscriptionResult,
 } from "../../../modules/subscriptions/types/SubscribeResult.js";
 
+import { isNonEmptyString } from "../../../shared/utils/validators.js";
+
 export class InMemorySubscriptionRepository
   extends EventEmitter
   implements SubscriptionRepository
 {
-  private readonly userSubs = new Map<string, Map<string, Subscription>>();
+  private readonly userSubscriptions = new Map<
+    string,
+    Map<string, Subscription>
+  >();
 
-  on(
+  private readonly streamerUsers = new Map<string, Set<string>>();
+
+  override on(
     event: string,
     listener: (streamerId: string) => Promise<void> | void,
   ): this {
@@ -25,9 +32,11 @@ export class InMemorySubscriptionRepository
     userId: string,
     streamerId: string,
   ): Promise<Subscription | null> {
-    return await Promise.resolve(
-      this.userSubs.get(userId)?.get(streamerId) ?? null,
-    );
+    if (!isNonEmptyString(userId) || !isNonEmptyString(streamerId)) {
+      return null;
+    }
+
+    return this.userSubscriptions.get(userId)?.get(streamerId) ?? null;
   }
 
   async subscribe(
@@ -35,53 +44,85 @@ export class InMemorySubscriptionRepository
     streamerId: string,
     notificationMessage = "",
   ): Promise<SubscribeResult> {
-    const userMap = this.ensureUser(userId);
-
-    if (userMap.has(streamerId)) {
-      return await Promise.resolve({
+    if (!isNonEmptyString(userId) || !isNonEmptyString(streamerId)) {
+      return {
         success: false,
-        reason: "already_subscribed",
-      });
+        reason: "invalid_input",
+      };
     }
 
-    userMap.set(streamerId, {
+    const subscriptions = this.ensureUser(userId);
+
+    if (subscriptions.has(streamerId)) {
+      return {
+        success: false,
+        reason: "already_subscribed",
+      };
+    }
+
+    subscriptions.set(streamerId, {
       id: streamerId,
       notification_message: notificationMessage,
     });
 
-    this.emit("streamerAdded", streamerId);
+    let users = this.streamerUsers.get(streamerId);
 
-    return await Promise.resolve({
+    const createdStreamer = users === undefined;
+
+    if (!users) {
+      users = new Set();
+      this.streamerUsers.set(streamerId, users);
+    }
+
+    users.add(userId);
+
+    if (createdStreamer) {
+      this.emit("streamerAdded", streamerId);
+    }
+
+    return {
       success: true,
-      createdStreamer: false,
-    });
+      createdStreamer,
+    };
   }
 
   async unsubscribe(
     userId: string,
     streamerId: string,
   ): Promise<UnsubscribeResult> {
-    const userMap = this.userSubs.get(userId);
+    if (!isNonEmptyString(userId) || !isNonEmptyString(streamerId)) {
+      return {
+        success: false,
+        reason: "invalid_input",
+      };
+    }
 
-    if (!userMap) {
-      return await Promise.resolve({
+    const subscriptions = this.userSubscriptions.get(userId);
+
+    if (!subscriptions) {
+      return {
         success: false,
         reason: "user_not_found",
-      });
+      };
     }
 
-    userMap.delete(streamerId);
+    subscriptions.delete(streamerId);
 
-    const usersLeft = userMap.size;
+    const users = this.streamerUsers.get(streamerId);
 
-    if (usersLeft === 0) {
-      this.emit("streamerEmpty", streamerId);
+    if (users) {
+      users.delete(userId);
+
+      if (users.size === 0) {
+        this.streamerUsers.delete(streamerId);
+        this.emit("streamerEmpty", streamerId);
+      }
     }
 
-    return await Promise.resolve({
+    return {
       success: true,
-      usersLeft,
-    });
+      usersLeft: users?.size ?? 0,
+    };
   }
 
   async updateSubscription(
@@ -89,44 +130,62 @@ export class InMemorySubscriptionRepository
     streamerId: string,
     data: Partial<Subscription>,
   ): Promise<UpdateSubscriptionResult> {
-    const userMap = this.userSubs.get(userId);
+    const subscriptions = this.userSubscriptions.get(userId);
 
-    if (!userMap) {
-      return await Promise.resolve({
+    if (!subscriptions) {
+      return {
         success: false,
         reason: "user_not_found",
-      });
+      };
     }
 
-    const existing = userMap.get(streamerId);
+    const existing = subscriptions.get(streamerId);
 
     if (!existing) {
-      return await Promise.resolve({
+      return {
         success: false,
         reason: "subscription_not_found",
-      });
+      };
     }
 
-    userMap.set(streamerId, {
+    subscriptions.set(streamerId, {
       ...existing,
       ...data,
     });
 
-    return await Promise.resolve({ success: true });
+    return {
+      success: true,
+    };
   }
 
-  private ensureUser(userId: string): Map<string, Subscription> {
-    let map = this.userSubs.get(userId);
+  seed(userId: string, subscription: Subscription): void {
+    const subscriptions = this.ensureUser(userId);
 
-    if (!map) {
-      map = new Map();
-      this.userSubs.set(userId, map);
+    subscriptions.set(subscription.id, subscription);
+
+    let users = this.streamerUsers.get(subscription.id);
+
+    if (!users) {
+      users = new Set();
+      this.streamerUsers.set(subscription.id, users);
     }
 
-    return map;
+    users.add(userId);
   }
 
   clear(): void {
-    this.userSubs.clear();
+    this.userSubscriptions.clear();
+    this.streamerUsers.clear();
+  }
+
+  private ensureUser(userId: string): Map<string, Subscription> {
+    let subscriptions = this.userSubscriptions.get(userId);
+
+    if (!subscriptions) {
+      subscriptions = new Map();
+      this.userSubscriptions.set(userId, subscriptions);
+    }
+
+    return subscriptions;
   }
 }
