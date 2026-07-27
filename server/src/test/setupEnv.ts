@@ -21,3 +21,9 @@ process.env.WEB_PUSH_SUBJECT = "mailto:test@example.com";
 process.env.NGROK_AUTH_TOKEN = "ngrok-auth-token";
 process.env.SSH_TUNNEL_URL = "http://localhost:4000";
 process.env.TUNNEL_PROVIDER = "ngrok";
+
+// Keep the suite output readable. Tests that care about logging spy on the
+// logger, which intercepts calls before the level is consulted.
+const { logger } = await import("../shared/logger/logger.js");
+
+logger.level = "silent";

@@ -1,8 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { StreamNotificationService } from "../../../../modules/notifications/application/StreamNotificationService.js";
-import type { TwitchEventSubStreamOnlineEvent } from "../../../../modules/twitch/domain/Twitch.js";
 import type { NotificationManager } from "../../../../modules/notifications/application/NotificationManager.js";
+import { StreamNotificationService } from "../../../../modules/notifications/application/StreamNotificationService.js";
+import type {
+  TwitchEventSubStreamOnlineEvent,
+  TwitchStreamer,
+} from "../../../../modules/twitch/domain/Twitch.js";
+
+import { buildStreamer } from "../../../builders/streamer.js";
+import { buildUser } from "../../../builders/user.js";
+import { FakeTwitchStreamers } from "../../../helpers/fakeTwitch.js";
+import { InMemoryStreamerRepository } from "../../../repositories/inMemory/InMemoryStreamerRepository.js";
+import { InMemorySubscriptionRepository } from "../../../repositories/inMemory/InMemorySubscriptionRepository.js";
+import { InMemoryUserRepository } from "../../../repositories/inMemory/InMemoryUserRepository.js";
 
 const event: TwitchEventSubStreamOnlineEvent = {
   broadcaster_user_id: "streamer-1",
@@ -12,115 +22,188 @@ const event: TwitchEventSubStreamOnlineEvent = {
   started_at: "2026-06-29T00:00:00Z",
 };
 
+const twitchStreamer: TwitchStreamer = {
+  id: "streamer-1",
+  login: "streamer",
+  display_name: "Streamer",
+  profile_image_url: "https://example.com/avatar.png",
+};
+
+type SetupOptions = {
+  knownStreamers?: TwitchStreamer[];
+  streamers?: ReturnType<typeof buildStreamer>[];
+  users?: ReturnType<typeof buildUser>[];
+  subscriptions?: Array<{
+    userId: string;
+    streamerId: string;
+    message: string;
+  }>;
+};
+
+function setup({
+  knownStreamers = [twitchStreamer],
+  streamers = [],
+  users = [],
+  subscriptions = [],
+}: SetupOptions = {}) {
+  const twitch = new FakeTwitchStreamers(knownStreamers);
+  const userRepository = new InMemoryUserRepository();
+  const streamerRepository = new InMemoryStreamerRepository();
+  const subscriptionRepository = new InMemorySubscriptionRepository();
+
+  for (const user of users) {
+    userRepository.seed(user);
+  }
+
+  for (const streamer of streamers) {
+    streamerRepository.seed(streamer);
+  }
+
+  for (const { userId, streamerId, message } of subscriptions) {
+    subscriptionRepository.seed(userId, {
+      id: streamerId,
+      notification_message: message,
+    });
+  }
+
+  const notify = vi.fn<NotificationManager["notify"]>().mockResolvedValue([]);
+  const notificationManager = { notify } as unknown as NotificationManager;
+
+  return {
+    notify,
+    userRepository,
+    service: new StreamNotificationService(
+      twitch,
+      userRepository,
+      streamerRepository,
+      subscriptionRepository,
+      notificationManager,
+    ),
+  };
+}
+
 describe("StreamNotificationService", () => {
   it("notifies subscribed users with their custom subscription message", async () => {
-    const twitch = {
-      getStreamer: vi.fn().mockResolvedValue({
-        id: "streamer-1",
-        login: "streamer",
-        display_name: "Streamer",
-        profile_image_url: "https://example.com/avatar.png",
-      }),
-      fetchStreamers: vi.fn(),
-      searchStreamers: vi.fn(),
-    };
-    const users = {
-      getUser: vi.fn().mockResolvedValue({
-        id: "user-1",
-        subscriptions: [],
-      }),
-      getUsers: vi.fn(),
-      updateUser: vi.fn(),
-    };
-    const streamers = {
-      on: vi.fn(),
-      getStreamers: vi.fn(),
-      getStreamer: vi.fn().mockResolvedValue({
-        id: "streamer-1",
-        users: ["user-1"],
-      }),
-      createStreamer: vi.fn(),
-      deleteStreamer: vi.fn(),
-    };
-    const subscriptions = {
-      on: vi.fn(),
-      getSubscription: vi.fn().mockResolvedValue({
-        id: "streamer-1",
-        notification_message: "Custom message",
-      }),
-      subscribe: vi.fn(),
-      unsubscribe: vi.fn(),
-      updateSubscription: vi.fn(),
-    };
-    const notify = vi.fn<NotificationManager["notify"]>().mockResolvedValue([]);
-    const notificationManager = {
-      notify,
-    } as unknown as NotificationManager;
-
-    const service = new StreamNotificationService(
-      twitch,
-      users,
-      streamers,
-      subscriptions,
-      notificationManager,
-    );
+    const { service, notify } = setup({
+      streamers: [buildStreamer({ id: "streamer-1", users: ["user-1"] })],
+      users: [buildUser({ id: "user-1" })],
+      subscriptions: [
+        {
+          userId: "user-1",
+          streamerId: "streamer-1",
+          message: "Custom message",
+        },
+      ],
+    });
 
     await service.handleStreamOnline(event);
 
-    expect(twitch.getStreamer.mock.calls).toEqual([["streamer"]]);
-    expect(subscriptions.getSubscription.mock.calls).toEqual([
-      ["user-1", "streamer-1"],
-    ]);
-    expect(notify.mock.calls).toHaveLength(1);
-    expect(notify.mock.calls[0]?.[0]).toEqual({
-      id: "user-1",
-      subscriptions: [],
-    });
+    expect(notify).toHaveBeenCalledOnce();
+    expect(notify.mock.calls[0]?.[0]).toMatchObject({ id: "user-1" });
     expect(notify.mock.calls[0]?.[1]).toMatchObject({
       type: "stream.online",
-      streamer: {
-        id: "streamer-1",
-        login: "streamer",
-      },
+      body: "Custom message",
+      streamer: { id: "streamer-1", login: "streamer" },
     });
   });
 
-  it("does not notify when Twitch cannot resolve the streamer", async () => {
-    const twitch = {
-      getStreamer: vi.fn().mockResolvedValue(null),
-      fetchStreamers: vi.fn(),
-      searchStreamers: vi.fn(),
-    };
-    const notify = vi.fn<NotificationManager["notify"]>();
-    const notificationManager = {
-      notify,
-    } as unknown as NotificationManager;
-    const service = new StreamNotificationService(
-      twitch,
-      {
-        getUser: vi.fn(),
-        getUsers: vi.fn(),
-        updateUser: vi.fn(),
-      },
-      {
-        on: vi.fn(),
-        getStreamers: vi.fn(),
-        getStreamer: vi.fn(),
-        createStreamer: vi.fn(),
-        deleteStreamer: vi.fn(),
-      },
-      {
-        on: vi.fn(),
-        getSubscription: vi.fn(),
-        subscribe: vi.fn(),
-        unsubscribe: vi.fn(),
-        updateSubscription: vi.fn(),
-      },
-      notificationManager,
-    );
+  it("falls back to the default message when the subscription has none", async () => {
+    const { service, notify } = setup({
+      streamers: [buildStreamer({ id: "streamer-1", users: ["user-1"] })],
+      users: [buildUser({ id: "user-1" })],
+      subscriptions: [
+        { userId: "user-1", streamerId: "streamer-1", message: "" },
+      ],
+    });
 
     await service.handleStreamOnline(event);
 
-    expect(notify.mock.calls).toHaveLength(0);
+    expect(notify.mock.calls[0]?.[1]).toMatchObject({
+      body: "Streamer is live!",
+    });
+  });
+
+  it("falls back to the default message when there is no subscription record", async () => {
+    const { service, notify } = setup({
+      streamers: [buildStreamer({ id: "streamer-1", users: ["user-1"] })],
+      users: [buildUser({ id: "user-1" })],
+    });
+
+    await service.handleStreamOnline(event);
+
+    expect(notify.mock.calls[0]?.[1]).toMatchObject({
+      body: "Streamer is live!",
+    });
+  });
+
+  it("notifies every subscriber of the streamer", async () => {
+    const { service, notify } = setup({
+      streamers: [
+        buildStreamer({ id: "streamer-1", users: ["user-1", "user-2"] }),
+      ],
+      users: [buildUser({ id: "user-1" }), buildUser({ id: "user-2" })],
+    });
+
+    await service.handleStreamOnline(event);
+
+    expect(notify.mock.calls.map((call) => call[0].id)).toEqual([
+      "user-1",
+      "user-2",
+    ]);
+  });
+
+  it("does not notify when Twitch cannot resolve the streamer", async () => {
+    const { service, notify } = setup({ knownStreamers: [] });
+
+    await service.handleStreamOnline(event);
+
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("does not notify when the streamer has no record", async () => {
+    const { service, notify } = setup();
+
+    await service.handleStreamOnline(event);
+
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("does not notify when the streamer has no subscribers", async () => {
+    const { service, notify } = setup({
+      streamers: [buildStreamer({ id: "streamer-1", users: [] })],
+    });
+
+    await service.handleStreamOnline(event);
+
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("skips subscribers whose user record has disappeared", async () => {
+    const { service, notify } = setup({
+      streamers: [
+        buildStreamer({ id: "streamer-1", users: ["user-1", "ghost"] }),
+      ],
+      users: [buildUser({ id: "user-1" })],
+    });
+
+    await service.handleStreamOnline(event);
+
+    expect(notify).toHaveBeenCalledOnce();
+    expect(notify.mock.calls[0]?.[0]).toMatchObject({ id: "user-1" });
+  });
+
+  it("propagates a repository failure", async () => {
+    const { service, userRepository } = setup({
+      streamers: [buildStreamer({ id: "streamer-1", users: ["user-1"] })],
+      users: [buildUser({ id: "user-1" })],
+    });
+
+    vi.spyOn(userRepository, "getUser").mockRejectedValue(
+      new Error("firestore unavailable"),
+    );
+
+    await expect(service.handleStreamOnline(event)).rejects.toThrow(
+      "firestore unavailable",
+    );
   });
 });

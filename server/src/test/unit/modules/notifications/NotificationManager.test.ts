@@ -6,6 +6,7 @@ import type {
   NotificationChannel,
 } from "../../../../modules/notifications/domain/Notification.js";
 import type { User } from "../../../../modules/users/domain/User.js";
+import { logger } from "../../../../shared/logger/logger.js";
 
 const user: User = {
   id: "user-1",
@@ -66,5 +67,30 @@ describe("NotificationManager", () => {
       status: "fulfilled",
       value: { sent: true },
     });
+  });
+
+  it("logs the failing channel before re-throwing", async () => {
+    const error = vi.spyOn(logger, "error").mockReturnValue();
+    const failing: NotificationChannel = {
+      name: "failing",
+      send: vi.fn().mockRejectedValue(new Error("boom")),
+    };
+
+    await new NotificationManager([failing]).notify(user, notification);
+
+    expect(error.mock.calls[0]?.[0]).toMatchObject({
+      channel: "failing",
+      userId: user.id,
+      notificationType: "stream.online",
+      message: "boom",
+    });
+
+    vi.restoreAllMocks();
+  });
+
+  it("resolves with no results when no channels are configured", async () => {
+    await expect(
+      new NotificationManager().notify(user, notification),
+    ).resolves.toEqual([]);
   });
 });

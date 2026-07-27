@@ -1,0 +1,192 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { errorResponseSchema } from "../../../http/schemas/responses.js";
+
+import { createTestApp } from "../../helpers/createTestApp.js";
+import { TestClient } from "../../helpers/TestClient.js";
+
+const VALID_PUSH_SUBSCRIPTION = {
+  endpoint: "https://push.example.com/subscription-1",
+  keys: { p256dh: "p256dh-key", auth: "auth-key" },
+};
+
+async function createClient() {
+  const ctx = await createTestApp();
+
+  return { ctx, client: new TestClient(ctx.app, ctx.repositories) };
+}
+
+function expectValidationError(body: unknown) {
+  expect(errorResponseSchema.parse(body)).toMatchObject({
+    error: "validation_error",
+    message: "Bad Request",
+  });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("GET /api/streamers/search validation", () => {
+  it("returns a validation error before calling route dependencies", async () => {
+    const { ctx, client } = await createClient();
+
+    const search = vi.spyOn(ctx.twitch, "searchStreamers");
+
+    const response = await client
+      .get("/api/streamers/search")
+      .query({ query: "" })
+      .expect(400);
+
+    expect(search).not.toHaveBeenCalled();
+    expectValidationError(response.body);
+  });
+
+  it.each([
+    ["a missing query", {}],
+    ["a whitespace-only query", { query: "   " }],
+    ["an over-long query", { query: "a".repeat(101) }],
+  ])("rejects %s", async (_label, query) => {
+    const { client } = await createClient();
+
+    const response = await client
+      .get("/api/streamers/search")
+      .query(query)
+      .expect(400);
+
+    expectValidationError(response.body);
+  });
+});
+
+describe("POST /api/streamers/info validation", () => {
+  it.each([
+    ["a missing ids array", {}],
+    ["an empty ids array", { ids: [] }],
+    [
+      "more than fifty ids",
+      { ids: Array.from({ length: 51 }, (_, i) => `s${i}`) },
+    ],
+    ["a blank id", { ids: [" "] }],
+    ["an over-long id", { ids: ["a".repeat(65)] }],
+    ["a non-array ids value", { ids: "streamer-1" }],
+  ])("rejects %s", async (_label, body) => {
+    const { ctx, client } = await createClient();
+
+    const fetchStreamers = vi.spyOn(ctx.twitch, "fetchStreamers");
+
+    const response = await client.post("/api/streamers/info").send(body);
+
+    expect(response.status).toBe(400);
+    expect(fetchStreamers).not.toHaveBeenCalled();
+    expectValidationError(response.body);
+  });
+});
+
+describe("subscription payload validation", () => {
+  it.each([
+    ["POST", "/api/subscriptions"],
+    ["DELETE", "/api/subscriptions"],
+  ] as const)("%s %s rejects a missing streamer id", async (method, path) => {
+    const { ctx, client } = await createClient();
+
+    const subscribe = vi.spyOn(ctx.repositories.subscriptions, "subscribe");
+
+    const response = await (
+      method === "POST" ? client.post(path) : client.delete(path)
+    ).send({});
+
+    expect(response.status).toBe(400);
+    expect(subscribe).not.toHaveBeenCalled();
+    expectValidationError(response.body);
+  });
+
+  it.each([
+    ["a blank streamer id", { streamerId: "   " }],
+    ["an over-long streamer id", { streamerId: "a".repeat(65) }],
+    ["a non-string streamer id", { streamerId: 42 }],
+  ])("POST /api/subscriptions rejects %s", async (_label, body) => {
+    const { client } = await createClient();
+
+    const response = await client.post("/api/subscriptions").send(body);
+
+    expect(response.status).toBe(400);
+    expectValidationError(response.body);
+  });
+
+  it.each([
+    ["a missing id", { message: "hello" }],
+    ["a blank id", { id: "  ", message: "hello" }],
+    ["an over-long message", { id: "streamer-1", message: "a".repeat(501) }],
+  ])("POST /api/subscriptions/set-message rejects %s", async (_label, body) => {
+    const { client } = await createClient();
+
+    const response = await client
+      .post("/api/subscriptions/set-message")
+      .send(body);
+
+    expect(response.status).toBe(400);
+    expectValidationError(response.body);
+  });
+});
+
+describe("web push payload validation", () => {
+  it.each([
+    ["a missing subscription", {}],
+    [
+      "a non-url endpoint",
+      { subscription: { ...VALID_PUSH_SUBSCRIPTION, endpoint: "not-a-url" } },
+    ],
+    [
+      "missing keys",
+      { subscription: { endpoint: VALID_PUSH_SUBSCRIPTION.endpoint } },
+    ],
+    [
+      "a blank p256dh key",
+      {
+        subscription: {
+          ...VALID_PUSH_SUBSCRIPTION,
+          keys: { p256dh: "", auth: "auth-key" },
+        },
+      },
+    ],
+    [
+      "a blank auth key",
+      {
+        subscription: {
+          ...VALID_PUSH_SUBSCRIPTION,
+          keys: { p256dh: "p256dh-key", auth: "" },
+        },
+      },
+    ],
+  ])("POST rejects %s", async (_label, body) => {
+    const { ctx, client } = await createClient();
+
+    const save = vi.spyOn(
+      ctx.repositories.pushSubscriptions,
+      "savePushSubscription",
+    );
+
+    const response = await client
+      .post("/api/notifications/web-push/subscriptions")
+      .send(body);
+
+    expect(response.status).toBe(400);
+    expect(save).not.toHaveBeenCalled();
+    expectValidationError(response.body);
+  });
+
+  it.each([
+    ["an empty body", {}],
+    ["a blank subscription id", { subscriptionId: "   " }],
+    ["an unusable subscription payload", { subscription: { endpoint: "" } }],
+  ])("DELETE rejects %s", async (_label, body) => {
+    const { client } = await createClient();
+
+    const response = await client
+      .delete("/api/notifications/web-push/subscriptions")
+      .send(body);
+
+    expect(response.status).toBe(400);
+    expectValidationError(response.body);
+  });
+});

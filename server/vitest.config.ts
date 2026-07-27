@@ -13,6 +13,18 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
+      include: ["src/**/*.ts"],
+      exclude: [
+        "src/test/**",
+        "src/**/*.d.ts",
+        // Composition roots and process entrypoints: wiring only, exercised in
+        // production by real Firebase/Discord/ngrok connections.
+        "src/app/index.ts",
+        "src/app/bootstrap.ts",
+        "src/app/container/**",
+        "src/shared/config/firebase.ts",
+        "src/docs/**",
+      ],
     },
   },
 });

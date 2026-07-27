@@ -47,19 +47,21 @@ export class TestClient {
     return this.agent.get(path);
   }
 
-  public async post(path: string) {
+  // These return supertest's request builder (itself awaitable) so callers can
+  // keep chaining `.send()` / `.query()` / `.expect()` before the request fires.
+  public post(path: string) {
     return this.agent.post(path);
   }
 
-  public async put(path: string) {
+  public put(path: string) {
     return this.agent.put(path);
   }
 
-  public async patch(path: string) {
+  public patch(path: string) {
     return this.agent.patch(path);
   }
 
-  public async delete(path: string) {
+  public delete(path: string) {
     return this.agent.delete(path);
   }
 }

@@ -5,9 +5,7 @@ import type { Express } from "express";
 import type { EventSubEnvelope } from "../../http/schemas/eventSub.js";
 
 export type EventSubMessageType =
-  | "notification"
-  | "webhook_callback_verification"
-  | "revocation";
+  "notification" | "webhook_callback_verification" | "revocation";
 
 export function signEventSubMessage({
   secret,
@@ -55,6 +53,28 @@ export function buildEventSubHeaders({
   };
 }
 
+type SendRawEventSubOptions = {
+  app: Express;
+  body: string;
+  headers: Record<string, string>;
+};
+
+/**
+ * Posts an arbitrary body and header set, for cases the typed helpers below
+ * cannot express (malformed JSON, missing or unknown headers).
+ */
+export function sendRawEventSub({
+  app,
+  body,
+  headers,
+}: SendRawEventSubOptions) {
+  return request(app)
+    .post("/eventsub")
+    .set(headers)
+    .set("Content-Type", "application/json")
+    .send(body);
+}
+
 type SendEventSubOptions = {
   app: Express;
   secret: string;
@@ -74,19 +94,17 @@ export function sendEventSub({
 }: SendEventSubOptions) {
   const body = JSON.stringify(payload);
 
-  return request(app)
-    .post("/eventsub")
-    .set(
-      buildEventSubHeaders({
-        secret,
-        body,
-        type,
-        messageId,
-        timestamp,
-      }),
-    )
-    .set("Content-Type", "application/json")
-    .send(body);
+  return sendRawEventSub({
+    app,
+    body,
+    headers: buildEventSubHeaders({
+      secret,
+      body,
+      type,
+      messageId,
+      timestamp,
+    }),
+  });
 }
 
 export function sendNotification(options: Omit<SendEventSubOptions, "type">) {

@@ -17,7 +17,15 @@ export function verifyEventSubSignature({
   signature,
   body,
 }: VerifyEventSubSignatureOptions): boolean {
-  const age = Math.abs(Date.now() - Date.parse(timestamp));
+  const sentAt = Date.parse(timestamp);
+
+  // An unparseable timestamp yields NaN, and every NaN comparison is false,
+  // which would let the message slip past the freshness check entirely.
+  if (Number.isNaN(sentAt)) {
+    return false;
+  }
+
+  const age = Math.abs(Date.now() - sentAt);
 
   if (age > MAX_EVENTSUB_MESSAGE_AGE_MS) {
     return false;

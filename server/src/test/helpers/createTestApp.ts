@@ -31,10 +31,14 @@ export interface TestContext {
   discord: ReturnType<typeof createTestContainer>["discord"];
 }
 
+export const TEST_WEB_PUSH_PUBLIC_KEY = "test-public-key";
+
 export type CreateTestAppOptions = {
   authenticated?: boolean;
   authUser?: typeof DEFAULT_AUTH_USER;
   state?: TestState;
+  /** Pass an empty string to model a deployment without Web Push configured. */
+  webPushPublicKey?: string;
 };
 
 function mockAuthenticatedUser(user = DEFAULT_AUTH_USER) {
@@ -81,7 +85,7 @@ export async function createTestApp(
       twitch: container.twitch,
       discord: container.discord,
       ensureFreshToken: (_req, _res, next) => next(),
-      webPushPublicKey: "test-public-key",
+      webPushPublicKey: options.webPushPublicKey ?? TEST_WEB_PUSH_PUBLIC_KEY,
     }),
   );
 
