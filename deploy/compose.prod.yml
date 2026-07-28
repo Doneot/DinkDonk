@@ -78,6 +78,8 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # See compose.dev.yml for why this is error rather than the default.
+      GF_LOG_LEVEL: error
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro

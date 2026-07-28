@@ -59,6 +59,9 @@ export const env = {
   prometheus: {
     enabled: parsedEnv.PROMETHEUS_ENABLED,
   },
+  requestLogging: {
+    enabled: parsedEnv.REQUEST_LOGGING_ENABLED,
+  },
   tunneling: {
     provider: parsedEnv.TUNNEL_PROVIDER,
     ngrok: {

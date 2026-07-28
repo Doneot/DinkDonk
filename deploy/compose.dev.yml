@@ -36,7 +36,15 @@ services:
       # (see compose.prod.yml).
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # Default (info) logging replays Grafana's entire migration/plugin-scan
+      # history on every startup, and this image ships several bundled
+      # datasource plugin.json files that fail to parse (warn-level noise,
+      # unrelated to our config). Malformed provisioning files are silently
+      # skipped by Grafana regardless of log level, so error doesn't hide
+      # anything actionable - it just drops the built-in image noise.
+      GF_LOG_LEVEL: error
     volumes:
+      - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
@@ -44,3 +52,4 @@ services:
 
 volumes:
   node_modules:
+  grafana_data:

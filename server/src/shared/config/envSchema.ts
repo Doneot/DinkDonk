@@ -56,6 +56,8 @@ const BaseEnvSchema = z.object({
 
   PROMETHEUS_ENABLED: booleanFromEnv,
 
+  REQUEST_LOGGING_ENABLED: booleanFromEnv,
+
   NGROK_AUTH_TOKEN: z.string().optional(),
 
   SSH_TUNNEL_URL: z.string().optional(),

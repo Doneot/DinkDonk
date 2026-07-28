@@ -53,6 +53,7 @@ describe("EnvSchema", () => {
       UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN: false,
       EVENTSUB_GC_INTERVAL_MS: 6 * 60 * 60 * 1000,
       PROMETHEUS_ENABLED: false,
+      REQUEST_LOGGING_ENABLED: false,
     });
   });
 
@@ -64,6 +65,7 @@ describe("EnvSchema", () => {
         UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN: "true",
         EVENTSUB_GC_INTERVAL_MS: "1000",
         PROMETHEUS_ENABLED: "1",
+        REQUEST_LOGGING_ENABLED: "1",
         TUNNEL_PROVIDER: "ssh",
       }),
     );
@@ -74,6 +76,7 @@ describe("EnvSchema", () => {
       UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN: true,
       EVENTSUB_GC_INTERVAL_MS: 1000,
       PROMETHEUS_ENABLED: true,
+      REQUEST_LOGGING_ENABLED: true,
       TUNNEL_PROVIDER: "ssh",
     });
   });

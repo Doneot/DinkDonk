@@ -90,7 +90,9 @@ export function configureMiddleware({
 
   app.use(initializeValidatedRequest);
 
-  app.use(requestLogger);
+  if (env.requestLogging.enabled) {
+    app.use(requestLogger);
+  }
 
   app.use(httpMetrics);
 

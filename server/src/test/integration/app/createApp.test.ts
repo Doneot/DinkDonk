@@ -6,6 +6,7 @@ import { createApp } from "../../../http/createApp.js";
 import { createSessionMiddleware } from "../../../http/configureMiddleware.js";
 import type { StreamNotificationService } from "../../../modules/notifications/application/StreamNotificationService.js";
 import { env } from "../../../shared/config/env.js";
+import { logger } from "../../../shared/logger/logger.js";
 
 import { buildStreamOnlineEvent } from "../../builders/eventSub.js";
 import { createTestContainer } from "../../helpers/createTestContainer.js";
@@ -56,6 +57,7 @@ function postEventSub(
 
 afterEach(() => {
   env.prometheus.enabled = false;
+  env.requestLogging.enabled = false;
   vi.restoreAllMocks();
 });
 
@@ -152,6 +154,26 @@ describe("createApp", () => {
       const response = await request(app).get("/metrics").expect(200);
 
       expect(response.text).toContain("eventsub_requests_total");
+    });
+
+    it("skips the request logger unless request logging is enabled", async () => {
+      const child = vi.spyOn(logger, "child");
+      const { app } = setup();
+
+      await request(app).get("/health/live").expect(200);
+
+      expect(child).not.toHaveBeenCalled();
+    });
+
+    it("attaches the request logger when request logging is enabled", async () => {
+      env.requestLogging.enabled = true;
+
+      const child = vi.spyOn(logger, "child");
+      const { app } = setup();
+
+      await request(app).get("/health/live").expect(200);
+
+      expect(child).toHaveBeenCalled();
     });
   });
 
