@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   eventSubEnvelopeSchema,
   streamOnlineEventSchema,
@@ -16,7 +17,10 @@ export async function dispatchEventSubNotification(
   );
 
   if (!notificationResult.success) {
-    throw new BadRequestError("Invalid EventSub payload");
+    throw new BadRequestError("Invalid EventSub payload", {
+      issues: z.treeifyError(notificationResult.error),
+      raw,
+    });
   }
 
   const notification = notificationResult.data;
@@ -45,7 +49,10 @@ export async function dispatchEventSubNotification(
   const eventResult = streamOnlineEventSchema.safeParse(notification.event);
 
   if (!eventResult.success) {
-    throw new BadRequestError("Invalid EventSub event payload");
+    throw new BadRequestError("Invalid EventSub event payload", {
+      issues: z.treeifyError(eventResult.error),
+      event: notification.event,
+    });
   }
 
   await handler(eventResult.data);

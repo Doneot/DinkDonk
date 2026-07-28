@@ -18,6 +18,7 @@ function errorLogContext(error: Error, req: Request): Record<string, unknown> {
     userId: req.user?.id,
     errorName: error.name,
     message: error.message,
+    details: "error" in error ? error.error : undefined,
     stack: env.isProduction ? undefined : error.stack,
   };
 }

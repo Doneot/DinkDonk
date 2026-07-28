@@ -34,7 +34,9 @@ export const eventSubSubscriptionSchema = z.object({
 export const eventSubEnvelopeSchema = z.object({
   subscription: eventSubSubscriptionSchema,
 
-  event: z.unknown(),
+  // Present for "notification" messages, absent for "webhook_callback_verification"
+  // and "revocation" messages. z.unknown() alone requires the key to exist in Zod 4.
+  event: z.unknown().optional(),
 
   challenge: z.string().optional(),
 });

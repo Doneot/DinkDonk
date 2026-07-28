@@ -66,6 +66,24 @@ describe("errorHandler", () => {
     });
   });
 
+  it("logs validation details alongside the request context", () => {
+    const warn = vi.spyOn(logger, "warn").mockReturnValue();
+
+    const details = { errors: ["streamerId is required"] };
+
+    handle(new BadRequestError("Bad Request", details));
+
+    expect(warn.mock.calls[0]?.[0]).toMatchObject({ details });
+  });
+
+  it("omits details from the log for AppErrors without them", () => {
+    const warn = vi.spyOn(logger, "warn").mockReturnValue();
+
+    handle(new UnauthorizedError());
+
+    expect(warn.mock.calls[0]?.[0]).toMatchObject({ details: undefined });
+  });
+
   it("hides unexpected errors behind a generic 500", () => {
     const error = vi.spyOn(logger, "error").mockReturnValue();
 

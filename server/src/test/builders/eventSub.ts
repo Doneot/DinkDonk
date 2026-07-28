@@ -35,8 +35,6 @@ export function buildWebhookVerification(
     },
 
     challenge,
-
-    event: {},
   };
 }
 
@@ -47,7 +45,5 @@ export function buildRevocationEvent(): EventSubEnvelope {
       version: "1",
       status: "authorization_revoked",
     },
-
-    event: {},
   };
 }

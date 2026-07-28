@@ -191,11 +191,17 @@ describe("POST /eventsub", () => {
       const { app, secret } = createEventSubTestApp();
       const body = JSON.stringify({ event: {} });
 
-      await sendRawEventSub({
+      const response = await sendRawEventSub({
         app,
         body,
         headers: buildEventSubHeaders({ secret, body }),
       }).expect(400);
+
+      expect(response.body).toMatchObject({
+        error: "validation_error",
+        message: "Invalid EventSub payload",
+        details: { raw: body },
+      });
     });
 
     it("rejects malformed JSON through the error handler", async () => {

@@ -108,6 +108,22 @@ describe("dispatchEventSubNotification", () => {
       expect(onNotification).not.toHaveBeenCalled();
     });
 
+    it("includes the invalid event and the validation issues on the error", async () => {
+      const { handlers } = setup();
+      const invalidEvent = { broadcaster_user_id: "streamer-1" };
+      const payload = { ...buildStreamOnlineEvent(), event: invalidEvent };
+
+      const error = await dispatch(payload, "notification", handlers).catch(
+        (caught: unknown) => caught,
+      );
+
+      expect(error).toBeInstanceOf(BadRequestError);
+      expect((error as BadRequestError).error).toMatchObject({
+        event: invalidEvent,
+      });
+      expect((error as BadRequestError).error.issues).toBeDefined();
+    });
+
     it("propagates a handler failure", async () => {
       const handlers = createEventSubHandlerRegistry(
         vi.fn().mockRejectedValue(new Error("notify failed")),
@@ -145,6 +161,20 @@ describe("dispatchEventSubNotification", () => {
       await expect(dispatch({ event: {} }, "notification")).rejects.toThrow(
         BadRequestError,
       );
+    });
+
+    it("includes the raw body and the validation issues on the error", async () => {
+      const payload = { event: {} };
+
+      const error = await dispatch(payload, "notification").catch(
+        (caught: unknown) => caught,
+      );
+
+      expect(error).toBeInstanceOf(BadRequestError);
+      expect((error as BadRequestError).error).toMatchObject({
+        raw: JSON.stringify(payload),
+      });
+      expect((error as BadRequestError).error.issues).toBeDefined();
     });
 
     it("rejects an envelope whose subscription has no type", async () => {
