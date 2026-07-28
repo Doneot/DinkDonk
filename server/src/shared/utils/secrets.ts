@@ -11,8 +11,8 @@ function readSecret(name: string): string | undefined {
 }
 
 export function envOrSecret(
-  envName: string,
-  secretName: string = envName.toLowerCase(),
+  envValue: string | undefined,
+  secretName: string,
 ): string | undefined {
-  return process.env[envName] || readSecret(secretName);
+  return envValue || readSecret(secretName);
 }

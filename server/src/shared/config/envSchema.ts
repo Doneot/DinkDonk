@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { booleanFromEnv, numberFromEnv } from "./envParsers.js";
+import { booleanFromEnv, numberFromEnv, secretFromEnv } from "./envParsers.js";
 
 const BaseEnvSchema = z.object({
   NODE_ENV: z
@@ -14,21 +14,21 @@ const BaseEnvSchema = z.object({
 
   CLIENT_ORIGIN: z.string().optional(),
 
-  SESSION_SECRET: z.string().min(1),
+  SESSION_SECRET: secretFromEnv("session_secret"),
 
   DISCORD_CLIENT_ID: z.string().min(1),
 
-  DISCORD_CLIENT_SECRET: z.string().min(1),
+  DISCORD_CLIENT_SECRET: secretFromEnv("discord_client_secret"),
 
-  DISCORD_TOKEN: z.string().min(1),
+  DISCORD_TOKEN: secretFromEnv("discord_token"),
 
   DISCORD_GUILD_ID: z.string().optional(),
 
   TWITCH_CLIENT_ID: z.string().min(1),
 
-  TWITCH_CLIENT_SECRET: z.string().min(1),
+  TWITCH_CLIENT_SECRET: secretFromEnv("twitch_client_secret"),
 
-  TWITCH_WEBHOOK_SECRET: z.string().min(1),
+  TWITCH_WEBHOOK_SECRET: secretFromEnv("twitch_webhook_secret"),
 
   UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN: booleanFromEnv,
 
@@ -46,7 +46,7 @@ const BaseEnvSchema = z.object({
 
   FIREBASE_CLIENT_ID: z.string().optional(),
 
-  ADMIN_PASSWORD: z.string().min(1),
+  ADMIN_PASSWORD: secretFromEnv("admin_password"),
 
   WEB_PUSH_PUBLIC_KEY: z.string().min(1),
 

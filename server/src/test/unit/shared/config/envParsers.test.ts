@@ -1,9 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  booleanFromEnv,
-  numberFromEnv,
-} from "../../../../shared/config/envParsers.js";
+const existsSync = vi.fn<(path: string) => boolean>();
+const readFileSync = vi.fn<(path: string, encoding: string) => string>();
+
+vi.mock("fs", () => ({
+  default: {
+    existsSync: (path: string) => existsSync(path),
+    readFileSync: (path: string, encoding: string) =>
+      readFileSync(path, encoding),
+  },
+}));
+
+// envSchema.js (pulled in transitively by setupEnv.ts's logger import) already
+// imported the real, unmocked "fs" before this file's mock was registered;
+// reset the module registry so the dynamic import below picks up the mock.
+vi.resetModules();
+
+const { booleanFromEnv, numberFromEnv, secretFromEnv } = await import(
+  "../../../../shared/config/envParsers.js"
+);
 
 describe("booleanFromEnv", () => {
   it.each(["1", "true", "TRUE", "yes", "Yes", "on", "ON"])(
@@ -36,5 +51,34 @@ describe("numberFromEnv", () => {
 
   it("rejects a non-numeric string", () => {
     expect(() => numberFromEnv(3000).parse("not-a-number")).toThrow();
+  });
+});
+
+describe("secretFromEnv", () => {
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("accepts the value when it is already present", () => {
+    expect(secretFromEnv("session_secret").parse("session-secret")).toBe(
+      "session-secret",
+    );
+    expect(existsSync).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the named docker secret file when the value is missing", () => {
+    existsSync.mockReturnValue(true);
+    readFileSync.mockReturnValue("from-secret\n");
+
+    expect(secretFromEnv("session_secret").parse(undefined)).toBe(
+      "from-secret",
+    );
+    expect(existsSync).toHaveBeenCalledWith("/run/secrets/session_secret");
+  });
+
+  it("rejects when neither the value nor the secret file is present", () => {
+    existsSync.mockReturnValue(false);
+
+    expect(() => secretFromEnv("session_secret").parse(undefined)).toThrow();
   });
 });

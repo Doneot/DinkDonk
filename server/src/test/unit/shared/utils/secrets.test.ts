@@ -11,51 +11,42 @@ vi.mock("fs", () => ({
   },
 }));
 
+// envSchema.js (pulled in transitively by setupEnv.ts's logger import) already
+// imported the real, unmocked "fs" before this file's mock was registered;
+// reset the module registry so the dynamic import below picks up the mock.
+vi.resetModules();
+
 const { envOrSecret } = await import("../../../../shared/utils/secrets.js");
 
-const ENV_NAME = "SECRETS_TEST_VALUE";
-
 afterEach(() => {
-  delete process.env[ENV_NAME];
   vi.resetAllMocks();
 });
 
 describe("envOrSecret", () => {
-  it("prefers the environment variable and never touches the filesystem", () => {
-    process.env[ENV_NAME] = "from-env";
-
-    expect(envOrSecret(ENV_NAME)).toBe("from-env");
+  it("prefers the given value and never touches the filesystem", () => {
+    expect(envOrSecret("from-env", "session_secret")).toBe("from-env");
     expect(existsSync).not.toHaveBeenCalled();
   });
 
-  it("falls back to the docker secret file derived from the env name", () => {
+  it("falls back to the named docker secret file when the value is missing", () => {
     existsSync.mockReturnValue(true);
     readFileSync.mockReturnValue("  from-secret\n");
 
-    expect(envOrSecret(ENV_NAME)).toBe("from-secret");
-    expect(existsSync).toHaveBeenCalledWith("/run/secrets/secrets_test_value");
+    expect(envOrSecret(undefined, "session_secret")).toBe("from-secret");
+    expect(existsSync).toHaveBeenCalledWith("/run/secrets/session_secret");
   });
 
-  it("reads an explicitly named secret file", () => {
-    existsSync.mockReturnValue(true);
-    readFileSync.mockReturnValue("custom");
-
-    expect(envOrSecret(ENV_NAME, "custom_secret")).toBe("custom");
-    expect(existsSync).toHaveBeenCalledWith("/run/secrets/custom_secret");
-  });
-
-  it("returns undefined when neither the env var nor the secret exists", () => {
+  it("returns undefined when neither the value nor the secret exists", () => {
     existsSync.mockReturnValue(false);
 
-    expect(envOrSecret(ENV_NAME)).toBeUndefined();
+    expect(envOrSecret(undefined, "session_secret")).toBeUndefined();
     expect(readFileSync).not.toHaveBeenCalled();
   });
 
-  it("falls back to the secret file when the env var is empty", () => {
-    process.env[ENV_NAME] = "";
+  it("falls back to the secret file when the value is an empty string", () => {
     existsSync.mockReturnValue(true);
     readFileSync.mockReturnValue("from-secret");
 
-    expect(envOrSecret(ENV_NAME)).toBe("from-secret");
+    expect(envOrSecret("", "session_secret")).toBe("from-secret");
   });
 });

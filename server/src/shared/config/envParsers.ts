@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { envOrSecret } from "../utils/secrets.js";
+
 export const booleanFromEnv = z
   .string()
   .optional()
@@ -13,3 +15,9 @@ export const booleanFromEnv = z
 
 export const numberFromEnv = (defaultValue: number) =>
   z.coerce.number().default(defaultValue);
+
+export const secretFromEnv = (secretName: string) =>
+  z.preprocess(
+    (value) => envOrSecret(value as string | undefined, secretName),
+    z.string().min(1),
+  );
