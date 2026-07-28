@@ -17,6 +17,7 @@ import { logger } from "../../../shared/logger/logger.js";
 
 import type { TwitchStreamer } from "../../twitch/domain/Twitch.js";
 import type { CommandContext } from "../domain/CommandContext.js";
+import type { DiscordService } from "../ports/DiscordService.js";
 
 type Command = {
   data: {
@@ -50,7 +51,7 @@ type DiscordClient = Client & {
   commands: Collection<string, Command>;
 };
 
-export class DiscordBot {
+export class DiscordBot implements DiscordService {
   private readonly token: string;
 
   private readonly commandDirectory: string;

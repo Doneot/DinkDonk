@@ -20,21 +20,7 @@ export class EventSubSyncService {
     ]);
 
     for (const streamer of streamers) {
-      const streamerId = streamer.id;
-
-      const exists = subscriptions.some(
-        (sub) => sub.condition?.broadcaster_user_id === streamerId,
-      );
-
-      if (!exists) {
-        subscriptionsCreatedTotal.inc();
-
-        logger.info(`Creating Twitch EventSub subscription for ${streamerId}`);
-
-        await this.twitch.subscribeToEvent("stream.online", {
-          broadcaster_user_id: streamerId,
-        });
-      }
+      await this.ensureSubscription(streamer.id, subscriptions);
     }
   }
 
@@ -49,6 +35,13 @@ export class EventSubSyncService {
   async handleStreamerAdded(streamerId: string): Promise<void> {
     const subscriptions = await this.getStreamOnlineSubscriptions();
 
+    await this.ensureSubscription(streamerId, subscriptions);
+  }
+
+  private async ensureSubscription(
+    streamerId: string,
+    subscriptions: TwitchEventSubSubscription[],
+  ): Promise<void> {
     const exists = subscriptions.some(
       (sub) => sub.condition?.broadcaster_user_id === streamerId,
     );
@@ -56,6 +49,7 @@ export class EventSubSyncService {
     if (exists) {
       return;
     }
+
     subscriptionsCreatedTotal.inc();
 
     logger.info(`Creating Twitch EventSub subscription for ${streamerId}`);

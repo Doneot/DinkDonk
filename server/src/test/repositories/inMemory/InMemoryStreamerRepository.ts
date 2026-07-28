@@ -24,11 +24,9 @@ export class InMemoryStreamerRepository
   }
 
   createStreamer(id: string): Promise<void> {
-    const existing = this.streamers.get(id);
-
     this.streamers.set(id, {
       id,
-      users: existing?.users ?? [],
+      users: [],
     });
 
     this.emit("streamerAdded", id);

@@ -2,7 +2,7 @@ import { createRuntime } from "./runtime/createRuntime.js";
 import { createContainer } from "./container/index.js";
 import { createServer } from "./server.js";
 import { UserChangeBroadcaster } from "../modules/users/application/UserChangeBroadcaster.js";
-import { configureEventSubscription } from "./configureEventSubscriptions.js";
+import { configureEventSubscriptions } from "./configureEventSubscriptions.js";
 import { SubscriptionCleanupScheduler } from "./SubscriptionCleanupScheduler.js";
 import { registerShutdownHooks } from "./shutdown.js";
 
@@ -32,7 +32,7 @@ export async function bootstrap() {
 
   server.httpServer.on("request", server.app);
 
-  configureEventSubscription(container);
+  configureEventSubscriptions(container);
 
   await Promise.all([container.twitch.start(), container.discord.start()]);
 

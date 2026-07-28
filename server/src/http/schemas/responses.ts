@@ -9,10 +9,6 @@ export const errorResponseSchema = z.object({
   details: z.unknown().optional(),
 });
 
-export const healthResponseSchema = z.object({
-  status: z.literal("ok"),
-});
-
 export const statusResponseSchema = z.object({
   online: z.boolean(),
 });

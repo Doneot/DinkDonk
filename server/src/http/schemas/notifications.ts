@@ -1,17 +1,11 @@
 import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 
+import { PushSubscriptionSchema } from "../../modules/notifications/schemas/PushSubscriptionSchema.js";
+
 extendZodWithOpenApi(z);
 
-export const pushSubscriptionSchema = z.object({
-  endpoint: z.string().url().max(2048),
-
-  keys: z.object({
-    p256dh: z.string().min(1).max(512),
-
-    auth: z.string().min(1).max(256),
-  }),
-});
+export const pushSubscriptionSchema = PushSubscriptionSchema.shape.subscription;
 
 export const savePushSubscriptionSchema = z.object({
   subscription: pushSubscriptionSchema,

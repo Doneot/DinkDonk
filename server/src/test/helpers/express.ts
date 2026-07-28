@@ -32,7 +32,7 @@ export function createMockRequest(init: MockRequestInit = {}): MockRequest {
     query: init.query ?? {},
     params: init.params ?? {},
     headers,
-    validated: { body: {}, query: {}, params: {} },
+    validated: { body: {}, query: {} },
     user: init.user,
     requestId: init.requestId ?? "request-id",
     logoutCalls: 0,

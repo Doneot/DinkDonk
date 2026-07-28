@@ -4,7 +4,7 @@ import type { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios";
 import { env } from "../../../shared/config/env.js";
 import { logger } from "../../../shared/logger/logger.js";
 import { assertDefined } from "../../../shared/utils/assert.js";
-import { normalizeTwitchLogin } from "../../../shared/utils/validators.js";
+import { normalizeTwitchLogin } from "./normalizeTwitchLogin.js";
 
 import { mapTwitchStreamer } from "./mappers/mapTwitchStreamer.js";
 
@@ -12,6 +12,10 @@ import type {
   TwitchEventSubSubscription,
   TwitchStreamer,
 } from "../domain/Twitch.js";
+import type {
+  TwitchStreamerProvider,
+  TwitchSubscriptionProvider,
+} from "../ports/TwitchGateway.js";
 
 export type TwitchRequestOptions = {
   method?: AxiosRequestConfig["method"];
@@ -47,7 +51,9 @@ type TwitchStream = {
   viewer_count: number;
 };
 
-export class TwitchClient {
+export class TwitchClient
+  implements TwitchStreamerProvider, TwitchSubscriptionProvider
+{
   private readonly http: AxiosInstance;
 
   private readonly clientId: string;

@@ -1,6 +1,8 @@
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { logger } from "../../../../shared/logger/logger.js";
+
 type KillCallback = (error?: Error) => void;
 
 type FakeChildProcess = EventEmitter & { pid: number | undefined };
@@ -36,7 +38,7 @@ async function settleStartupWindow(): Promise<void> {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.spyOn(console, "log").mockImplementation(() => undefined);
+  vi.spyOn(logger, "info").mockReturnValue();
   kill.mockReset().mockImplementation((_pid, _signal, callback) => callback());
 });
 

@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Container } from "../../../app/container/index.js";
-import { configureEventSubscription } from "../../../app/configureEventSubscriptions.js";
+import { configureEventSubscriptions } from "../../../app/configureEventSubscriptions.js";
 
 import { InMemoryStreamerRepository } from "../../repositories/inMemory/InMemoryStreamerRepository.js";
 import { InMemorySubscriptionRepository } from "../../repositories/inMemory/InMemorySubscriptionRepository.js";
@@ -29,7 +29,7 @@ function setup() {
     twitch,
   } as unknown as Container;
 
-  configureEventSubscription(container);
+  configureEventSubscriptions(container);
 
   return {
     streamers,
@@ -42,7 +42,7 @@ function setup() {
   };
 }
 
-describe("configureEventSubscription", () => {
+describe("configureEventSubscriptions", () => {
   it("subscribes to Twitch when the streamer repository gains a streamer", async () => {
     const { streamers, handleStreamerAdded } = setup();
 

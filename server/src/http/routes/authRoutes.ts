@@ -6,11 +6,9 @@ import { requireUser } from "../middleware/auth.js";
 import type { DiscordService } from "../../modules/discord/ports/DiscordService.js";
 import type { UserRepository } from "../../modules/users/ports/UserRepository.js";
 import type { UserResponse } from "../schemas/responses.js";
-import { logger } from "../../shared/logger/logger.js";
+const discordAuth = passport.authenticate("discord") as RequestHandler;
 
-export const discordAuth = passport.authenticate("discord") as RequestHandler;
-
-export const discordAuthCallback = passport.authenticate("discord", {
+const discordAuthCallback = passport.authenticate("discord", {
   failureRedirect: "/login-failed",
 }) as RequestHandler;
 
@@ -37,26 +35,17 @@ export function createAuthRouter({
     discordAuthCallback,
 
     async (req, res) => {
-      logger.info("Callback reached");
       const authUser = requireUser(req);
-      logger.info({ authUser }, "Authenticated");
       const user = await repository.getUser(authUser.id);
-      logger.info({ user }, "Fetched user");
 
       const canReceiveDM =
         user?.canReceiveDM ?? (await discord.canSendDirectMessage(authUser.id));
-
-      logger.info({ canReceiveDM }, "DM capability");
 
       await repository.updateUser(authUser.id, {
         canReceiveDM,
       });
 
-      logger.info("User updated");
-
       req.session.canReceiveDM = canReceiveDM;
-
-      logger.info("Redirecting");
 
       res.redirect(
         env.isProduction
@@ -74,9 +63,9 @@ export function createAuthRouter({
       const user = await repository.getUser(authUser.id);
 
       if (!user) {
-        res.status(500).send("Failed retrieving user");
-
-        return;
+        throw new Error(
+          `No user record found for authenticated user ${authUser.id}`,
+        );
       }
 
       res.json({
@@ -92,10 +81,10 @@ export function createAuthRouter({
 
     ensureFreshToken,
 
-    (req, res) => {
+    (req, res, next) => {
       req.logout((error) => {
         if (error) {
-          res.status(500).send("Logout failed");
+          next(error);
 
           return;
         }

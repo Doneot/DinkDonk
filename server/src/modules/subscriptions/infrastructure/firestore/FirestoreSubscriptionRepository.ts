@@ -20,7 +20,10 @@ import { isNonEmptyString } from "../../../../shared/utils/validators.js";
 /**
  * Normalizers (key to eliminating ESLint unsafe issues)
  */
-function toUser(userId: string, data: DocumentData | undefined): User {
+function normalizeUserRecord(
+  userId: string,
+  data: DocumentData | undefined,
+): User {
   return {
     id: userId,
     canReceiveDM: Boolean(data?.canReceiveDM),
@@ -30,7 +33,7 @@ function toUser(userId: string, data: DocumentData | undefined): User {
   };
 }
 
-function toStreamer(data: DocumentData | undefined): string[] {
+function normalizeStreamerUsers(data: DocumentData | undefined): string[] {
   return Array.isArray(data?.users) ? (data.users as string[]) : [];
 }
 
@@ -67,8 +70,8 @@ export class FirestoreSubscriptionRepository
       ]);
 
       const user = userDoc.exists
-        ? toUser(userId, userDoc.data())
-        : toUser(userId, undefined);
+        ? normalizeUserRecord(userId, userDoc.data())
+        : normalizeUserRecord(userId, undefined);
 
       const currentSubscriptions = user.subscriptions;
 
@@ -98,7 +101,7 @@ export class FirestoreSubscriptionRepository
         { merge: true },
       );
 
-      const existingUsers = toStreamer(streamerDoc.data());
+      const existingUsers = normalizeStreamerUsers(streamerDoc.data());
 
       tx.set(
         streamerRef,
@@ -148,14 +151,14 @@ export class FirestoreSubscriptionRepository
         } as const;
       }
 
-      const user = toUser(userId, userDoc.data());
+      const user = normalizeUserRecord(userId, userDoc.data());
       const nextSubscriptions = user.subscriptions.filter(
         (s) => s.id !== streamerId,
       );
 
       tx.update(userRef, { subscriptions: nextSubscriptions });
 
-      const nextUsers = toStreamer(streamerDoc.data()).filter(
+      const nextUsers = normalizeStreamerUsers(streamerDoc.data()).filter(
         (id) => id !== userId,
       );
 
@@ -188,7 +191,7 @@ export class FirestoreSubscriptionRepository
 
     if (!doc.exists) return null;
 
-    const user = toUser(userId, doc.data());
+    const user = normalizeUserRecord(userId, doc.data());
 
     return user.subscriptions.find((s) => s.id === streamerId) ?? null;
   }
@@ -210,7 +213,7 @@ export class FirestoreSubscriptionRepository
         } as const;
       }
 
-      const user = toUser(userId, doc.data());
+      const user = normalizeUserRecord(userId, doc.data());
 
       const exists = user.subscriptions.some((s) => s.id === streamerId);
 

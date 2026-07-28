@@ -15,7 +15,6 @@ declare module "express-serve-static-core" {
     validated: {
       body: unknown;
       query: unknown;
-      params: unknown;
     };
 
     cookies: Record<string, string>;

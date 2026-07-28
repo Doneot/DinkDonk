@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
+import type { Session, SessionData } from "express-session";
 import { Server, type Socket } from "socket.io";
 import { env } from "../shared/config/env.js";
 import { logger } from "../shared/logger/logger.js";
@@ -23,14 +24,8 @@ type CreateSocketServerOptions = {
   sessionMiddleware: RequestHandler;
 };
 
-type SessionRequest = {
-  session?: {
-    passport?: {
-      user?: {
-        id?: string;
-      };
-    };
-  };
+type SessionRequest = IncomingMessage & {
+  session?: Session & Partial<SessionData>;
 };
 
 export function createSocketServer(

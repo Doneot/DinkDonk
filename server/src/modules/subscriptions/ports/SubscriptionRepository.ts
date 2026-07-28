@@ -6,7 +6,7 @@ import type {
 } from "../types/SubscribeResult.js";
 
 export interface SubscriptionRepository {
-  on(arg0: string, arg1: (streamerId: string) => Promise<void>): unknown;
+  on(event: string, listener: (streamerId: string) => Promise<void>): unknown;
 
   getSubscription(
     userId: string,

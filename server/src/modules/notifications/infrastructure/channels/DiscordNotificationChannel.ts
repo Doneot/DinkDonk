@@ -6,12 +6,12 @@ import type {
 } from "../../domain/Notification.js";
 import type { UserRepository } from "../../../users/ports/UserRepository.js";
 
-type DiscordService = {
+type DiscordMessenger = {
   notifyUser(userId: string, message: string): Promise<void>;
 };
 
 type DiscordNotificationChannelOptions = {
-  discord: DiscordService;
+  discord: DiscordMessenger;
 
   userRepository: UserRepository;
 };
@@ -19,7 +19,7 @@ type DiscordNotificationChannelOptions = {
 export class DiscordNotificationChannel {
   readonly name = "discord";
 
-  private readonly discord: DiscordService;
+  private readonly discord: DiscordMessenger;
 
   private readonly userRepository: UserRepository;
 

@@ -54,7 +54,10 @@ describe("GET /api/notifications/web-push/public-key", () => {
       .get("/api/notifications/web-push/public-key")
       .expect(503);
 
-    expect(response.body).toEqual({ error: "Web Push is not configured" });
+    expect(response.body).toEqual({
+      error: "service_unavailable",
+      message: "Web Push is not configured",
+    });
   });
 });
 

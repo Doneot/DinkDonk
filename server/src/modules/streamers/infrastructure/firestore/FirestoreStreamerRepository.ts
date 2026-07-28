@@ -14,13 +14,11 @@ export class FirestoreStreamerRepository
   extends EventEmitter
   implements StreamerRepository
 {
-  private readonly db: Firestore;
   private readonly streamers: CollectionReference<DocumentData>;
 
   constructor(db: Firestore) {
     super();
 
-    this.db = db;
     this.streamers = db.collection("streamers");
   }
 

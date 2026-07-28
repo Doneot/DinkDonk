@@ -1,6 +1,6 @@
 import type { Container } from "./container/index.js";
 
-export function configureEventSubscription({
+export function configureEventSubscriptions({
   repositories,
   services,
   twitch,

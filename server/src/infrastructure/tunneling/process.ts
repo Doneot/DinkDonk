@@ -17,6 +17,8 @@ export function killProcessTree(
       }
 
       if (
+        // On Windows, taskkill exits 128 when the process already died on its own
+        // between the liveness check and the kill call; treat that race as success.
         process.platform === "win32" &&
         "code" in error &&
         error.code === 128

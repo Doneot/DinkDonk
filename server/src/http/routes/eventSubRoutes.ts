@@ -1,21 +1,23 @@
 import express from "express";
 import type { Router } from "express";
+import { z } from "zod";
 import { createEventSubHandlerRegistry } from "../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
 import type { TwitchEventSubStreamOnlineEvent } from "../../modules/twitch/domain/Twitch.js";
 import { eventSubHeadersSchema } from "../schemas/eventSub.js";
 import { verifyEventSubSignature } from "../../modules/twitch/eventsub/EventSubSignatureVerifier.js";
 import { dispatchEventSubNotification } from "../../modules/twitch/eventsub/EventSubDispatcher.js";
+import { BadRequestError } from "../errors/BadRequestError.js";
 import {
   eventSubRequestsTotal,
   eventSubSignatureFailuresTotal,
+  eventSubDuplicateMessagesTotal,
 } from "../../infrastructure/metrics/prometheus.js";
-import type { InMemoryReplayStore } from "../../modules/notifications/infrastructure/InMemoryReplayStore.js";
-import { eventSubDuplicateMessagesTotal } from "../../infrastructure/metrics/prometheus.js";
+import type { ReplayStore } from "../../modules/notifications/ports/ReplayStore.js";
 
 type CreateEventSubRouterOptions = {
   secret: string;
 
-  replayStore: InMemoryReplayStore;
+  replayStore: ReplayStore;
 
   onNotification: (
     type: string,
@@ -41,8 +43,10 @@ export function createEventSubRouter({
       const headers = eventSubHeadersSchema.safeParse(req.headers);
 
       if (!headers.success) {
-        res.sendStatus(400);
-        return;
+        throw new BadRequestError(
+          "Invalid EventSub headers",
+          z.treeifyError(headers.error),
+        );
       }
 
       const {
@@ -87,10 +91,6 @@ export function createEventSubRouter({
 
         case 204:
           res.sendStatus(204);
-          return;
-
-        default:
-          res.sendStatus(400);
           return;
       }
     },

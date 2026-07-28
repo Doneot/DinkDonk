@@ -5,10 +5,8 @@ import { BadRequestError } from "../../../../http/errors/BadRequestError.js";
 import {
   initializeValidatedRequest,
   validateBody,
-  validateParams,
   validateQuery,
   validatedBody,
-  validatedParams,
   validatedQuery,
 } from "../../../../http/middleware/validate.js";
 
@@ -31,7 +29,7 @@ describe("initializeValidatedRequest", () => {
 
     initializeValidatedRequest(req, createMockResponse(), next);
 
-    expect(req.validated).toEqual({ body: {}, query: {}, params: {} });
+    expect(req.validated).toEqual({ body: {}, query: {} });
     expect(next.calls).toEqual([undefined]);
   });
 });
@@ -39,7 +37,6 @@ describe("initializeValidatedRequest", () => {
 describe.each([
   ["body", validateBody, validatedBody],
   ["query", validateQuery, validatedQuery],
-  ["params", validateParams, validatedParams],
 ] as const)("validate%s", (source, factory, read) => {
   const middleware = factory(schema);
 
@@ -80,7 +77,7 @@ describe.each([
 
     middleware(req, createMockResponse(), createNext());
 
-    const untouched = (["body", "query", "params"] as const).filter(
+    const untouched = (["body", "query"] as const).filter(
       (key) => key !== source,
     );
 

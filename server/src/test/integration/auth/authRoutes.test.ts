@@ -151,7 +151,9 @@ describe("GET /api/auth/user", () => {
 
     const response = await request(app).get("/api/auth/user").expect(500);
 
-    expect(response.text).toBe("Failed retrieving user");
+    expect(errorResponseSchema.parse(response.body)).toMatchObject({
+      error: "internal_server_error",
+    });
   });
 
   it("rejects an anonymous request", async () => {
@@ -185,6 +187,8 @@ describe("POST /api/auth/logout", () => {
 
     const response = await request(app).post("/api/auth/logout").expect(500);
 
-    expect(response.text).toBe("Logout failed");
+    expect(errorResponseSchema.parse(response.body)).toMatchObject({
+      error: "internal_server_error",
+    });
   });
 });

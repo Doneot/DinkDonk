@@ -31,7 +31,6 @@ import {
   notificationChannelsResponseSchema,
   publicKeyResponseSchema,
   savePushResponseSchema,
-  healthResponseSchema,
   statusResponseSchema,
   streamerSummaryResponseSchema,
   subscribeResponseSchema,
@@ -66,7 +65,6 @@ registry.register("UnsubscribeRequest", subscribeSchema);
 registry.register("SetMessageRequest", setMessageSchema);
 
 registry.register("ErrorResponse", errorResponseSchema);
-registry.register("HealthResponse", healthResponseSchema);
 registry.register("StatusResponse", statusResponseSchema);
 registry.register("PublicKeyResponse", publicKeyResponseSchema);
 registry.register(

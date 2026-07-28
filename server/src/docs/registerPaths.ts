@@ -23,7 +23,6 @@ import {
   notificationChannelsResponseSchema,
   publicKeyResponseSchema,
   savePushResponseSchema,
-  healthResponseSchema,
   statusResponseSchema,
   streamerSummaryResponseSchema,
   subscribeResponseSchema,
@@ -97,7 +96,7 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     path: "/health/live",
     summary: "Liveness probe",
     responses: {
-      200: jsonResponse("Health - Live", healthResponseSchema),
+      200: emptyResponse,
     },
   });
 
@@ -106,8 +105,8 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     path: "/health/ready",
     summary: "Readiness probe",
     responses: {
-      200: jsonResponse("Health - Ready", healthResponseSchema),
-      500: internalErrorResponse,
+      200: emptyResponse,
+      503: emptyResponse,
     },
   });
 
@@ -164,7 +163,12 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     summary: "Log out authenticated user",
     security: authSecurity,
     responses: {
-      302: redirectResponse,
+      200: jsonResponse(
+        "Logged out",
+        z.object({
+          ok: z.literal(true),
+        }),
+      ),
       401: unauthorizedResponse,
       500: internalErrorResponse,
     },
@@ -177,7 +181,7 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     responses: {
       200: textResponse("Challenge verification response"),
       204: emptyResponse,
-      400: textResponse("Invalid EventSub request"),
+      400: validationErrorResponse,
       403: textResponse("Invalid EventSub signature"),
       500: internalErrorResponse,
     },

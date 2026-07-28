@@ -10,15 +10,16 @@ import type {
   DeletePushSubscribeResult,
 } from "../../types/PushSubscribeResult.js";
 import type { PushSubscription } from "../../domain/PushSubscription.js";
+import type { PushSubscriptionRepository } from "../../ports/PushSubscriptionRepository.js";
 import { isNonEmptyString } from "../../../../shared/utils/validators.js";
 
-export class FirestorePushSubscriptionRepository {
-  private readonly db: Firestore;
+export class FirestorePushSubscriptionRepository
+  implements PushSubscriptionRepository
+{
   private readonly users: CollectionReference<DocumentData>;
 
   constructor(db: Firestore) {
-    this.db = db;
-    this.users = this.db.collection("users");
+    this.users = db.collection("users");
   }
 
   private getPushSubscriptionsRef(

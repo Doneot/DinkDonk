@@ -45,18 +45,15 @@ describe("dispatchEventSubNotification", () => {
     it("rejects a verification without a challenge", async () => {
       const { challenge: _challenge, ...payload } = buildWebhookVerification();
 
-      const result = await dispatch(payload, "webhook_callback_verification");
-
-      expect(result).toEqual({ status: 400 });
+      await expect(
+        dispatch(payload, "webhook_callback_verification"),
+      ).rejects.toThrow(BadRequestError);
     });
 
     it("rejects an empty challenge", async () => {
-      const result = await dispatch(
-        buildWebhookVerification(""),
-        "webhook_callback_verification",
-      );
-
-      expect(result).toEqual({ status: 400 });
+      await expect(
+        dispatch(buildWebhookVerification(""), "webhook_callback_verification"),
+      ).rejects.toThrow(BadRequestError);
     });
 
     it("never invokes notification handlers", async () => {
@@ -105,9 +102,9 @@ describe("dispatchEventSubNotification", () => {
         event: { broadcaster_user_id: "streamer-1" },
       };
 
-      const result = await dispatch(payload, "notification", handlers);
-
-      expect(result).toEqual({ status: 400 });
+      await expect(
+        dispatch(payload, "notification", handlers),
+      ).rejects.toThrow(BadRequestError);
       expect(onNotification).not.toHaveBeenCalled();
     });
 
@@ -145,28 +142,21 @@ describe("dispatchEventSubNotification", () => {
 
   describe("malformed input", () => {
     it("rejects an envelope without a subscription", async () => {
-      const result = await dispatch({ event: {} }, "notification");
-
-      expect(result).toEqual({ status: 400 });
+      await expect(dispatch({ event: {} }, "notification")).rejects.toThrow(
+        BadRequestError,
+      );
     });
 
     it("rejects an envelope whose subscription has no type", async () => {
-      const result = await dispatch(
-        { subscription: { version: "1" }, event: {} },
-        "notification",
-      );
-
-      expect(result).toEqual({ status: 400 });
+      await expect(
+        dispatch({ subscription: { version: "1" }, event: {} }, "notification"),
+      ).rejects.toThrow(BadRequestError);
     });
 
     it("rejects a JSON body that is not an object", async () => {
-      const result = await dispatchEventSubNotification(
-        "[]",
-        "notification",
-        setup().handlers,
-      );
-
-      expect(result).toEqual({ status: 400 });
+      await expect(
+        dispatchEventSubNotification("[]", "notification", setup().handlers),
+      ).rejects.toThrow(BadRequestError);
     });
 
     it("throws BadRequestError for malformed JSON", async () => {

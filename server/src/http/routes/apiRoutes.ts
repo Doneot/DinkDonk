@@ -81,7 +81,8 @@ export function createApiRouter({
     (_req: Request, res: Response): void => {
       if (!webPushPublicKey) {
         res.status(503).json({
-          error: "Web Push is not configured",
+          error: "service_unavailable",
+          message: "Web Push is not configured",
         });
 
         return;
