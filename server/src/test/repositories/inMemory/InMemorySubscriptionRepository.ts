@@ -1,5 +1,3 @@
-import { EventEmitter } from "node:events";
-
 import type { SubscriptionRepository } from "../../../modules/subscriptions/ports/SubscriptionRepository.js";
 import type { Subscription } from "../../../modules/subscriptions/domain/Subscription.js";
 import type {
@@ -7,13 +5,13 @@ import type {
   UnsubscribeResult,
   UpdateSubscriptionResult,
 } from "../../../modules/subscriptions/types/SubscribeResult.js";
+import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
+import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
+import { logger } from "../../../shared/logger/logger.js";
 
 import { isNonEmptyString } from "../../../shared/utils/validators.js";
 
-export class InMemorySubscriptionRepository
-  extends EventEmitter
-  implements SubscriptionRepository
-{
+export class InMemorySubscriptionRepository implements SubscriptionRepository {
   private readonly userSubscriptions = new Map<
     string,
     Map<string, Subscription>
@@ -21,12 +19,7 @@ export class InMemorySubscriptionRepository
 
   private readonly streamerUsers = new Map<string, Set<string>>();
 
-  override on(
-    event: string,
-    listener: (streamerId: string) => Promise<void> | void,
-  ): this {
-    return super.on(event, listener);
-  }
+  constructor(readonly events: DomainEventBus = createDomainEventBus(logger)) {}
 
   getSubscription(
     userId: string,
@@ -79,7 +72,7 @@ export class InMemorySubscriptionRepository
     users.add(userId);
 
     if (createdStreamer) {
-      this.emit("streamerAdded", streamerId);
+      this.events.emit({ type: "streamerAdded", streamerId });
     }
 
     return Promise.resolve({
@@ -114,7 +107,7 @@ export class InMemorySubscriptionRepository
 
       if (users.size === 0) {
         this.streamerUsers.delete(streamerId);
-        this.emit("streamerEmpty", streamerId);
+        this.events.emit({ type: "streamerEmpty", streamerId });
       }
     }
 

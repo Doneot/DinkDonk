@@ -32,6 +32,20 @@ const limiter = rateLimit({
   standardHeaders: "draft-8", // draft-6: `RateLimit-*` headers; draft-7 & draft-8: combined `RateLimit` header
   legacyHeaders: false,
   ipv6Subnet: 56, // Set to 60 or 64 to be less aggressive, or 52 or 48 to be more aggressive
+  // Health/readiness probes are polled frequently by the orchestrator and
+  // must never be starved by public API traffic sharing the same budget.
+  skip: (req) => req.path.startsWith("/health") || req.path.startsWith("/metrics"),
+});
+
+// Twitch's own EventSub webhook traffic (plus redeliveries) is unauthenticated
+// and public, so it needs its own bound distinct from the general API limiter
+// rather than being left completely unlimited.
+const eventSubLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  limit: 120,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  ipv6Subnet: 56,
 });
 
 type ConfigureMiddlewareOptions = {
@@ -61,6 +75,11 @@ export function createSessionMiddleware(firestore: Firestore): RequestHandler {
       httpOnly: true,
 
       sameSite: "lax",
+
+      // Bounds how long a session (and its Firestore-backed document) stays
+      // valid; without this, sessions never expire server-side and a stolen
+      // session id would remain usable indefinitely.
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     },
   });
 }
@@ -102,7 +121,11 @@ export function configureMiddleware({
 
   app.use(configuredPassport.session());
 
+  app.use(helmet());
+
   app.use(
+    eventSubLimiter,
+
     createEventSubRouter({
       secret: assertDefined(env.twitch.webhookSecret, "Twitch Webhook Secret"),
 
@@ -117,8 +140,6 @@ export function configureMiddleware({
       },
     }),
   );
-
-  app.use(helmet());
 
   app.use(limiter);
 }

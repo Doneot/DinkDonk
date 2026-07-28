@@ -8,7 +8,7 @@
     "dev": "node --import tsx src/app/index.ts",
     "start": "node dist/src/app/index.js",
     "build": "tsc",
-    "deploy:commands": "node --env-file=.env.development --import tsx deploy-commands.ts",
+    "deploy:commands": "node --env-file=.env.development --import tsx src/deploy-commands.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

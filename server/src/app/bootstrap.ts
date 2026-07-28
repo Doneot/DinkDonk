@@ -34,14 +34,9 @@ export async function bootstrap() {
 
   configureEventSubscriptions(container);
 
-  await Promise.all([container.twitch.start(), container.discord.start()]);
-
-  server.httpServer.listen(env.port, "0.0.0.0", () => {
-    logger.info(`HTTP and Socket.IO server listening on ${env.port}`);
-  });
-
-  cleanupScheduler.start();
-
+  // Registered before the (potentially slow) Twitch/Discord startup calls so a
+  // signal arriving during that window still triggers a graceful teardown of
+  // whatever has already been started (e.g. the user change listener).
   registerShutdownHooks(
     runtime,
     container,
@@ -49,4 +44,26 @@ export async function bootstrap() {
     userChangeBroadcaster,
     cleanupScheduler,
   );
+
+  const [twitchStart, discordStart] = await Promise.allSettled([
+    container.twitch.start(),
+    container.discord.start(),
+  ]);
+
+  for (const [name, result] of [
+    ["Twitch", twitchStart],
+    ["Discord", discordStart],
+  ] as const) {
+    if (result.status === "rejected") {
+      throw new Error(`Failed to start ${name} client`, {
+        cause: result.reason,
+      });
+    }
+  }
+
+  server.httpServer.listen(env.port, "0.0.0.0", () => {
+    logger.info(`HTTP and Socket.IO server listening on ${env.port}`);
+  });
+
+  cleanupScheduler.start();
 }

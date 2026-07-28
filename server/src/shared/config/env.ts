@@ -1,15 +1,16 @@
 import path from "path";
 import dotenv from "dotenv";
-dotenv.config({ path: path.resolve(process.cwd(), ".env") });
-
-import { EnvSchema } from "./envSchema.js";
 
 const envFile =
   process.env.NODE_ENV === "production" ? ".env" : ".env.development";
 
-dotenv.config({
-  path: path.resolve(process.cwd(), envFile),
-});
+// Load the environment-specific file first so it wins over the shared `.env`
+// fallback: dotenv never overrides a key already present in process.env, so
+// load order determines precedence.
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+
+import { EnvSchema } from "./envSchema.js";
 
 const parsedEnv = EnvSchema.parse(process.env);
 
@@ -25,6 +26,8 @@ export const env = {
   clientOrigin: parsedEnv.CLIENT_ORIGIN || parsedEnv.SERVER_URL,
 
   sessionSecret: parsedEnv.SESSION_SECRET,
+
+  encryptionKey: parsedEnv.ENCRYPTION_KEY,
 
   unsubscribeEventSubOnShutdown: parsedEnv.UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN,
 
@@ -48,9 +51,7 @@ export const env = {
     privateKey: parsedEnv.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
     clientEmail: parsedEnv.FIREBASE_CLIENT_EMAIL,
     clientId: parsedEnv.FIREBASE_CLIENT_ID,
-    clientX509CertUrl: parsedEnv.GOOGLE_APPLICATION_CREDENTIALS,
   },
-  adminPassword: parsedEnv.ADMIN_PASSWORD,
   webPush: {
     publicKey: parsedEnv.WEB_PUSH_PUBLIC_KEY,
     privateKey: parsedEnv.WEB_PUSH_PRIVATE_KEY,

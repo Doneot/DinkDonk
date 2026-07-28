@@ -14,13 +14,13 @@ function baseEnv(overrides: Record<string, string | undefined> = {}) {
   return {
     SERVER_URL: "http://localhost:3000",
     SESSION_SECRET: "session-secret",
+    ENCRYPTION_KEY: "encryption-key-32-bytes-long!!!!",
     DISCORD_CLIENT_ID: "discord-client-id",
     DISCORD_CLIENT_SECRET: "discord-client-secret",
     DISCORD_TOKEN: "discord-token",
     TWITCH_CLIENT_ID: "twitch-client-id",
     TWITCH_CLIENT_SECRET: "twitch-client-secret",
     TWITCH_WEBHOOK_SECRET: "twitch-webhook-secret",
-    ADMIN_PASSWORD: "admin-password",
     WEB_PUSH_PUBLIC_KEY: "web-push-public-key",
     WEB_PUSH_PRIVATE_KEY: "web-push-private-key",
     WEB_PUSH_SUBJECT: "mailto:test@example.com",
@@ -111,12 +111,11 @@ describe("EnvSchema", () => {
 
     const parsed = EnvSchema.parse({
       ...env,
-      GOOGLE_APPLICATION_CREDENTIALS:
-        "https://example.com/service-account.json",
+      GOOGLE_APPLICATION_CREDENTIALS: "/run/secrets/firebase_service_account",
     });
 
     expect(parsed.GOOGLE_APPLICATION_CREDENTIALS).toBe(
-      "https://example.com/service-account.json",
+      "/run/secrets/firebase_service_account",
     );
   });
 
@@ -128,10 +127,10 @@ describe("EnvSchema", () => {
 
   it.each([
     "SESSION_SECRET",
+    "ENCRYPTION_KEY",
     "DISCORD_TOKEN",
     "TWITCH_CLIENT_ID",
     "TWITCH_WEBHOOK_SECRET",
-    "ADMIN_PASSWORD",
     "WEB_PUSH_PUBLIC_KEY",
   ])("rejects a missing %s", (key) => {
     expect(messagesFor(baseEnv({ [key]: undefined }))).not.toHaveLength(0);

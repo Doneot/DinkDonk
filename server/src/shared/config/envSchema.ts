@@ -16,6 +16,11 @@ const BaseEnvSchema = z.object({
 
   SESSION_SECRET: secretFromEnv("session_secret"),
 
+  // Used to encrypt OAuth access/refresh tokens at rest in Firestore.
+  ENCRYPTION_KEY: secretFromEnv("encryption_key").pipe(
+    z.string().min(16, "ENCRYPTION_KEY must be at least 16 characters"),
+  ),
+
   DISCORD_CLIENT_ID: z.string().min(1),
 
   DISCORD_CLIENT_SECRET: secretFromEnv("discord_client_secret"),
@@ -34,7 +39,7 @@ const BaseEnvSchema = z.object({
 
   EVENTSUB_GC_INTERVAL_MS: numberFromEnv(6 * 60 * 60 * 1000),
 
-  GOOGLE_APPLICATION_CREDENTIALS: z.url().optional(),
+  GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1).optional(),
 
   FIREBASE_PROJECT_ID: z.string().optional(),
 
@@ -45,8 +50,6 @@ const BaseEnvSchema = z.object({
   FIREBASE_PRIVATE_KEY: z.string().optional(),
 
   FIREBASE_CLIENT_ID: z.string().optional(),
-
-  ADMIN_PASSWORD: secretFromEnv("admin_password"),
 
   WEB_PUSH_PUBLIC_KEY: z.string().min(1),
 

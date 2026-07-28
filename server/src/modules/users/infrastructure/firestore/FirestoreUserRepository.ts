@@ -7,10 +7,11 @@ import type {
 import type { UserRepository } from "../../ports/UserRepository.js";
 import type { User } from "../../domain/User.js";
 import type { UserUpdate } from "../../domain/UserUpdate.js";
-import { UserRecordSchema } from "./records/UserRecord.js";
+import { UserRecordSchema, UserUpdateSchema } from "./records/UserRecord.js";
 import { toUser } from "./mappers/userMapper.js";
 
 import { isNonEmptyString } from "../../../../shared/utils/validators.js";
+import { getExistingDoc } from "../../../../shared/utils/firestore.js";
 
 export class FirestoreUserRepository implements UserRepository {
   private readonly users: CollectionReference<DocumentData>;
@@ -20,15 +21,13 @@ export class FirestoreUserRepository implements UserRepository {
   }
 
   async getUser(userId: string): Promise<User | null> {
-    const doc = await this.users.doc(userId).get();
+    const doc = await getExistingDoc(this.users, userId);
 
-    if (!doc.exists) {
+    if (!doc) {
       return null;
     }
 
-    const record = UserRecordSchema.parse(doc.data());
-
-    return toUser(doc.id, record);
+    return toUser(doc.id, UserRecordSchema.parse(doc.data()));
   }
 
   async getUsers(): Promise<User[]> {
@@ -46,6 +45,17 @@ export class FirestoreUserRepository implements UserRepository {
       throw new Error("Invalid user id");
     }
 
-    await this.users.doc(userId).set(data, { merge: true });
+    const validated = UserUpdateSchema.parse(data);
+
+    await this.users.doc(userId).set(validated, { merge: true });
+  }
+
+  async countUsersReceivingDM(): Promise<number> {
+    const snapshot = await this.users
+      .where("canReceiveDM", "==", true)
+      .count()
+      .get();
+
+    return snapshot.data().count;
   }
 }

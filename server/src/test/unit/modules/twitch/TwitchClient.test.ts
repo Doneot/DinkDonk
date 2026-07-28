@@ -35,9 +35,12 @@ function networkError(code: string): AxiosError {
   return Object.assign(new Error(code), { code }) as AxiosError;
 }
 
-function httpError(status: number): AxiosError {
+function httpError(
+  status: number,
+  headers?: Record<string, string>,
+): AxiosError {
   return Object.assign(new Error(`Request failed with status ${status}`), {
-    response: { status },
+    response: { status, headers },
   }) as AxiosError;
 }
 
@@ -155,19 +158,59 @@ describe("TwitchClient", () => {
       expect(error).toHaveBeenCalledOnce();
     });
 
-    it("does not retry a non-retryable failure", async () => {
+    it("does not retry a non-retryable client error", async () => {
       const error = vi.spyOn(logger, "error").mockReturnValue();
       const { client, request } = createClient();
 
-      request.mockRejectedValue(httpError(500));
+      request.mockRejectedValue(httpError(400));
 
       await expect(client.getEventSubSubscriptions()).resolves.toEqual([]);
       expect(request).toHaveBeenCalledOnce();
       expect(error.mock.calls[0]?.[0]).toMatchObject({
         endpoint: "eventsub/subscriptions",
         method: "GET",
-        status: 500,
+        status: 400,
       });
+    });
+
+    it("retries after a 5xx server error and returns the eventual data", async () => {
+      vi.useFakeTimers();
+
+      const { client, request } = createClient();
+
+      request
+        .mockRejectedValueOnce(httpError(503))
+        .mockResolvedValue({ data: { data: [{ id: "streamer-1" }] } });
+
+      const pending = client.getEventSubSubscriptions();
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      await expect(pending).resolves.toEqual([{ id: "streamer-1" }]);
+      expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries a 429 after the delay given in the Retry-After header", async () => {
+      vi.useFakeTimers();
+
+      const { client, request } = createClient();
+
+      const rateLimited = httpError(429, { "retry-after": "2" });
+
+      request
+        .mockRejectedValueOnce(rateLimited)
+        .mockResolvedValue({ data: { data: [{ id: "streamer-1" }] } });
+
+      const pending = client.getEventSubSubscriptions();
+
+      // Not yet elapsed: still only the first attempt.
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(request).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      await expect(pending).resolves.toEqual([{ id: "streamer-1" }]);
+      expect(request).toHaveBeenCalledTimes(2);
     });
 
     it("treats a 404 on DELETE as an already-removed subscription", async () => {

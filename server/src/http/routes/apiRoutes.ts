@@ -129,17 +129,17 @@ export function createApiRouter({
     "/user-count",
 
     async (_req: Request, res: Response): Promise<void> => {
-      const users = await repositories.users.getUsers();
+      const count = await repositories.users.countUsersReceivingDM();
 
       const payload = {
-        count: users.filter((user) => user.canReceiveDM).length,
+        count,
       } satisfies UserCountResponse;
 
       res.json(payload);
     },
   );
 
-  router.get(
+  router.post(
     "/can-receive-dm",
 
     async (req, res) => {

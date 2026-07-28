@@ -1,6 +1,6 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import { env } from "../src/shared/config/env.js";
+import { env } from "../shared/config/env.js";
 
 export const data = new SlashCommandBuilder()
   .setName("dashboard")

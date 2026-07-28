@@ -38,7 +38,7 @@ export function createProviders(repositories: Repositories, runtime: Runtime) {
   const discord = new DiscordBot({
     token: assertDefined(env.discord.token, "Discord token"),
 
-    commandDirectory: path.join(__dirname, "../../../commands"),
+    commandDirectory: path.join(__dirname, "../../commands"),
 
     context,
 

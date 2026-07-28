@@ -1,3 +1,5 @@
+import { logger } from "../shared/logger/logger.js";
+
 import type { Container } from "./container/index.js";
 
 export function configureEventSubscriptions({
@@ -5,25 +7,31 @@ export function configureEventSubscriptions({
   services,
   twitch,
 }: Container): void {
-  repositories.streamers.on("streamerAdded", (streamerId: string) => {
-    return services.eventSubSync.handleStreamerAdded(streamerId);
+  // Both the streamer and subscription repositories share the same event
+  // bus (see createRepositories), so registering here catches a streamer
+  // created through either one.
+  repositories.subscriptions.events.on("streamerAdded", (event) => {
+    return services.eventSubSync.handleStreamerAdded(event.streamerId);
   });
 
-  repositories.subscriptions.on("streamerAdded", (streamerId: string) => {
-    return services.eventSubSync.handleStreamerAdded(streamerId);
-  });
-
-  repositories.subscriptions.on("streamerEmpty", (streamerId: string) => {
-    return services.subscriptionCleanup.garbageCollectStreamer(streamerId);
+  repositories.subscriptions.events.on("streamerEmpty", (event) => {
+    return services.subscriptionCleanup.garbageCollectStreamer(
+      event.streamerId,
+    );
   });
 
   twitch.on("ready", () =>
     services.eventSubSync
       .syncEventSubSubscriptions()
-      .then(() => services.subscriptionCleanup.garbageCollectSubscriptions()),
+      .then(() => services.subscriptionCleanup.garbageCollectSubscriptions())
+      .catch((error: unknown) => {
+        logger.error({ error }, 'Failed to handle Twitch "ready" event');
+      }),
   );
 
   twitch.on("tokenRefreshed", () =>
-    services.eventSubSync.syncEventSubSubscriptions(),
+    services.eventSubSync.syncEventSubSubscriptions().catch((error: unknown) => {
+      logger.error({ error }, 'Failed to handle Twitch "tokenRefreshed" event');
+    }),
   );
 }

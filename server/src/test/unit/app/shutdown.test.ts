@@ -34,6 +34,7 @@ function setup() {
       calls.push("http");
       callback();
     },
+    closeAllConnections: vi.fn(),
   } as unknown as http.Server;
 
   const sockets = {
@@ -138,8 +139,8 @@ describe("registerShutdownHooks", () => {
       "broadcaster",
       "scheduler",
       "runtime",
-      "http",
       "sockets",
+      "http",
       "discord",
       "twitch",
     ]);
@@ -179,6 +180,59 @@ describe("registerShutdownHooks", () => {
     });
 
     expect(broadcaster.stop).toHaveBeenCalledOnce();
+  });
+
+  it("forces remaining HTTP connections closed if closing the server times out", async () => {
+    vi.useFakeTimers();
+
+    try {
+      vi.spyOn(logger, "info").mockReturnValue();
+      vi.spyOn(logger, "warn").mockReturnValue();
+      vi.spyOn(logger, "flush").mockImplementation((callback?: () => void) =>
+        callback?.(),
+      );
+
+      const exit = stubExit();
+      const closeAllConnections = vi.fn();
+
+      const httpServer = {
+        // Never invokes the callback, simulating a client connection that
+        // never ends on its own.
+        close: () => {},
+        closeAllConnections,
+      } as unknown as http.Server;
+
+      const sockets = {
+        close: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SocketServer;
+
+      const container = {
+        twitch: { stop: vi.fn().mockResolvedValue(undefined) },
+        discord: { stop: vi.fn().mockResolvedValue(undefined) },
+      } as unknown as Container;
+
+      const runtime = {
+        publicUrl: "",
+        dispose: vi.fn().mockResolvedValue(undefined),
+      };
+
+      registerShutdownHooks(
+        runtime,
+        container,
+        { httpServer, sockets } as unknown as Server,
+        { stop: vi.fn() } as unknown as UserChangeBroadcaster,
+        { stop: vi.fn() } as unknown as SubscriptionCleanupScheduler,
+      );
+
+      process.emit("SIGTERM", "SIGTERM");
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(closeAllConnections).toHaveBeenCalledOnce();
+      expect(exit).toHaveBeenCalledWith(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("exits with a failure code when teardown throws", async () => {

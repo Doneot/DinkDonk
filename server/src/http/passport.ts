@@ -56,6 +56,11 @@ export function configurePassport(
         : "http://localhost:3000/api/auth/discord/callback",
 
       scope: ["identify"],
+
+      // Binds a session-stored nonce into the OAuth redirect/callback round
+      // trip, preventing an attacker from injecting their own Discord
+      // identity into a victim's session (login/OAuth CSRF).
+      state: true,
     },
 
     async (
@@ -91,7 +96,10 @@ export function configurePassport(
     },
   );
 
-  DiscordStrategy.prototype.authorizationParams = (): {
+  // Set on this strategy instance rather than DiscordStrategy.prototype so it
+  // doesn't leak as a global side effect onto every DiscordStrategy in the
+  // process.
+  strategy.authorizationParams = (): {
     prompt: string;
   } => ({
     prompt: "none",

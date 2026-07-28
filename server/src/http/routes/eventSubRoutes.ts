@@ -13,6 +13,7 @@ import {
   eventSubDuplicateMessagesTotal,
 } from "../../infrastructure/metrics/prometheus.js";
 import type { ReplayStore } from "../../modules/notifications/ports/ReplayStore.js";
+import { logger } from "../../shared/logger/logger.js";
 
 type CreateEventSubRouterOptions = {
   secret: string;
@@ -66,6 +67,10 @@ export function createEventSubRouter({
         })
       ) {
         eventSubSignatureFailuresTotal.inc();
+        logger.warn(
+          { requestId: req.requestId, ip: req.ip, messageId },
+          "Rejected EventSub request with an invalid signature",
+        );
         res.sendStatus(403);
         return;
       }

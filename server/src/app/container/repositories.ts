@@ -9,6 +9,8 @@ import type { AuthUserRepository } from "../../modules/auth/ports/AuthUserReposi
 import type { StreamerRepository } from "../../modules/streamers/ports/StreamerRepository.js";
 import type { SubscriptionRepository } from "../../modules/subscriptions/ports/SubscriptionRepository.js";
 import type { PushSubscriptionRepository } from "../../modules/notifications/ports/PushSubscriptionRepository.js";
+import { createDomainEventBus } from "../../shared/events/DomainEventBus.js";
+import { logger } from "../../shared/logger/logger.js";
 
 export interface Repositories {
   users: UserRepository;
@@ -21,11 +23,16 @@ export interface Repositories {
 export function createRepositories(
   firestore: FirebaseFirestore.Firestore,
 ): Repositories {
+  // Shared so a streamer created via either repository (subscribing a first
+  // user, or the standalone createStreamer API) is announced through the
+  // same event stream.
+  const events = createDomainEventBus(logger);
+
   return {
     users: new FirestoreUserRepository(firestore),
     authUsers: new FirestoreAuthUserRepository(firestore),
-    streamers: new FirestoreStreamerRepository(firestore),
-    subscriptions: new FirestoreSubscriptionRepository(firestore),
+    streamers: new FirestoreStreamerRepository(firestore, events),
+    subscriptions: new FirestoreSubscriptionRepository(firestore, events),
     pushSubscriptions: new FirestorePushSubscriptionRepository(firestore),
   };
 }

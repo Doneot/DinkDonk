@@ -3,9 +3,12 @@ set -eu
 
 LOCKFILE="node_modules/.docker-package-lock.hash"
 
-# Compute the current package-lock.json hash
+# Compute the current package-lock.json hash. Avoids a pipe so a failure
+# reading the lockfile (e.g. it's missing) propagates under `set -e` instead
+# of being masked by awk's own (successful) exit status.
 current_hash() {
-    sha256sum package-lock.json | awk '{print $1}'
+    hash_and_name="$(sha256sum package-lock.json)"
+    echo "${hash_and_name%% *}"
 }
 
 install_dependencies() {

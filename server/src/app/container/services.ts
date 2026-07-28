@@ -22,7 +22,6 @@ export function createServices(
       twitch.client,
       repositories.users,
       repositories.streamers,
-      repositories.subscriptions,
       notificationManager,
     ),
 

@@ -35,12 +35,12 @@ describe("AppError subclasses", () => {
   });
 
   it("defaults BadRequestError details to an empty object", () => {
-    expect(new BadRequestError().error).toEqual({});
+    expect(new BadRequestError().details).toEqual({});
   });
 
   it("keeps BadRequestError validation details", () => {
     const details = { errors: ["streamerId is required"] };
 
-    expect(new BadRequestError("Bad Request", details).error).toEqual(details);
+    expect(new BadRequestError("Bad Request", details).details).toEqual(details);
   });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { FirestoreSubscriptionRepository } from "../../../modules/subscriptions/infrastructure/firestore/FirestoreSubscriptionRepository.js";
+import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
+import { logger } from "../../../shared/logger/logger.js";
 
 import { FakeFirestore } from "../../helpers/fakeFirestore.js";
 
@@ -11,7 +13,10 @@ function setup() {
 
   return {
     firestore,
-    repository: new FirestoreSubscriptionRepository(firestore.asFirestore()),
+    repository: new FirestoreSubscriptionRepository(
+      firestore.asFirestore(),
+      createDomainEventBus(logger),
+    ),
   };
 }
 
@@ -33,7 +38,20 @@ function seedSubscription(
     canReceiveDM: true,
     subscriptions: [{ id: streamerId, notification_message: message }],
   });
-  firestore.write(`streamers/${streamerId}`, { id: streamerId, users });
+  firestore.write(`streamers/${streamerId}`, { id: streamerId });
+
+  for (const subscriberId of users) {
+    firestore.write(`streamers/${streamerId}/subscribers/${subscriberId}`, {
+      subscribedAt: 1,
+    });
+  }
+}
+
+function subscriberIds(firestore: FakeFirestore, streamerId: string): string[] {
+  return firestore
+    .paths(`streamers/${streamerId}/subscribers`)
+    .map((path) => path.slice(`streamers/${streamerId}/subscribers/`.length))
+    .sort();
 }
 
 describe("FirestoreSubscriptionRepository", () => {
@@ -43,7 +61,7 @@ describe("FirestoreSubscriptionRepository", () => {
 
       const listener = vi.fn();
 
-      repository.on("streamerAdded", listener);
+      repository.events.on("streamerAdded", listener);
 
       await expect(
         repository.subscribe("user-1", "streamer-1", "hello"),
@@ -54,9 +72,11 @@ describe("FirestoreSubscriptionRepository", () => {
       });
       expect(firestore.read("streamers/streamer-1")).toEqual({
         id: "streamer-1",
-        users: ["user-1"],
       });
-      expect(listener.mock.calls).toEqual([["streamer-1"]]);
+      expect(subscriberIds(firestore, "streamer-1")).toEqual(["user-1"]);
+      expect(listener.mock.calls).toEqual([
+        [{ type: "streamerAdded", streamerId: "streamer-1" }],
+      ]);
     });
 
     it("defaults the notification message to an empty string", async () => {
@@ -72,18 +92,19 @@ describe("FirestoreSubscriptionRepository", () => {
     it("reports an existing streamer as not newly created", async () => {
       const { firestore, repository } = setup();
 
-      firestore.write("streamers/streamer-1", {
-        id: "streamer-1",
-        users: ["user-2"],
+      firestore.write("streamers/streamer-1", { id: "streamer-1" });
+      firestore.write("streamers/streamer-1/subscribers/user-2", {
+        subscribedAt: 1,
       });
 
       await expect(
         repository.subscribe("user-1", "streamer-1"),
       ).resolves.toEqual({ success: true, createdStreamer: false });
 
-      expect(firestore.read("streamers/streamer-1")).toMatchObject({
-        users: ["user-2", "user-1"],
-      });
+      expect(subscriberIds(firestore, "streamer-1")).toEqual([
+        "user-1",
+        "user-2",
+      ]);
     });
 
     it("keeps other subscriptions of the user", async () => {
@@ -101,20 +122,18 @@ describe("FirestoreSubscriptionRepository", () => {
       });
     });
 
-    it("does not duplicate the user on the streamer document", async () => {
+    it("does not create a duplicate subscriber document", async () => {
       const { firestore, repository } = setup();
 
       firestore.write("users/user-1", { subscriptions: [] });
-      firestore.write("streamers/streamer-1", {
-        id: "streamer-1",
-        users: ["user-1"],
+      firestore.write("streamers/streamer-1", { id: "streamer-1" });
+      firestore.write("streamers/streamer-1/subscribers/user-1", {
+        subscribedAt: 1,
       });
 
       await repository.subscribe("user-1", "streamer-1");
 
-      expect(firestore.read("streamers/streamer-1")).toMatchObject({
-        users: ["user-1"],
-      });
+      expect(subscriberIds(firestore, "streamer-1")).toEqual(["user-1"]);
     });
 
     it("rejects a repeat subscription without announcing a streamer", async () => {
@@ -122,7 +141,7 @@ describe("FirestoreSubscriptionRepository", () => {
 
       const listener = vi.fn();
 
-      repository.on("streamerAdded", listener);
+      repository.events.on("streamerAdded", listener);
       seedSubscription(firestore);
 
       await expect(
@@ -163,7 +182,7 @@ describe("FirestoreSubscriptionRepository", () => {
 
       const listener = vi.fn();
 
-      repository.on("streamerEmpty", listener);
+      repository.events.on("streamerEmpty", listener);
       seedSubscription(firestore);
 
       await expect(
@@ -173,10 +192,10 @@ describe("FirestoreSubscriptionRepository", () => {
       expect(firestore.read("users/user-1")).toMatchObject({
         subscriptions: [],
       });
-      expect(firestore.read("streamers/streamer-1")).toMatchObject({
-        users: [],
-      });
-      expect(listener.mock.calls).toEqual([["streamer-1"]]);
+      expect(subscriberIds(firestore, "streamer-1")).toEqual([]);
+      expect(listener.mock.calls).toEqual([
+        [{ type: "streamerEmpty", streamerId: "streamer-1" }],
+      ]);
     });
 
     it("keeps the streamer when other users remain subscribed", async () => {
@@ -184,7 +203,7 @@ describe("FirestoreSubscriptionRepository", () => {
 
       const listener = vi.fn();
 
-      repository.on("streamerEmpty", listener);
+      repository.events.on("streamerEmpty", listener);
       seedSubscription(firestore, { users: ["user-1", "user-2"] });
 
       await expect(

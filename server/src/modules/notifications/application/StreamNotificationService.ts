@@ -1,7 +1,6 @@
 import type { TwitchStreamerProvider } from "../../twitch/ports/TwitchGateway.js";
 import type { UserRepository } from "../../users/ports/UserRepository.js";
 import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
-import type { SubscriptionRepository } from "../../subscriptions/ports/SubscriptionRepository.js";
 import type { NotificationManager } from "./NotificationManager.js";
 import type {
   TwitchEventSubStreamOnlineEvent,
@@ -9,12 +8,16 @@ import type {
 } from "../../twitch/domain/Twitch.js";
 import { buildStreamerLivePayload } from "../domain/buildStreamerLiveNotification.js";
 
+// Bounds how many subscribers are notified concurrently so a very popular
+// streamer going live doesn't fire thousands of simultaneous Firestore reads
+// and notification-channel calls in one burst.
+const NOTIFY_BATCH_SIZE = 25;
+
 export class StreamNotificationService {
   constructor(
     private readonly twitch: TwitchStreamerProvider,
     private readonly users: UserRepository,
     private readonly streamers: StreamerRepository,
-    private readonly subscriptionRepository: SubscriptionRepository,
     private readonly notificationManager: NotificationManager,
   ) {}
 
@@ -29,13 +32,15 @@ export class StreamNotificationService {
       return;
     }
 
-    const streamerDocument = await this.streamers.getStreamer(streamer.id);
+    const userIds = await this.streamers.getSubscriberIds(streamer.id);
 
-    const userIds = streamerDocument?.users || [];
+    for (let i = 0; i < userIds.length; i += NOTIFY_BATCH_SIZE) {
+      const batch = userIds.slice(i, i + NOTIFY_BATCH_SIZE);
 
-    await Promise.all(
-      userIds.map((userId) => this.notifyUserForStreamer(userId, streamer)),
-    );
+      await Promise.all(
+        batch.map((userId) => this.notifyUserForStreamer(userId, streamer)),
+      );
+    }
   }
 
   private async notifyUserForStreamer(
@@ -48,10 +53,7 @@ export class StreamNotificationService {
       return;
     }
 
-    const subscription = await this.subscriptionRepository.getSubscription(
-      userId,
-      streamer.id,
-    );
+    const subscription = user.subscriptions.find((s) => s.id === streamer.id);
     const message = subscription?.notification_message || "";
 
     const notification = buildStreamerLivePayload({

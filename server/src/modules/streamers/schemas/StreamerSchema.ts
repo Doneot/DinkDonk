@@ -5,5 +5,4 @@ extendZodWithOpenApi(z);
 
 export const StreamerSchema = z.object({
   id: z.string().min(1).max(64),
-  users: z.array(z.string().min(1)),
 });

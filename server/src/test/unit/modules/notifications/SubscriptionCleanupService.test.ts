@@ -68,10 +68,10 @@ describe("SubscriptionCleanupService", () => {
       expect(twitch.subscriptions).toEqual([]);
     });
 
-    it("treats a streamer record without a users field as empty", async () => {
+    it("treats a streamer with no subscribers as empty", async () => {
       const { service, twitch } = setup({
         subscriptions: [buildEventSubSubscription({ id: "sub-1" })],
-        streamers: [{ id: "streamer-1" }],
+        streamers: [buildStreamer({ id: "streamer-1" })],
       });
 
       await service.garbageCollectStreamer("streamer-1");
@@ -155,10 +155,10 @@ describe("SubscriptionCleanupService", () => {
       expect(twitch.subscriptions).toEqual([]);
     });
 
-    it("drops subscriptions for a streamer record without a users field", async () => {
+    it("drops subscriptions for a streamer with no subscribers", async () => {
       const { service, twitch } = setup({
         subscriptions: [buildEventSubSubscription({ id: "sub-1" })],
-        streamers: [{ id: "streamer-1" }],
+        streamers: [buildStreamer({ id: "streamer-1" })],
       });
 
       await service.garbageCollectSubscriptions();
@@ -192,6 +192,28 @@ describe("SubscriptionCleanupService", () => {
       await service.garbageCollectSubscriptions();
 
       expect(twitch.subscriptions).toHaveLength(1);
+    });
+
+    it("fetches the Twitch EventSub subscription list only once per sweep, even with multiple empty streamers", async () => {
+      const { service, twitch } = setup({
+        subscriptions: [
+          buildEventSubSubscription({
+            id: "sub-empty-1",
+            condition: { broadcaster_user_id: "streamer-empty-1" },
+          }),
+          buildEventSubSubscription({
+            id: "sub-empty-2",
+            condition: { broadcaster_user_id: "streamer-empty-2" },
+          }),
+        ],
+      });
+
+      const getSubscriptions = vi.spyOn(twitch, "getEventSubSubscriptions");
+
+      await service.garbageCollectSubscriptions();
+
+      expect(getSubscriptions).toHaveBeenCalledOnce();
+      expect(twitch.subscriptions).toEqual([]);
     });
 
     it("does not start a second sweep while one is in flight", async () => {

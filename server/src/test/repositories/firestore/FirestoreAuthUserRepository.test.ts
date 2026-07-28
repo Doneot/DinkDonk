@@ -75,7 +75,7 @@ describe("FirestoreAuthUserRepository", () => {
   });
 
   describe("updateAuthUser", () => {
-    it("merges rotated credentials into the existing document", async () => {
+    it("merges rotated credentials into the existing document, encrypted at rest", async () => {
       const { firestore, repository } = setup();
 
       firestore.write("auth/user-1", RECORD);
@@ -85,10 +85,18 @@ describe("FirestoreAuthUserRepository", () => {
         fetchTime: 1_700_000_000_001,
       });
 
-      expect(firestore.read("auth/user-1")).toEqual({
-        ...RECORD,
-        accessToken: "rotated",
+      const stored = firestore.read("auth/user-1") as Record<string, unknown>;
+      const { accessToken: _plaintextAccessToken, ...restOfRecord } = RECORD;
+
+      expect(stored).toMatchObject({
+        ...restOfRecord,
         fetchTime: 1_700_000_000_001,
+      });
+      expect(stored.accessToken).not.toBe("rotated");
+      expect(stored.accessToken).toMatch(/^enc:v1:/);
+
+      await expect(repository.getAuthUser("user-1")).resolves.toMatchObject({
+        accessToken: "rotated",
       });
     });
 

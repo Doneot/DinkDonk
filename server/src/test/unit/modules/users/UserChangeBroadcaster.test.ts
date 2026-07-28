@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { UserChangeBroadcaster } from "../../../../modules/users/application/UserChangeBroadcaster.js";
 import type { SocketServer } from "../../../../realtime/socketServer.js";
+import { logger } from "../../../../shared/logger/logger.js";
 
 type DocChange = {
   type: "added" | "modified" | "removed";
@@ -10,6 +11,7 @@ type DocChange = {
 };
 
 type SnapshotListener = (snapshot: { docChanges: () => DocChange[] }) => void;
+type SnapshotErrorListener = (error: Error) => void;
 
 function docChange(
   type: DocChange["type"],
@@ -22,9 +24,17 @@ function docChange(
 function setup() {
   const unsubscribe = vi.fn();
   const listeners: SnapshotListener[] = [];
+  const errorListeners: SnapshotErrorListener[] = [];
   const collection = vi.fn().mockReturnValue({
-    onSnapshot: (listener: SnapshotListener) => {
+    onSnapshot: (
+      listener: SnapshotListener,
+      onError?: SnapshotErrorListener,
+    ) => {
       listeners.push(listener);
+
+      if (onError) {
+        errorListeners.push(onError);
+      }
 
       return unsubscribe;
     },
@@ -41,6 +51,11 @@ function setup() {
     emit: (...changes: DocChange[]) => {
       for (const listener of listeners) {
         listener({ docChanges: () => changes });
+      }
+    },
+    emitError: (error: Error) => {
+      for (const onError of errorListeners) {
+        onError(error);
       }
     },
     listenerCount: () => listeners.length,
@@ -60,15 +75,28 @@ describe("UserChangeBroadcaster", () => {
     expect(collection.mock.calls).toEqual([["users"]]);
   });
 
-  it("pushes modified user documents to the owning socket", () => {
+  it("pushes modified user documents to the owning socket, mapped through the domain schema", () => {
     const { broadcaster, emit, notifyUser } = setup();
 
     broadcaster.start();
 
-    emit(docChange("modified", "user-1", { canReceiveDM: true }));
+    emit(
+      docChange("modified", "user-1", {
+        canReceiveDM: true,
+        subscriptions: [{ id: "streamer-1", notification_message: "hi" }],
+      }),
+    );
 
     expect(notifyUser.mock.calls).toEqual([
-      ["user-1", "user_data_updated", { canReceiveDM: true }],
+      [
+        "user-1",
+        "user_data_updated",
+        {
+          id: "user-1",
+          canReceiveDM: true,
+          subscriptions: [{ id: "streamer-1", notification_message: "hi" }],
+        },
+      ],
     ]);
   });
 
@@ -97,6 +125,34 @@ describe("UserChangeBroadcaster", () => {
       "user-1",
       "user-3",
     ]);
+  });
+
+  it("logs and skips a document that fails schema validation instead of throwing", () => {
+    const error = vi.spyOn(logger, "error").mockReturnValue();
+    const { broadcaster, emit, notifyUser } = setup();
+
+    broadcaster.start();
+
+    expect(() =>
+      emit(docChange("modified", "user-1", { canReceiveDM: "not-a-boolean" })),
+    ).not.toThrow();
+
+    expect(notifyUser).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledOnce();
+  });
+
+  it("logs when the snapshot listener itself errors", () => {
+    const error = vi.spyOn(logger, "error").mockReturnValue();
+    const { broadcaster, emitError } = setup();
+
+    broadcaster.start();
+
+    emitError(new Error("firestore unavailable"));
+
+    expect(error).toHaveBeenCalledWith(
+      { error: expect.any(Error) as Error },
+      "User change listener failed",
+    );
   });
 
   it("does not attach a second listener when started twice", () => {

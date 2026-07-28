@@ -266,9 +266,10 @@ export function registerPaths(registry: OpenAPIRegistry): void {
   });
 
   registry.registerPath({
-    method: "get",
+    method: "post",
     path: "/api/can-receive-dm",
-    summary: "Check whether authenticated user can receive Discord DMs",
+    summary:
+      "Re-check and persist whether the authenticated user can receive Discord DMs",
     security: authSecurity,
     responses: {
       200: jsonResponse("DM capability", canReceiveDmResponseSchema),

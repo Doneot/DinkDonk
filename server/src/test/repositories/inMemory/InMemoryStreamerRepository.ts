@@ -1,15 +1,16 @@
-import { EventEmitter } from "node:events";
-
 import type { StreamerRepository } from "../../../modules/streamers/ports/StreamerRepository.js";
 import type { Streamer } from "../../../modules/streamers/domain/Streamer.js";
+import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
+import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
+import { logger } from "../../../shared/logger/logger.js";
 
 import { isNonEmptyString } from "../../../shared/utils/validators.js";
 
-export class InMemoryStreamerRepository
-  extends EventEmitter
-  implements StreamerRepository
-{
+export class InMemoryStreamerRepository implements StreamerRepository {
   private readonly streamers = new Map<string, Streamer>();
+  private readonly subscribers = new Map<string, Set<string>>();
+
+  constructor(readonly events: DomainEventBus = createDomainEventBus(logger)) {}
 
   getStreamers(): Promise<Streamer[]> {
     return Promise.resolve([...this.streamers.values()]);
@@ -24,12 +25,10 @@ export class InMemoryStreamerRepository
   }
 
   createStreamer(id: string): Promise<void> {
-    this.streamers.set(id, {
-      id,
-      users: [],
-    });
+    this.streamers.set(id, { id });
+    this.subscribers.set(id, this.subscribers.get(id) ?? new Set());
 
-    this.emit("streamerAdded", id);
+    this.events.emit({ type: "streamerAdded", streamerId: id });
 
     return Promise.resolve();
   }
@@ -40,15 +39,50 @@ export class InMemoryStreamerRepository
     }
 
     this.streamers.delete(id);
+    this.subscribers.delete(id);
 
     return Promise.resolve();
   }
 
-  seed(streamer: Streamer): void {
-    this.streamers.set(streamer.id, structuredClone(streamer));
+  getSubscriberIds(id: string): Promise<string[]> {
+    if (!isNonEmptyString(id)) {
+      return Promise.resolve([]);
+    }
+
+    return Promise.resolve([...(this.subscribers.get(id) ?? [])]);
+  }
+
+  deleteStreamerIfEmpty(id: string): Promise<boolean> {
+    if (!isNonEmptyString(id)) {
+      return Promise.resolve(false);
+    }
+
+    const subscribers = this.subscribers.get(id);
+
+    if (subscribers && subscribers.size > 0) {
+      return Promise.resolve(false);
+    }
+
+    this.streamers.delete(id);
+    this.subscribers.delete(id);
+
+    return Promise.resolve(true);
+  }
+
+  /**
+   * `users` is a test-only convenience for seeding which users are already
+   * subscribed to this streamer (mirroring the `subscribers` subcollection
+   * Firestore uses); it isn't part of the `Streamer` domain type.
+   */
+  seed(streamer: Streamer & { users?: string[] }): void {
+    const { users, ...rest } = streamer;
+
+    this.streamers.set(rest.id, structuredClone(rest));
+    this.subscribers.set(rest.id, new Set(users ?? []));
   }
 
   clear(): void {
     this.streamers.clear();
+    this.subscribers.clear();
   }
 }

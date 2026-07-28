@@ -146,6 +146,44 @@ describe("FirestoreSessionRepository", () => {
     vi.restoreAllMocks();
   });
 
+  it("returns null and deletes the document for an expired session", async () => {
+    const { firestore, store } = setup();
+
+    const expiredSession: SessionData = {
+      cookie: {
+        originalMaxAge: 3_600_000,
+        expires: new Date(Date.now() - 60_000),
+      },
+      canReceiveDM: true,
+    };
+
+    await call((callback) => store.set("session-1", expiredSession, callback));
+
+    await expect(get(store, "session-1")).resolves.toBeNull();
+
+    await vi.waitFor(() => {
+      expect(firestore.read("sessions/session-1")).toBeUndefined();
+    });
+  });
+
+  it("returns a session whose cookie has not yet expired", async () => {
+    const { store } = setup();
+
+    const freshSession: SessionData = {
+      cookie: {
+        originalMaxAge: 3_600_000,
+        expires: new Date(Date.now() + 3_600_000),
+      },
+      canReceiveDM: true,
+    };
+
+    await call((callback) => store.set("session-1", freshSession, callback));
+
+    await expect(get(store, "session-1")).resolves.toEqual(
+      JSON.parse(JSON.stringify(freshSession)),
+    );
+  });
+
   it("honours a custom collection name", async () => {
     const { firestore, store } = setup("custom-sessions");
 

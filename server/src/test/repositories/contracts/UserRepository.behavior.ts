@@ -93,5 +93,15 @@ export function userRepositoryBehavior(
 
       await expect(repository.getUsers()).resolves.toEqual([]);
     });
+
+    it("counts only users with canReceiveDM=true", async () => {
+      const repository = createRepository();
+
+      repository.seed(buildUser({ id: "user-1", canReceiveDM: true }));
+      repository.seed(buildUser({ id: "user-2", canReceiveDM: false }));
+      repository.seed(buildUser({ id: "user-3", canReceiveDM: true }));
+
+      await expect(repository.countUsersReceivingDM()).resolves.toBe(2);
+    });
   });
 }

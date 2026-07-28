@@ -106,15 +106,11 @@ describe("env", () => {
 
   it("exposes the service account path when one is configured", async () => {
     const env = await loadEnv({
-      GOOGLE_APPLICATION_CREDENTIALS:
-        "https://example.com/service-account.json",
+      GOOGLE_APPLICATION_CREDENTIALS: "/run/secrets/firebase_service_account",
     });
 
     expect(env.firebase.serviceAccountPath).toBe(
-      "https://example.com/service-account.json",
-    );
-    expect(env.firebase.clientX509CertUrl).toBe(
-      "https://example.com/service-account.json",
+      "/run/secrets/firebase_service_account",
     );
   });
 

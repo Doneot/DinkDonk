@@ -118,10 +118,10 @@ describe("dispatchEventSubNotification", () => {
       );
 
       expect(error).toBeInstanceOf(BadRequestError);
-      expect((error as BadRequestError).error).toMatchObject({
+      expect((error as BadRequestError).details).toMatchObject({
         event: invalidEvent,
       });
-      expect((error as BadRequestError).error.issues).toBeDefined();
+      expect((error as BadRequestError).details?.issues).toBeDefined();
     });
 
     it("propagates a handler failure", async () => {
@@ -171,10 +171,10 @@ describe("dispatchEventSubNotification", () => {
       );
 
       expect(error).toBeInstanceOf(BadRequestError);
-      expect((error as BadRequestError).error).toMatchObject({
+      expect((error as BadRequestError).details).toMatchObject({
         raw: JSON.stringify(payload),
       });
-      expect((error as BadRequestError).error.issues).toBeDefined();
+      expect((error as BadRequestError).details?.issues).toBeDefined();
     });
 
     it("rejects an envelope whose subscription has no type", async () => {

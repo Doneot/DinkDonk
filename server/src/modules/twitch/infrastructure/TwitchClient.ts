@@ -39,6 +39,8 @@ export type TwitchClientOptions = {
   accessToken?: string;
 };
 
+const REQUEST_TIMEOUT_MS = 10_000;
+
 type TwitchStream = {
   id: string;
 
@@ -64,7 +66,7 @@ export class TwitchClient
 
   constructor({
     publicUrl,
-    http = axios.create(),
+    http = axios.create({ timeout: REQUEST_TIMEOUT_MS }),
     clientId = assertDefined(
       env.twitch.clientId,
       "Twitch Client ID is not defined",
@@ -84,6 +86,11 @@ export class TwitchClient
 
   setAccessToken(accessToken: string): void {
     this.accessToken = accessToken;
+  }
+
+  /** Whether an app access token has been obtained at least once. */
+  get isReady(): boolean {
+    return Boolean(this.accessToken);
   }
 
   async request<T>(
@@ -130,12 +137,23 @@ export class TwitchClient
       } catch (error) {
         const err = error as AxiosError;
 
-        const retryable = ["ENOTFOUND", "ECONNRESET", "ECONNREFUSED"].includes(
-          err.code || "",
-        );
+        const status = err.response?.status;
 
-        const notFoundDelete =
-          err.response?.status === 404 && method === "DELETE";
+        const retryableNetworkError = [
+          "ENOTFOUND",
+          "ECONNRESET",
+          "ECONNREFUSED",
+          "ECONNABORTED",
+          "ETIMEDOUT",
+        ].includes(err.code || "");
+
+        // Rate limited or a transient server-side failure: both are worth
+        // retrying, unlike a 4xx client error (bad request, unauthorized).
+        const retryableStatus = status === 429 || (status ?? 0) >= 500;
+
+        const retryable = retryableNetworkError || retryableStatus;
+
+        const notFoundDelete = status === 404 && method === "DELETE";
 
         if (notFoundDelete) {
           return [];
@@ -148,7 +166,7 @@ export class TwitchClient
 
               method,
 
-              status: err.response?.status,
+              status,
 
               message: err.message,
             },
@@ -158,7 +176,13 @@ export class TwitchClient
           return [];
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+        const retryAfterSeconds = Number(err.response?.headers?.["retry-after"]);
+
+        const delayMs = Number.isFinite(retryAfterSeconds)
+          ? retryAfterSeconds * 1000
+          : 500 * attempt;
+
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
 

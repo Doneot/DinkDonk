@@ -140,6 +140,24 @@ describe("createApp", () => {
       expect(response.body).toMatchObject({ error: "unauthorized" });
     });
 
+    it("also serves /api/v1 as a non-breaking alias of /api", async () => {
+      const { app } = setup();
+
+      const response = await request(app).get("/api/v1/status").expect(401);
+
+      expect(response.body).toMatchObject({ error: "unauthorized" });
+    });
+
+    it("also serves /api/v1/auth as a non-breaking alias of /api/auth", async () => {
+      const { app } = setup();
+
+      const response = await request(app)
+        .get("/api/v1/auth/discord")
+        .expect(302);
+
+      expect(response.headers.location).toContain("discord.com");
+    });
+
     it("does not expose metrics unless Prometheus is enabled", async () => {
       const { app } = setup();
 

@@ -18,7 +18,7 @@ function errorLogContext(error: Error, req: Request): Record<string, unknown> {
     userId: req.user?.id,
     errorName: error.name,
     message: error.message,
-    details: "error" in error ? error.error : undefined,
+    details: error instanceof AppError ? error.details : undefined,
     stack: env.isProduction ? undefined : error.stack,
   };
 }
@@ -37,8 +37,8 @@ export const errorHandler: ErrorRequestHandler = (
       message: error.message,
     };
 
-    if ("error" in error) {
-      payload.details = error.error;
+    if (error.details !== undefined) {
+      payload.details = error.details;
     }
 
     return res.status(error.statusCode).json(payload);

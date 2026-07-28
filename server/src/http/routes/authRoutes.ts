@@ -5,7 +5,7 @@ import { env } from "../../shared/config/env.js";
 import { requireUser } from "../middleware/auth.js";
 import type { DiscordService } from "../../modules/discord/ports/DiscordService.js";
 import type { UserRepository } from "../../modules/users/ports/UserRepository.js";
-import type { UserResponse } from "../schemas/responses.js";
+import { userResponseSchema } from "../schemas/responses.js";
 const discordAuth = passport.authenticate("discord") as RequestHandler;
 
 const discordAuthCallback = passport.authenticate("discord", {
@@ -45,6 +45,23 @@ export function createAuthRouter({
         canReceiveDM,
       });
 
+      // Rotate the session id on every successful login to prevent session
+      // fixation. Passport 0.6+ preserves req.session.passport across regenerate.
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((error: unknown) => {
+          if (error) {
+            reject(
+              error instanceof Error
+                ? error
+                : new Error("Session regeneration failed"),
+            );
+            return;
+          }
+
+          resolve();
+        });
+      });
+
       req.session.canReceiveDM = canReceiveDM;
 
       res.redirect(
@@ -60,19 +77,36 @@ export function createAuthRouter({
 
     async (req, res) => {
       const authUser = requireUser(req);
-      const user = await repository.getUser(authUser.id);
+      let user = await repository.getUser(authUser.id);
+
+      if (!user) {
+        // Self-heal: the users/{id} doc can be missing if the write during the
+        // OAuth callback failed after the auth doc was already created, leaving
+        // a valid session with no corresponding user record.
+        await repository.updateUser(authUser.id, {
+          canReceiveDM: await discord.canSendDirectMessage(authUser.id),
+          subscriptions: [],
+        });
+
+        user = await repository.getUser(authUser.id);
+      }
 
       if (!user) {
         throw new Error(
-          `No user record found for authenticated user ${authUser.id}`,
+          `Failed to create user record for authenticated user ${authUser.id}`,
         );
       }
 
-      res.json({
-        ...req.user,
-
-        ...user,
-      } satisfies UserResponse);
+      res.json(
+        userResponseSchema.parse({
+          id: authUser.id,
+          username: authUser.username,
+          discriminator: authUser.discriminator,
+          avatar: authUser.avatar,
+          canReceiveDM: user.canReceiveDM,
+          subscriptions: user.subscriptions,
+        }),
+      );
     },
   );
 

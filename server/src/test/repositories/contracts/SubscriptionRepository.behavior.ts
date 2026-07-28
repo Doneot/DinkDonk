@@ -154,11 +154,14 @@ export function subscriptionRepositoryBehavior(
 
       const listener = vi.fn();
 
-      repository.on("streamerAdded", listener);
+      repository.events.on("streamerAdded", listener);
 
       await repository.subscribe("user-1", "streamer-1");
 
-      expect(listener).toHaveBeenCalledWith("streamer-1");
+      expect(listener).toHaveBeenCalledWith({
+        type: "streamerAdded",
+        streamerId: "streamer-1",
+      });
     });
 
     it("emits streamerEmpty", async () => {
@@ -173,11 +176,14 @@ export function subscriptionRepositoryBehavior(
 
       const listener = vi.fn();
 
-      repository.on("streamerEmpty", listener);
+      repository.events.on("streamerEmpty", listener);
 
       await repository.unsubscribe("user-1", "streamer-1");
 
-      expect(listener).toHaveBeenCalledWith("streamer-1");
+      expect(listener).toHaveBeenCalledWith({
+        type: "streamerEmpty",
+        streamerId: "streamer-1",
+      });
     });
 
     it("clear removes every subscription", async () => {

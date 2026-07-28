@@ -4,9 +4,11 @@ import type {
   UnsubscribeResult,
   UpdateSubscriptionResult,
 } from "../types/SubscribeResult.js";
+import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
 
 export interface SubscriptionRepository {
-  on(event: string, listener: (streamerId: string) => Promise<void>): unknown;
+  /** Emits "streamerAdded"/"streamerEmpty" as subscriptions change. */
+  readonly events: DomainEventBus;
 
   getSubscription(
     userId: string,

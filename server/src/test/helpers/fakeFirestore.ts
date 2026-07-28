@@ -112,7 +112,7 @@ export class FakeDocumentReference {
 
 export class FakeCollectionReference {
   constructor(
-    private readonly firestore: FakeFirestore,
+    readonly firestore: FakeFirestore,
     private readonly path: string,
   ) {}
 
@@ -141,10 +141,68 @@ export class FakeCollectionReference {
 
     return Promise.resolve({ docs });
   }
+
+  where(field: string, operator: "==", value: unknown): FakeQuery {
+    return new FakeQuery(this.firestore, this.path, [
+      (data) => data?.[field] === value,
+    ]);
+  }
+
+  count(): FakeAggregateQuery {
+    return new FakeQuery(this.firestore, this.path, []).count();
+  }
 }
 
+export class FakeQuery {
+  constructor(
+    private readonly firestore: FakeFirestore,
+    private readonly path: string,
+    private readonly predicates: Array<
+      (data: DocumentData | undefined) => boolean
+    >,
+  ) {}
+
+  where(field: string, operator: "==", value: unknown): FakeQuery {
+    return new FakeQuery(this.firestore, this.path, [
+      ...this.predicates,
+      (data) => data?.[field] === value,
+    ]);
+  }
+
+  get(): Promise<{ docs: FakeDocumentSnapshot[] }> {
+    const docs = this.firestore
+      .paths(this.path)
+      .map((documentPath) => {
+        const id = documentPath.slice(this.path.length + 1);
+
+        return new FakeDocumentSnapshot(id, this.firestore.read(documentPath));
+      })
+      .filter((doc) => this.predicates.every((matches) => matches(doc.data())));
+
+    return Promise.resolve({ docs });
+  }
+
+  count(): FakeAggregateQuery {
+    return {
+      get: async () => {
+        const { docs } = await this.get();
+
+        return { data: () => ({ count: docs.length }) };
+      },
+    };
+  }
+}
+
+export type FakeAggregateQuery = {
+  get: () => Promise<{ data: () => { count: number } }>;
+};
+
 export class FakeTransaction {
-  get(reference: FakeDocumentReference): Promise<FakeDocumentSnapshot> {
+  get(reference: FakeDocumentReference): Promise<FakeDocumentSnapshot>;
+  get(reference: FakeCollectionReference): Promise<{ docs: FakeDocumentSnapshot[] }>;
+  get(
+    reference: FakeDocumentReference | FakeCollectionReference,
+  ): Promise<FakeDocumentSnapshot | { docs: FakeDocumentSnapshot[] }> {
     return reference.get();
   }
 

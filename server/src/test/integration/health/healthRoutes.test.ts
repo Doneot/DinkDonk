@@ -8,11 +8,24 @@ import { logger } from "../../../shared/logger/logger.js";
 
 import { InMemoryAuthUserRepository } from "../../repositories/inMemory/InMemoryAuthUserRepository.js";
 
-function createHealthApp() {
+function createHealthApp(
+  overrides: { discordReady?: boolean; twitchReady?: boolean } = {},
+) {
   const authUserRepository = new InMemoryAuthUserRepository();
   const app = express();
 
-  app.use("/health", createHealthRouter({ authUserRepository }));
+  app.use(
+    "/health",
+    createHealthRouter({
+      authUserRepository,
+      ...(overrides.discordReady !== undefined
+        ? { discord: { isReady: overrides.discordReady } }
+        : {}),
+      ...(overrides.twitchReady !== undefined
+        ? { twitch: { isReady: overrides.twitchReady } }
+        : {}),
+    }),
+  );
 
   return { app, authUserRepository };
 }
@@ -47,6 +60,31 @@ describe("GET /health/ready", () => {
     await request(app).get("/health/ready").expect(503);
 
     expect(error).toHaveBeenCalledOnce();
+  });
+
+  it("reports unavailable when the Discord bot is not ready", async () => {
+    const warn = vi.spyOn(logger, "warn").mockReturnValue();
+    const { app } = createHealthApp({ discordReady: false });
+
+    await request(app).get("/health/ready").expect(503);
+
+    expect(warn).toHaveBeenCalledWith(
+      { notReady: ["discord"] },
+      "Readiness check failed",
+    );
+  });
+
+  it("reports unavailable when the Twitch client is not ready", async () => {
+    vi.spyOn(logger, "warn").mockReturnValue();
+    const { app } = createHealthApp({ twitchReady: false });
+
+    await request(app).get("/health/ready").expect(503);
+  });
+
+  it("reports ready when Discord and Twitch both report ready", async () => {
+    const { app } = createHealthApp({ discordReady: true, twitchReady: true });
+
+    await request(app).get("/health/ready").expect(200);
   });
 });
 

@@ -1,4 +1,3 @@
-import { EventEmitter } from "node:events";
 import type {
   Firestore,
   CollectionReference,
@@ -14,6 +13,7 @@ import type {
 import type { SubscriptionRepository } from "../../ports/SubscriptionRepository.js";
 import type { User } from "../../../users/domain/User.js";
 import type { Subscription } from "../../domain/Subscription.js";
+import type { DomainEventBus } from "../../../../shared/events/DomainEventBus.js";
 
 import { isNonEmptyString } from "../../../../shared/utils/validators.js";
 
@@ -33,22 +33,20 @@ function normalizeUserRecord(
   };
 }
 
-function normalizeStreamerUsers(data: DocumentData | undefined): string[] {
-  return Array.isArray(data?.users) ? (data.users as string[]) : [];
-}
-
-export class FirestoreSubscriptionRepository
-  extends EventEmitter
-  implements SubscriptionRepository
-{
+export class FirestoreSubscriptionRepository implements SubscriptionRepository {
   private readonly users: CollectionReference<DocumentData>;
   private readonly streamers: CollectionReference<DocumentData>;
 
-  constructor(db: Firestore) {
-    super();
-
+  constructor(
+    db: Firestore,
+    readonly events: DomainEventBus,
+  ) {
     this.users = db.collection("users");
     this.streamers = db.collection("streamers");
+  }
+
+  private subscribersOf(streamerId: string): CollectionReference<DocumentData> {
+    return this.streamers.doc(streamerId).collection("subscribers");
   }
 
   async subscribe(
@@ -62,6 +60,7 @@ export class FirestoreSubscriptionRepository
 
     const userRef = this.users.doc(userId);
     const streamerRef = this.streamers.doc(streamerId);
+    const subscriberRef = this.subscribersOf(streamerId).doc(userId);
 
     const result = await userRef.firestore.runTransaction(async (tx) => {
       const [userDoc, streamerDoc] = await Promise.all([
@@ -101,18 +100,9 @@ export class FirestoreSubscriptionRepository
         { merge: true },
       );
 
-      const existingUsers = normalizeStreamerUsers(streamerDoc.data());
+      tx.set(streamerRef, { id: streamerId }, { merge: true });
 
-      tx.set(
-        streamerRef,
-        {
-          id: streamerId,
-          users: existingUsers.includes(userId)
-            ? existingUsers
-            : [...existingUsers, userId],
-        },
-        { merge: true },
-      );
+      tx.set(subscriberRef, { subscribedAt: Date.now() });
 
       return {
         success: true,
@@ -121,7 +111,7 @@ export class FirestoreSubscriptionRepository
     });
 
     if ("createdStreamer" in result) {
-      this.emit("streamerAdded", streamerId);
+      this.events.emit({ type: "streamerAdded", streamerId });
     }
 
     return result;
@@ -136,12 +126,13 @@ export class FirestoreSubscriptionRepository
     }
 
     const userRef = this.users.doc(userId);
-    const streamerRef = this.streamers.doc(streamerId);
+    const subscribersRef = this.subscribersOf(streamerId);
+    const subscriberRef = subscribersRef.doc(userId);
 
     const result = await userRef.firestore.runTransaction(async (tx) => {
-      const [userDoc, streamerDoc] = await Promise.all([
+      const [userDoc, subscribers] = await Promise.all([
         tx.get(userRef),
-        tx.get(streamerRef),
+        tx.get(subscribersRef),
       ]);
 
       if (!userDoc.exists) {
@@ -158,22 +149,20 @@ export class FirestoreSubscriptionRepository
 
       tx.update(userRef, { subscriptions: nextSubscriptions });
 
-      const nextUsers = normalizeStreamerUsers(streamerDoc.data()).filter(
-        (id) => id !== userId,
-      );
+      tx.delete(subscriberRef);
 
-      if (streamerDoc.exists) {
-        tx.update(streamerRef, { users: nextUsers });
-      }
+      const usersLeft = subscribers.docs.filter(
+        (doc) => doc.id !== userId,
+      ).length;
 
       return {
         success: true,
-        usersLeft: nextUsers.length,
+        usersLeft,
       } as const;
     });
 
     if (result.success && result.usersLeft === 0) {
-      this.emit("streamerEmpty", streamerId);
+      this.events.emit({ type: "streamerEmpty", streamerId });
     }
 
     return result;

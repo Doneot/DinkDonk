@@ -20,6 +20,8 @@ export type TwitchAccessToken = {
   expiresIn: number;
 };
 
+const REQUEST_TIMEOUT_MS = 10_000;
+
 export class TwitchAuthenticator {
   private readonly http: AxiosInstance;
 
@@ -28,7 +30,7 @@ export class TwitchAuthenticator {
   private readonly clientSecret: string;
 
   constructor({
-    http = axios.create(),
+    http = axios.create({ timeout: REQUEST_TIMEOUT_MS }),
     clientId = assertDefined(
       env.twitch.clientId,
       "Twitch Client ID is not defined",

@@ -100,6 +100,24 @@ describe("FirestoreUserRepository", () => {
     });
   });
 
+  describe("countUsersReceivingDM", () => {
+    it("counts only users with canReceiveDM=true", async () => {
+      const { firestore, repository } = setup();
+
+      firestore.write("users/user-1", { canReceiveDM: true });
+      firestore.write("users/user-2", { canReceiveDM: false });
+      firestore.write("users/user-3", { canReceiveDM: true });
+
+      await expect(repository.countUsersReceivingDM()).resolves.toBe(2);
+    });
+
+    it("returns zero for an empty collection", async () => {
+      const { repository } = setup();
+
+      await expect(repository.countUsersReceivingDM()).resolves.toBe(0);
+    });
+  });
+
   describe("updateUser", () => {
     it("merges the update into the existing document", async () => {
       const { firestore, repository } = setup();

@@ -17,4 +17,4 @@ ENTRYPOINT ["entrypoint.sh"]
 
 EXPOSE 3000
 
-CMD ["npm", "run", "dev"]
+CMD ["node", "--import", "tsx", "src/app/index.ts"]

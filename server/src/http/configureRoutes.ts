@@ -28,7 +28,7 @@ type ConfigureRoutesOptions = {
 
   repositories: Repositories;
 
-  twitch: TwitchStreamerProvider;
+  twitch: TwitchStreamerProvider & { isReady?: boolean };
 
   discord: DiscordService;
 };
@@ -43,7 +43,11 @@ export function configureRoutes({
 
   app.use(
     "/health",
-    createHealthRouter({ authUserRepository: repositories.authUsers }),
+    createHealthRouter({
+      authUserRepository: repositories.authUsers,
+      discord,
+      twitch,
+    }),
   );
 
   if (env.prometheus.enabled) {
@@ -52,38 +56,44 @@ export function configureRoutes({
 
   app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
 
-  app.use(
-    "/api/auth",
+  const authRouter = createAuthRouter({
+    repository: repositories.users,
 
-    createAuthRouter({
-      repository: repositories.users,
+    discord,
 
-      discord,
+    ensureFreshToken,
+  });
 
-      ensureFreshToken,
-    }),
-  );
+  const apiRouter = createApiRouter({
+    repositories,
 
-  app.use(
-    "/api",
+    twitch,
 
-    requireAuthenticated,
+    discord,
 
-    createApiRouter({
-      repositories,
+    ensureFreshToken,
 
-      twitch,
+    webPushPublicKey: assertDefined(
+      env.webPush.publicKey,
+      "Web Push Public Key",
+    ),
+  });
 
-      discord,
+  // /api/v1 is a non-breaking alias of /api: same router instances, so a
+  // future breaking change has somewhere to diverge to without forcing every
+  // consumer to migrate on the same day. Registered most-specific-prefix
+  // first ("/api/v1" before "/api"): Express matches `app.use("/api", ...)`
+  // against any path starting with "/api/", which would otherwise shadow
+  // every "/api/v1/..." route if "/api" were registered first.
+  const prefixes = ["/api/v1", "/api"];
 
-      ensureFreshToken,
+  for (const prefix of prefixes) {
+    app.use(`${prefix}/auth`, authRouter);
+  }
 
-      webPushPublicKey: assertDefined(
-        env.webPush.publicKey,
-        "Web Push Public Key",
-      ),
-    }),
-  );
+  for (const prefix of prefixes) {
+    app.use(prefix, requireAuthenticated, apiRouter);
+  }
 
   app.get(
     "/login-failed",

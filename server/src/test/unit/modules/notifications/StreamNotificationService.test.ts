@@ -11,7 +11,6 @@ import { buildStreamer } from "../../../builders/streamer.js";
 import { buildUser } from "../../../builders/user.js";
 import { FakeTwitchStreamers } from "../../../helpers/fakeTwitch.js";
 import { InMemoryStreamerRepository } from "../../../repositories/inMemory/InMemoryStreamerRepository.js";
-import { InMemorySubscriptionRepository } from "../../../repositories/inMemory/InMemorySubscriptionRepository.js";
 import { InMemoryUserRepository } from "../../../repositories/inMemory/InMemoryUserRepository.js";
 
 const event: TwitchEventSubStreamOnlineEvent = {
@@ -49,21 +48,31 @@ function setup({
   const twitch = new FakeTwitchStreamers(knownStreamers);
   const userRepository = new InMemoryUserRepository();
   const streamerRepository = new InMemoryStreamerRepository();
-  const subscriptionRepository = new InMemorySubscriptionRepository();
 
-  for (const user of users) {
+  // Subscriptions now live on the User record itself (StreamNotificationService
+  // no longer depends on SubscriptionRepository), so merge them into the
+  // seeded users before storing.
+  const usersById = new Map(
+    users.map((user) => [user.id, structuredClone(user)]),
+  );
+
+  for (const { userId, streamerId, message } of subscriptions) {
+    const user = usersById.get(userId) ?? buildUser({ id: userId });
+
+    user.subscriptions = [
+      ...user.subscriptions,
+      { id: streamerId, notification_message: message },
+    ];
+
+    usersById.set(userId, user);
+  }
+
+  for (const user of usersById.values()) {
     userRepository.seed(user);
   }
 
   for (const streamer of streamers) {
     streamerRepository.seed(streamer);
-  }
-
-  for (const { userId, streamerId, message } of subscriptions) {
-    subscriptionRepository.seed(userId, {
-      id: streamerId,
-      notification_message: message,
-    });
   }
 
   const notify = vi.fn<NotificationManager["notify"]>().mockResolvedValue([]);
@@ -76,7 +85,6 @@ function setup({
       twitch,
       userRepository,
       streamerRepository,
-      subscriptionRepository,
       notificationManager,
     ),
   };

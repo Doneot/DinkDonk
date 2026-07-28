@@ -3,13 +3,19 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Container } from "../../../app/container/index.js";
 import { configureEventSubscriptions } from "../../../app/configureEventSubscriptions.js";
+import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
+import { logger } from "../../../shared/logger/logger.js";
 
 import { InMemoryStreamerRepository } from "../../repositories/inMemory/InMemoryStreamerRepository.js";
 import { InMemorySubscriptionRepository } from "../../repositories/inMemory/InMemorySubscriptionRepository.js";
 
 function setup() {
-  const streamers = new InMemoryStreamerRepository();
-  const subscriptions = new InMemorySubscriptionRepository();
+  // Mirrors production wiring: both repositories share one event bus (see
+  // createRepositories), so a streamer created through either one is
+  // announced the same way.
+  const events = createDomainEventBus(logger);
+  const streamers = new InMemoryStreamerRepository(events);
+  const subscriptions = new InMemorySubscriptionRepository(events);
   const twitch = new EventEmitter();
 
   const handleStreamerAdded = vi.fn().mockResolvedValue(undefined);

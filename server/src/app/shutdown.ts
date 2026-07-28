@@ -7,6 +7,8 @@ import { logger } from "../shared/logger/logger.js";
 import type { Runtime } from "./runtime/Runtime.js";
 import { closeHttpServer } from "../shared/utils/http.js";
 
+const HTTP_CLOSE_TIMEOUT_MS = 5000;
+
 export function registerShutdownHooks(
   runtime: Runtime,
   { twitch, discord }: Container,
@@ -32,9 +34,30 @@ export function registerShutdownHooks(
     try {
       await runtime.dispose();
 
-      await closeHttpServer(httpServer);
-
+      // Disconnect live WebSocket clients first (io.close() also closes the
+      // underlying http.Server once its clients are gone). http.Server.close()
+      // only invokes its callback once every open connection has ended, so
+      // closing it before the sockets riding on it would hang indefinitely on
+      // a single lingering client; bound the whole thing with a timeout and
+      // force-close anything still open as a last resort.
       await sockets.close();
+
+      await Promise.race([
+        closeHttpServer(httpServer),
+        new Promise<void>((_, reject) => {
+          setTimeout(
+            () => reject(new Error("Timed out waiting for HTTP server to close")),
+            HTTP_CLOSE_TIMEOUT_MS,
+          ).unref();
+        }),
+      ]).catch((error: unknown) => {
+        logger.warn(
+          { message: (error as Error).message },
+          "Forcing remaining HTTP connections closed after timeout",
+        );
+
+        httpServer.closeAllConnections();
+      });
 
       await discord.stop();
 

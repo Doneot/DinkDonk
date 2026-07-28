@@ -1,36 +1,35 @@
 import { Buffer } from "node:buffer";
 
 import type { ChatInputCommandInteraction } from "discord.js";
-import { SlashCommandBuilder, AttachmentBuilder } from "discord.js";
-import { env } from "../src/shared/config/env.js";
-import type { CommandContext } from "../src/modules/discord/domain/CommandContext.js";
+import {
+  SlashCommandBuilder,
+  AttachmentBuilder,
+  PermissionFlagsBits,
+  MessageFlags,
+} from "discord.js";
+import type { CommandContext } from "../modules/discord/domain/CommandContext.js";
 
 export const data = new SlashCommandBuilder()
   .setName("get-subscriptions")
   .setDescription("Get all eventsub subscription")
-  .addStringOption((option) =>
-    option
-      .setName("password")
-      .setDescription("Admin password required to run this cmd")
-      .setRequired(true),
-  );
+  // Enforced server-side by Discord (not just hidden client-side), so this
+  // cannot be bypassed the way a password argument visible in the invocation
+  // could be.
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
 export async function execute(
   interaction: ChatInputCommandInteraction,
   context: CommandContext,
 ): Promise<void> {
-  const password = interaction.options.getString("password");
   const { twitch } = context;
-
-  if (password !== env.adminPassword) {
-    await interaction.reply("❌ Wrong password, you cannot use this command");
-    return;
-  }
 
   const res = await twitch.getEventSubSubscriptions();
 
   if (res.length === 0) {
-    await interaction.reply("No current subscription");
+    await interaction.reply({
+      content: "No current subscription",
+      flags: MessageFlags.Ephemeral,
+    });
     return;
   }
 
@@ -44,5 +43,6 @@ export async function execute(
   await interaction.reply({
     content: "**Current subscriptions:**",
     files: [file],
+    flags: MessageFlags.Ephemeral,
   });
 }

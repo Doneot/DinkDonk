@@ -45,6 +45,10 @@ class MockSlashCommandBuilder {
 
     return this;
   }
+
+  setDefaultMemberPermissions(): this {
+    return this;
+  }
 }
 
 const clients: MockClient[] = [];
@@ -90,12 +94,13 @@ vi.mock("discord.js", () => ({
   GatewayIntentBits: { Guilds: 1, GuildMembers: 2, DirectMessages: 4 },
   MessageFlags: { Ephemeral: 64 },
   Partials: { Channel: 1 },
+  PermissionFlagsBits: { Administrator: 8 },
 }));
 
 const { DiscordBot } =
   await import("../../../../modules/discord/infrastructure/DiscordBot.js");
 
-const COMMAND_DIRECTORY = path.join(process.cwd(), "commands");
+const COMMAND_DIRECTORY = path.join(process.cwd(), "src", "commands");
 
 const streamer: TwitchStreamer = {
   id: "streamer-1",

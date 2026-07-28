@@ -1,5 +1,14 @@
 import type { ReplayStore } from "../ports/ReplayStore.js";
 
+/**
+ * Single-instance only: the dedupe set lives in process memory, so it is
+ * wiped on restart and isn't shared across instances. A Twitch EventSub
+ * redelivery that lands shortly after a restart, or that a load balancer
+ * routes to a different instance than the original delivery, will not be
+ * caught and can produce a duplicate notification. Fine for a single-instance
+ * deployment; back this with Firestore/Redis before running more than one
+ * instance or relying on dedupe across frequent restarts.
+ */
 export class InMemoryReplayStore implements ReplayStore {
   private readonly entries = new Map<string, number>();
 

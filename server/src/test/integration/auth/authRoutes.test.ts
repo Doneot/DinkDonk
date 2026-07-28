@@ -146,8 +146,31 @@ describe("GET /api/auth/user", () => {
     });
   });
 
-  it("returns 500 when the user record is missing", async () => {
-    const { app } = await createAuthTestApp();
+  it("self-heals by creating a default user record when one is missing", async () => {
+    const { app, repositories } = await createAuthTestApp();
+
+    const response = await request(app).get("/api/auth/user").expect(200);
+
+    expect(userResponseSchema.parse(response.body)).toEqual({
+      id: AUTH_TEST_USER.id,
+      username: AUTH_TEST_USER.username,
+      discriminator: AUTH_TEST_USER.discriminator,
+      avatar: AUTH_TEST_USER.avatar,
+      canReceiveDM: true,
+      subscriptions: [],
+    });
+
+    await expect(
+      repositories.users.getUser(AUTH_TEST_USER.id),
+    ).resolves.toMatchObject({ canReceiveDM: true, subscriptions: [] });
+  });
+
+  it("surfaces a repository failure as a 500 even after attempting to self-heal", async () => {
+    const { app, repositories } = await createAuthTestApp();
+
+    vi.spyOn(repositories.users, "updateUser").mockRejectedValue(
+      new Error("firestore unavailable"),
+    );
 
     const response = await request(app).get("/api/auth/user").expect(500);
 

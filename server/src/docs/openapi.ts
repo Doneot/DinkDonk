@@ -9,7 +9,6 @@ import { z } from "zod";
 import { PushSubscriptionSchema } from "../modules/notifications/schemas/PushSubscriptionSchema.js";
 import { SubscriptionSchema } from "../modules/subscriptions/schemas/SubscriptionSchema.js";
 import { StreamerSchema } from "../modules/streamers/schemas/StreamerSchema.js";
-import { AuthUserRecordSchema } from "../modules/auth/infrastructure/firestore/records/AuthUserRecord.js";
 import { UserRecordSchema } from "../modules/users/infrastructure/firestore/records/UserRecord.js";
 
 import {
@@ -49,7 +48,6 @@ export const registry = new OpenAPIRegistry();
 registry.register("PushSubscription", PushSubscriptionSchema);
 registry.register("Subscription", SubscriptionSchema);
 registry.register("Streamer", StreamerSchema);
-registry.register("AuthUser", AuthUserRecordSchema);
 registry.register("User", UserRecordSchema);
 
 registry.register("SavePushSubscriptionRequest", savePushSubscriptionSchema);

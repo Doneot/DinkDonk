@@ -107,9 +107,11 @@ export class DiscordBot implements DiscordService {
   }
 
   private async loadCommands(commandDirectory: string): Promise<void> {
+    // Accept both source (.ts, run via tsx in dev) and compiled (.js, run in
+    // production) command modules; source maps (.js.map) are excluded.
     const files = fs
       .readdirSync(commandDirectory)
-      .filter((file) => file.endsWith(".ts"));
+      .filter((file) => file.endsWith(".ts") || file.endsWith(".js"));
 
     for (const file of files) {
       const modulePath = path.join(commandDirectory, file);

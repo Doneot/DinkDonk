@@ -66,7 +66,7 @@ describe("GET /api/user-count", () => {
   it("surfaces a repository failure as a 500", async () => {
     const { ctx, client } = await createClient();
 
-    vi.spyOn(ctx.repositories.users, "getUsers").mockRejectedValue(
+    vi.spyOn(ctx.repositories.users, "countUsersReceivingDM").mockRejectedValue(
       new Error("firestore unavailable"),
     );
 
@@ -76,13 +76,13 @@ describe("GET /api/user-count", () => {
   });
 });
 
-describe("GET /api/can-receive-dm", () => {
+describe("POST /api/can-receive-dm", () => {
   it("persists a positive DM check on the user record", async () => {
     const { ctx, client } = await createClient({
       state: { users: [buildUser({ id: "user-1", canReceiveDM: false })] },
     });
 
-    const response = await client.get("/api/can-receive-dm").expect(200);
+    const response = await client.post("/api/can-receive-dm").expect(200);
 
     expect(canReceiveDmResponseSchema.parse(response.body)).toEqual({
       canReceiveDM: true,
@@ -99,7 +99,7 @@ describe("GET /api/can-receive-dm", () => {
 
     vi.spyOn(ctx.discord, "canSendDirectMessage").mockResolvedValue(false);
 
-    const response = await client.get("/api/can-receive-dm").expect(200);
+    const response = await client.post("/api/can-receive-dm").expect(200);
 
     expect(response.body).toEqual({ canReceiveDM: false });
     await expect(
@@ -112,7 +112,7 @@ describe("GET /api/can-receive-dm", () => {
   it("creates the user record when the check runs for an unknown user", async () => {
     const { ctx, client } = await createClient();
 
-    await client.get("/api/can-receive-dm").expect(200);
+    await client.post("/api/can-receive-dm").expect(200);
 
     await expect(
       ctx.repositories.users.getUser("user-1"),
@@ -126,7 +126,7 @@ describe("GET /api/can-receive-dm", () => {
       new Error("discord unavailable"),
     );
 
-    await client.get("/api/can-receive-dm").expect(500);
+    await client.post("/api/can-receive-dm").expect(500);
 
     vi.restoreAllMocks();
   });

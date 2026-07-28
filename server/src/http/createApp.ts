@@ -11,6 +11,7 @@ import type { StreamNotificationService } from "../modules/notifications/applica
 import { configureRoutes } from "./configureRoutes.js";
 import { configureMiddleware } from "./configureMiddleware.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { NotFoundError } from "./errors/NotFoundError.js";
 
 type CreateAppOptions = {
   sessionMiddleware: RequestHandler;
@@ -45,6 +46,10 @@ export function createApp({
   });
 
   configureRoutes({ app, repositories, twitch, discord });
+
+  app.use((req) => {
+    throw new NotFoundError(`Route ${req.method} ${req.originalUrl} not found`);
+  });
 
   app.use(errorHandler);
 

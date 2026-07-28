@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { REST, Routes } from "discord.js";
-import { assertDefined } from "./src/shared/utils/assert.js";
-import { env } from "./src/shared/config/env.js";
+import { assertDefined } from "./shared/utils/assert.js";
+import { env } from "./shared/config/env.js";
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -19,7 +19,7 @@ const commandsDirectory = path.join(__dirname, "commands");
 
 const commandFiles = fs
   .readdirSync(commandsDirectory)
-  .filter((file) => file.endsWith(".ts"));
+  .filter((file) => file.endsWith(".ts") || file.endsWith(".js"));
 
 async function registerCommands(): Promise<void> {
   const commands = await Promise.all(

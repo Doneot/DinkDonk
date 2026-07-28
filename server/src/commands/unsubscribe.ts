@@ -1,6 +1,6 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import type { CommandContext } from "../src/modules/discord/domain/CommandContext.js";
+import type { CommandContext } from "../modules/discord/domain/CommandContext.js";
 
 export const data = new SlashCommandBuilder()
   .setName("unsubscribe")

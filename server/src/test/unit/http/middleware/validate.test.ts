@@ -64,7 +64,7 @@ describe.each([
     }
 
     expect(thrown).toBeInstanceOf(BadRequestError);
-    expect((thrown as BadRequestError).error).toMatchObject({
+    expect((thrown as BadRequestError).details).toMatchObject({
       properties: {
         name: { errors: arrayContaining([anyString]) },
       },

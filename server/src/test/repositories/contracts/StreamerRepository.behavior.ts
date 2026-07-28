@@ -25,9 +25,9 @@ export function streamerRepositoryBehavior(
 
       repository.seed(streamer);
 
-      await expect(repository.getStreamer(streamer.id)).resolves.toEqual(
-        streamer,
-      );
+      await expect(repository.getStreamer(streamer.id)).resolves.toEqual({
+        id: streamer.id,
+      });
     });
 
     it("returns every streamer", async () => {
@@ -48,8 +48,10 @@ export function streamerRepositoryBehavior(
 
       await expect(repository.getStreamer("streamer-1")).resolves.toEqual({
         id: "streamer-1",
-        users: [],
       });
+      await expect(
+        repository.getSubscriberIds("streamer-1"),
+      ).resolves.toEqual([]);
     });
 
     it("deletes a streamer", async () => {
@@ -67,11 +69,14 @@ export function streamerRepositoryBehavior(
 
       const listener = vi.fn();
 
-      repository.on("streamerAdded", listener);
+      repository.events.on("streamerAdded", listener);
 
       await repository.createStreamer("streamer-1");
 
-      expect(listener).toHaveBeenCalledWith("streamer-1");
+      expect(listener).toHaveBeenCalledWith({
+        type: "streamerAdded",
+        streamerId: "streamer-1",
+      });
     });
 
     it("clear removes every streamer", async () => {
@@ -82,6 +87,48 @@ export function streamerRepositoryBehavior(
       repository.clear();
 
       await expect(repository.getStreamers()).resolves.toEqual([]);
+    });
+
+    it("returns the subscriber ids seeded for a streamer", async () => {
+      const repository = createRepository();
+
+      repository.seed(buildStreamer({ users: ["user-1", "user-2"] }));
+
+      await expect(
+        repository.getSubscriberIds("streamer-1"),
+      ).resolves.toEqual(["user-1", "user-2"]);
+    });
+
+    it("returns no subscriber ids for an unknown streamer", async () => {
+      const repository = createRepository();
+
+      await expect(
+        repository.getSubscriberIds("missing"),
+      ).resolves.toEqual([]);
+    });
+
+    it("deletes a streamer with no subscribers", async () => {
+      const repository = createRepository();
+
+      repository.seed(buildStreamer({ users: [] }));
+
+      await expect(
+        repository.deleteStreamerIfEmpty("streamer-1"),
+      ).resolves.toBe(true);
+
+      await expect(repository.getStreamer("streamer-1")).resolves.toBeNull();
+    });
+
+    it("does not delete a streamer that still has subscribers", async () => {
+      const repository = createRepository();
+
+      repository.seed(buildStreamer({ users: ["user-1"] }));
+
+      await expect(
+        repository.deleteStreamerIfEmpty("streamer-1"),
+      ).resolves.toBe(false);
+
+      await expect(repository.getStreamer("streamer-1")).resolves.not.toBeNull();
     });
   });
 }

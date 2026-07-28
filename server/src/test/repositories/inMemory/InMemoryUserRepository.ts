@@ -37,6 +37,12 @@ export class InMemoryUserRepository implements UserRepository {
     return Promise.resolve();
   }
 
+  countUsersReceivingDM(): Promise<number> {
+    return Promise.resolve(
+      [...this.users.values()].filter((user) => user.canReceiveDM).length,
+    );
+  }
+
   seed(user: User): void {
     this.users.set(user.id, structuredClone(user));
   }
