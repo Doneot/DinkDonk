@@ -9,6 +9,7 @@ import {
 import { createTestApp } from "../../helpers/createTestApp.js";
 import { TestClient } from "../../helpers/TestClient.js";
 import type { TestState } from "../../fixtures/seedState.js";
+import { register } from "../../../infrastructure/metrics/prometheus.js";
 
 async function createClient(state?: TestState) {
   const ctx = await createTestApp(state ? { state } : {});
@@ -22,6 +23,7 @@ const EXISTING_SUBSCRIPTION: TestState = {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  register.getSingleMetric("streamer_subscriptions_total")?.reset();
 });
 
 describe("POST /api/subscriptions", () => {
@@ -40,6 +42,22 @@ describe("POST /api/subscriptions", () => {
     await expect(
       ctx.repositories.subscriptions.getSubscription("user-1", "streamer-1"),
     ).resolves.toEqual({ id: "streamer-1", notification_message: "" });
+    expect(await register.metrics()).toContain(
+      'streamer_subscriptions_total{action="subscribed"} 1',
+    );
+  });
+
+  it("does not record a metric for a rejected subscription attempt", async () => {
+    const { client } = await createClient(EXISTING_SUBSCRIPTION);
+
+    await client
+      .post("/api/subscriptions")
+      .send({ streamerId: "streamer-1" })
+      .expect(400);
+
+    expect(await register.metrics()).not.toContain(
+      "streamer_subscriptions_total{action=",
+    );
   });
 
   it("reports an existing streamer as not newly created", async () => {
@@ -112,6 +130,9 @@ describe("DELETE /api/subscriptions", () => {
     await expect(
       ctx.repositories.subscriptions.getSubscription("user-1", "streamer-1"),
     ).resolves.toBeNull();
+    expect(await register.metrics()).toContain(
+      'streamer_subscriptions_total{action="unsubscribed"} 1',
+    );
   });
 
   it("reports the subscribers that remain for the streamer", async () => {

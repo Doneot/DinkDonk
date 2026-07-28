@@ -5,7 +5,7 @@ import { logger } from "../../../shared/logger/logger.js";
 import type { TwitchClient } from "../infrastructure/TwitchClient.js";
 import { TwitchAuthenticator } from "../infrastructure/TwitchAuthenticator.js";
 
-import { subscriptionsDeletedTotal } from "../../../infrastructure/metrics/prometheus.js";
+import { eventSubSubscriptionsDeletedTotal } from "../../../infrastructure/metrics/prometheus.js";
 
 export type TwitchProviderOptions = {
   client: TwitchClient;
@@ -104,7 +104,7 @@ export class TwitchProvider extends EventEmitter {
 
     await Promise.all(
       matchingSubscriptions.map((subscription) => {
-        subscriptionsDeletedTotal.inc();
+        eventSubSubscriptionsDeletedTotal.inc();
         return this.client.unsubscribeFromEvent(subscription.id);
       }),
     );

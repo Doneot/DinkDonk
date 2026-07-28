@@ -60,6 +60,6 @@ describe("GET /metrics", () => {
 
     expect(response.headers["content-type"]).toContain("text/plain");
     expect(response.text).toContain("eventsub_requests_total");
-    expect(response.text).toContain("subscriptions_created_total");
+    expect(response.text).toContain("eventsub_subscriptions_created_total");
   });
 });

@@ -23,6 +23,7 @@ import type { StreamNotificationService } from "../modules/notifications/applica
 import { assertDefined } from "../shared/utils/assert.js";
 import { requestId } from "./middleware/requestId.js";
 import { requestLogger } from "./middleware/requestLogger.js";
+import { httpMetrics } from "./middleware/httpMetrics.js";
 import { initializeValidatedRequest } from "./middleware/validate.js";
 
 const limiter = rateLimit({
@@ -90,6 +91,8 @@ export function configureMiddleware({
   app.use(initializeValidatedRequest);
 
   app.use(requestLogger);
+
+  app.use(httpMetrics);
 
   app.use(sessionMiddleware);
 

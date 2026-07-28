@@ -1,10 +1,27 @@
 import { logger } from "../../../shared/logger/logger.js";
+import { notificationsSentTotal } from "../../../infrastructure/metrics/prometheus.js";
 import type { User } from "../../users/domain/User.js";
 import type {
   Notification,
   NotificationChannel,
   NotificationResult,
 } from "../domain/Notification.js";
+
+function resultLabel(result: NotificationResult): string {
+  if (result.sent) {
+    return "sent";
+  }
+
+  if (result.expired) {
+    return "expired";
+  }
+
+  if (result.skipped) {
+    return "skipped";
+  }
+
+  return "failed";
+}
 
 export class NotificationManager {
   private readonly channels: NotificationChannel[];
@@ -20,9 +37,21 @@ export class NotificationManager {
     return Promise.allSettled(
       this.channels.map(async (channel): Promise<NotificationResult> => {
         try {
-          return await channel.send(user, notification);
+          const result = await channel.send(user, notification);
+
+          notificationsSentTotal.inc({
+            channel: channel.name,
+            result: resultLabel(result),
+          });
+
+          return result;
         } catch (error: unknown) {
           const err = error as Error;
+
+          notificationsSentTotal.inc({
+            channel: channel.name,
+            result: "error",
+          });
 
           logger.error(
             {

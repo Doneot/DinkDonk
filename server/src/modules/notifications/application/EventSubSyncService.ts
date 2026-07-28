@@ -2,7 +2,7 @@ import type { TwitchEventSubSubscription } from "../../twitch/domain/Twitch.js";
 import type { TwitchSubscriptionProvider } from "../../twitch/ports/TwitchGateway.js";
 import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
 
-import { subscriptionsCreatedTotal } from "../../../infrastructure/metrics/prometheus.js";
+import { eventSubSubscriptionsCreatedTotal } from "../../../infrastructure/metrics/prometheus.js";
 
 import { logger } from "../../../shared/logger/logger.js";
 
@@ -50,7 +50,7 @@ export class EventSubSyncService {
       return;
     }
 
-    subscriptionsCreatedTotal.inc();
+    eventSubSubscriptionsCreatedTotal.inc();
 
     logger.info(`Creating Twitch EventSub subscription for ${streamerId}`);
 

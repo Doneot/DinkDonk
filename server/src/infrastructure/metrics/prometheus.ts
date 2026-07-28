@@ -1,4 +1,4 @@
-import { Counter, Registry, collectDefaultMetrics } from "prom-client";
+import { Counter, Histogram, Registry, collectDefaultMetrics } from "prom-client";
 
 export const register = new Registry();
 
@@ -6,10 +6,15 @@ collectDefaultMetrics({
   register,
 });
 
-function createCounter(name: string, help: string): Counter<string> {
+function createCounter(
+  name: string,
+  help: string,
+  labelNames: string[] = [],
+): Counter<string> {
   return new Counter({
     name,
     help,
+    labelNames,
     registers: [register],
   });
 }
@@ -29,17 +34,36 @@ export const eventSubDuplicateMessagesTotal = createCounter(
   "Duplicate EventSub messages",
 );
 
-export const subscriptionsCreatedTotal = createCounter(
-  "subscriptions_created_total",
-  "Subscriptions created",
+export const eventSubSubscriptionsCreatedTotal = createCounter(
+  "eventsub_subscriptions_created_total",
+  "Twitch EventSub subscriptions created",
 );
 
-export const subscriptionsDeletedTotal = createCounter(
-  "subscriptions_deleted_total",
-  "Subscriptions deleted",
+export const eventSubSubscriptionsDeletedTotal = createCounter(
+  "eventsub_subscriptions_deleted_total",
+  "Twitch EventSub subscriptions deleted",
 );
 
 export const discordDmChecksTotal = createCounter(
   "discord_dm_checks_total",
   "Discord DM checks",
 );
+
+export const streamerSubscriptionsTotal = createCounter(
+  "streamer_subscriptions_total",
+  "Users subscribing to or unsubscribing from a streamer",
+  ["action"],
+);
+
+export const notificationsSentTotal = createCounter(
+  "notifications_sent_total",
+  "Streamer-live notifications attempted per channel",
+  ["channel", "result"],
+);
+
+export const httpRequestDurationSeconds = new Histogram({
+  name: "http_request_duration_seconds",
+  help: "HTTP request duration in seconds",
+  labelNames: ["method", "route", "status_code"],
+  registers: [register],
+});

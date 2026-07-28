@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { NotificationManager } from "../../../../modules/notifications/application/NotificationManager.js";
 import type {
@@ -7,6 +7,7 @@ import type {
 } from "../../../../modules/notifications/domain/Notification.js";
 import type { User } from "../../../../modules/users/domain/User.js";
 import { logger } from "../../../../shared/logger/logger.js";
+import { register } from "../../../../infrastructure/metrics/prometheus.js";
 
 const user: User = {
   id: "user-1",
@@ -19,6 +20,14 @@ const notification: Notification = {
   body: "Come watch",
   url: "https://example.com",
 };
+
+afterEach(() => {
+  register.getSingleMetric("notifications_sent_total")?.reset();
+});
+
+async function metricsText(): Promise<string> {
+  return register.metrics();
+}
 
 describe("NotificationManager", () => {
   it("sends a notification through every channel", async () => {
@@ -45,6 +54,41 @@ describe("NotificationManager", () => {
       { status: "fulfilled", value: { sent: true } },
       { status: "fulfilled", value: { sent: false, skipped: true } },
     ]);
+
+    const exposition = await metricsText();
+
+    expect(exposition).toContain(
+      'notifications_sent_total{channel="discord",result="sent"} 1',
+    );
+    expect(exposition).toContain(
+      'notifications_sent_total{channel="web-push",result="skipped"} 1',
+    );
+  });
+
+  it("records an expired result", async () => {
+    const channel: NotificationChannel = {
+      name: "discord",
+      send: vi.fn().mockResolvedValue({ sent: false, expired: true }),
+    };
+
+    await new NotificationManager([channel]).notify(user, notification);
+
+    expect(await metricsText()).toContain(
+      'notifications_sent_total{channel="discord",result="expired"} 1',
+    );
+  });
+
+  it("records a failed result when the channel resolves without a skip/expiry reason", async () => {
+    const channel: NotificationChannel = {
+      name: "web-push",
+      send: vi.fn().mockResolvedValue({ sent: false, reason: "unknown_error" }),
+    };
+
+    await new NotificationManager([channel]).notify(user, notification);
+
+    expect(await metricsText()).toContain(
+      'notifications_sent_total{channel="web-push",result="failed"} 1',
+    );
   });
 
   it("keeps other channel results when one channel fails", async () => {
@@ -67,6 +111,15 @@ describe("NotificationManager", () => {
       status: "fulfilled",
       value: { sent: true },
     });
+
+    const exposition = await metricsText();
+
+    expect(exposition).toContain(
+      'notifications_sent_total{channel="failing",result="error"} 1',
+    );
+    expect(exposition).toContain(
+      'notifications_sent_total{channel="working",result="sent"} 1',
+    );
   });
 
   it("logs the failing channel before re-throwing", async () => {

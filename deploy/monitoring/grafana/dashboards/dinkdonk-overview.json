@@ -1,0 +1,132 @@
+{
+  "title": "DinkDonk Overview",
+  "uid": "dinkdonk-overview",
+  "tags": ["dinkdonk"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    { "id": 1, "type": "row", "title": "HTTP", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Request rate by route",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_request_duration_seconds_count[5m])) by (route)",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Error rate (5xx)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_request_duration_seconds_count{status_code=~\"5..\"}[5m])) / sum(rate(http_request_duration_seconds_count[5m]))",
+          "legendFormat": "5xx ratio"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Request latency (p50 / p95)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    { "id": 5, "type": "row", "title": "EventSub & subscriptions", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 } },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "EventSub webhook traffic",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "rate(eventsub_requests_total[5m])", "legendFormat": "requests" },
+        { "refId": "B", "expr": "rate(eventsub_signature_failures_total[5m])", "legendFormat": "signature failures" },
+        { "refId": "C", "expr": "rate(eventsub_duplicate_messages_total[5m])", "legendFormat": "duplicates" }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Twitch EventSub subscription lifecycle",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "increase(eventsub_subscriptions_created_total[1h])", "legendFormat": "created (1h)" },
+        { "refId": "B", "expr": "increase(eventsub_subscriptions_deleted_total[1h])", "legendFormat": "deleted (1h)" }
+      ]
+    },
+    { "id": 8, "type": "row", "title": "Product & process", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 } },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Streamer subscriptions by action",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(streamer_subscriptions_total[1h])) by (action)",
+          "legendFormat": "{{action}} (1h)"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Notifications sent by channel/result",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(notifications_sent_total[1h])) by (channel, result)",
+          "legendFormat": "{{channel}} / {{result}} (1h)"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Process memory & CPU",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "process_resident_memory_bytes", "legendFormat": "RSS bytes" },
+        { "refId": "B", "expr": "rate(process_cpu_seconds_total[5m])", "legendFormat": "CPU seconds/s" }
+      ]
+    }
+  ]
+}

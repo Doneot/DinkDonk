@@ -38,7 +38,10 @@ import type {
   StreamerSummaryResponse,
   UserCountResponse,
 } from "../schemas/responses.js";
-import { discordDmChecksTotal } from "../../infrastructure/metrics/prometheus.js";
+import {
+  discordDmChecksTotal,
+  streamerSubscriptionsTotal,
+} from "../../infrastructure/metrics/prometheus.js";
 
 type CreateApiRouterOptions = {
   repositories: Repositories;
@@ -289,6 +292,10 @@ export function createApiRouter({
         "",
       );
 
+      if (result.success) {
+        streamerSubscriptionsTotal.inc({ action: "subscribed" });
+      }
+
       res.status(result.success ? 200 : 400).json(result);
     },
   );
@@ -308,6 +315,10 @@ export function createApiRouter({
         user.id,
         streamerId,
       );
+
+      if (result.success) {
+        streamerSubscriptionsTotal.inc({ action: "unsubscribed" });
+      }
 
       res.status(result.success ? 200 : 400).json(result);
     },

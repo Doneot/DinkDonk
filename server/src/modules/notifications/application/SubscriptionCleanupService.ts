@@ -1,7 +1,7 @@
 import type { TwitchSubscriptionProvider } from "../../twitch/ports/TwitchGateway.js";
 import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
 
-import { subscriptionsDeletedTotal } from "../../../infrastructure/metrics/prometheus.js";
+import { eventSubSubscriptionsDeletedTotal } from "../../../infrastructure/metrics/prometheus.js";
 
 export class SubscriptionCleanupService {
   private gcRunning = false;
@@ -62,7 +62,7 @@ export class SubscriptionCleanupService {
 
     await Promise.all(
       matching.map((sub) => {
-        subscriptionsDeletedTotal.inc();
+        eventSubSubscriptionsDeletedTotal.inc();
         return this.twitch.unsubscribeFromEvent(sub.id);
       }),
     );
