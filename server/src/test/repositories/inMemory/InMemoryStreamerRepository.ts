@@ -5,12 +5,15 @@ import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
 
 import { isNonEmptyString } from "../../../shared/utils/validators.js";
+import { InMemorySubscriberStore } from "./InMemorySubscriberStore.js";
 
 export class InMemoryStreamerRepository implements StreamerRepository {
   private readonly streamers = new Map<string, Streamer>();
-  private readonly subscribers = new Map<string, Set<string>>();
 
-  constructor(readonly events: DomainEventBus = createDomainEventBus(logger)) {}
+  constructor(
+    readonly events: DomainEventBus = createDomainEventBus(logger),
+    private readonly subscribers: InMemorySubscriberStore = new InMemorySubscriberStore(),
+  ) {}
 
   getStreamers(): Promise<Streamer[]> {
     return Promise.resolve([...this.streamers.values()]);
@@ -26,7 +29,7 @@ export class InMemoryStreamerRepository implements StreamerRepository {
 
   createStreamer(id: string): Promise<void> {
     this.streamers.set(id, { id });
-    this.subscribers.set(id, this.subscribers.get(id) ?? new Set());
+    this.subscribers.ensure(id);
 
     this.events.emit({ type: "streamerAdded", streamerId: id });
 
@@ -49,7 +52,7 @@ export class InMemoryStreamerRepository implements StreamerRepository {
       return Promise.resolve([]);
     }
 
-    return Promise.resolve([...(this.subscribers.get(id) ?? [])]);
+    return Promise.resolve(this.subscribers.get(id));
   }
 
   deleteStreamerIfEmpty(id: string): Promise<boolean> {
@@ -57,9 +60,7 @@ export class InMemoryStreamerRepository implements StreamerRepository {
       return Promise.resolve(false);
     }
 
-    const subscribers = this.subscribers.get(id);
-
-    if (subscribers && subscribers.size > 0) {
+    if (this.subscribers.get(id).length > 0) {
       return Promise.resolve(false);
     }
 
@@ -78,7 +79,7 @@ export class InMemoryStreamerRepository implements StreamerRepository {
     const { users, ...rest } = streamer;
 
     this.streamers.set(rest.id, structuredClone(rest));
-    this.subscribers.set(rest.id, new Set(users ?? []));
+    this.subscribers.seed(rest.id, users ?? []);
   }
 
   clear(): void {

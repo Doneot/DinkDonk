@@ -37,7 +37,7 @@ export async function bootstrap() {
   // Registered before the (potentially slow) Twitch/Discord startup calls so a
   // signal arriving during that window still triggers a graceful teardown of
   // whatever has already been started (e.g. the user change listener).
-  registerShutdownHooks(
+  const { shutdown } = registerShutdownHooks(
     runtime,
     container,
     server,
@@ -55,9 +55,23 @@ export async function bootstrap() {
     ["Discord", discordStart],
   ] as const) {
     if (result.status === "rejected") {
-      throw new Error(`Failed to start ${name} client`, {
+      const error = new Error(`Failed to start ${name} client`, {
         cause: result.reason,
       });
+
+      logger.error(
+        { message: error.message, stack: error.stack },
+        "Application failed to start; tearing down",
+      );
+
+      // Runs the same teardown the signal handlers use - closing the tunnel
+      // subprocess, disconnecting whichever of Twitch/Discord did start,
+      // stopping the user-change listener - instead of leaking it all behind
+      // a bare process.exit(1). shutdown() itself calls process.exit, so
+      // this never returns.
+      await shutdown("startup_failure");
+
+      return;
     }
   }
 

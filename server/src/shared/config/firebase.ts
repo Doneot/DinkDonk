@@ -1,15 +1,20 @@
 import type { ServiceAccount } from "firebase-admin";
-import admin from "firebase-admin";
+import {
+  applicationDefault,
+  cert,
+  getApps,
+  initializeApp,
+} from "firebase-admin/app";
 import type { Firestore } from "firebase-admin/firestore";
 import { getFirestore } from "firebase-admin/firestore";
 import { env } from "./env.js";
 import { assertDefined } from "../utils/assert.js";
 
 export function createFirestore(): Firestore {
-  if (!admin.apps.length) {
+  if (!getApps().length) {
     if (env.firebase.serviceAccountPath) {
-      admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
+      initializeApp({
+        credential: applicationDefault(),
       });
     } else {
       const serviceAccount: ServiceAccount = {
@@ -23,8 +28,8 @@ export function createFirestore(): Firestore {
           "Firebase Client Email",
         ),
       };
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
+      initializeApp({
+        credential: cert(serviceAccount),
       });
     }
   }

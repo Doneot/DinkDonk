@@ -16,9 +16,8 @@ vi.mock("fs", () => ({
 // reset the module registry so the dynamic import below picks up the mock.
 vi.resetModules();
 
-const { booleanFromEnv, numberFromEnv, secretFromEnv } = await import(
-  "../../../../shared/config/envParsers.js"
-);
+const { booleanFromEnv, numberFromEnv, secretFromEnv, optionalSecretFromEnv } =
+  await import("../../../../shared/config/envParsers.js");
 
 describe("booleanFromEnv", () => {
   it.each(["1", "true", "TRUE", "yes", "Yes", "on", "ON"])(
@@ -80,5 +79,35 @@ describe("secretFromEnv", () => {
     existsSync.mockReturnValue(false);
 
     expect(() => secretFromEnv("session_secret").parse(undefined)).toThrow();
+  });
+});
+
+describe("optionalSecretFromEnv", () => {
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("accepts the value when it is already present", () => {
+    expect(optionalSecretFromEnv("metrics_token").parse("a-token")).toBe(
+      "a-token",
+    );
+  });
+
+  it("falls back to the named docker secret file when the value is missing", () => {
+    existsSync.mockReturnValue(true);
+    readFileSync.mockReturnValue("from-secret\n");
+
+    expect(optionalSecretFromEnv("metrics_token").parse(undefined)).toBe(
+      "from-secret",
+    );
+    expect(existsSync).toHaveBeenCalledWith("/run/secrets/metrics_token");
+  });
+
+  it("resolves to undefined, not an error, when neither is present", () => {
+    existsSync.mockReturnValue(false);
+
+    expect(
+      optionalSecretFromEnv("metrics_token").parse(undefined),
+    ).toBeUndefined();
   });
 });

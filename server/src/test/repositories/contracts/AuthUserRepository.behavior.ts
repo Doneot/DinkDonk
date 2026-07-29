@@ -51,22 +51,39 @@ export function authUserRepositoryBehavior(
       });
     });
 
-    it("creates an auth user when updating a missing user", async () => {
+    it("creates an auth user when every required field is given at once", async () => {
       const repository = createRepository();
 
       await repository.updateAuthUser("user-1", {
         username: "tester",
+        discriminator: "0001",
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+        fetchTime: 1_700_000_000_000,
       });
 
       await expect(repository.getAuthUser("user-1")).resolves.toEqual({
         id: "user-1",
         username: "tester",
-        discriminator: "",
+        discriminator: "0001",
         avatar: "",
-        accessToken: "",
-        refreshToken: "",
-        fetchTime: 0,
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+        fetchTime: 1_700_000_000_000,
       });
+    });
+
+    it("rejects a partial update that would leave a required field missing on a new user", async () => {
+      const repository = createRepository();
+
+      // Nothing to merge onto (the user doesn't exist yet), and this payload
+      // alone doesn't satisfy every required field - it must fail loudly here
+      // rather than persisting a corrupt record that only breaks on read.
+      await expect(
+        repository.updateAuthUser("user-1", { username: "tester" }),
+      ).rejects.toThrow();
+
+      await expect(repository.getAuthUser("user-1")).resolves.toBeNull();
     });
 
     it("throws for an invalid user id", async () => {

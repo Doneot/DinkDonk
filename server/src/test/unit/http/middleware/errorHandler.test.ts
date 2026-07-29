@@ -84,6 +84,52 @@ describe("errorHandler", () => {
     expect(warn.mock.calls[0]?.[0]).toMatchObject({ details: undefined });
   });
 
+  it("passes through a framework error's own 4xx status instead of flattening it to 500", () => {
+    const warn = vi.spyOn(logger, "warn").mockReturnValue();
+
+    // Mirrors what body-parser's JSON middleware throws for malformed JSON:
+    // a plain http-errors instance (not AppError) carrying a real status.
+    const error = Object.assign(new SyntaxError("Unexpected token h in JSON"), {
+      status: 400,
+      expose: true,
+    });
+
+    const res = handle(error);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.jsonBody).toEqual({
+      error: "bad_request",
+      message: "Unexpected token h in JSON",
+    });
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it("reads a framework error's status from statusCode when status is absent", () => {
+    vi.spyOn(logger, "warn").mockReturnValue();
+
+    const error = Object.assign(new Error("Payload Too Large"), {
+      statusCode: 413,
+    });
+
+    const res = handle(error);
+
+    expect(res.statusCode).toBe(413);
+    expect(res.jsonBody).toMatchObject({ error: "payload_too_large" });
+  });
+
+  it("still falls back to a generic 500 for a framework error outside the 4xx range", () => {
+    const error = vi.spyOn(logger, "error").mockReturnValue();
+
+    const res = handle(Object.assign(new Error("boom"), { status: 502 }));
+
+    expect(res.statusCode).toBe(500);
+    expect(res.jsonBody).toEqual({
+      error: "internal_server_error",
+      message: "Unexpected error",
+    });
+    expect(error).toHaveBeenCalledOnce();
+  });
+
   it("hides unexpected errors behind a generic 500", () => {
     const error = vi.spyOn(logger, "error").mockReturnValue();
 

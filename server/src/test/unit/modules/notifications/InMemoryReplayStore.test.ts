@@ -71,6 +71,26 @@ describe("InMemoryReplayStore", () => {
     store.dispose();
   });
 
+  it("allows a forgotten message id to be reserved again immediately", async () => {
+    const store = new InMemoryReplayStore({ ttlMs: 60_000 });
+
+    await store.rememberIfNew("message-1");
+
+    await store.forget("message-1");
+
+    await expect(store.rememberIfNew("message-1")).resolves.toBe(true);
+
+    store.dispose();
+  });
+
+  it("is a no-op when forgetting a message id that was never reserved", async () => {
+    const store = new InMemoryReplayStore({ ttlMs: 60_000 });
+
+    await expect(store.forget("never-seen")).resolves.toBeUndefined();
+
+    store.dispose();
+  });
+
   it("stops its cleanup timer on disposal", () => {
     vi.useFakeTimers();
 

@@ -3,7 +3,7 @@ import type {
   CollectionReference,
   DocumentData,
 } from "firebase-admin/firestore";
-import admin from "firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 import type {
   SavePushSubscribeResult,
@@ -60,9 +60,9 @@ export class FirestorePushSubscriptionRepository
         {
           subscription,
           userAgent: metadata.userAgent || "",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          lastSeenAt: FieldValue.serverTimestamp(),
         },
         { merge: true },
       );
@@ -78,7 +78,7 @@ export class FirestorePushSubscriptionRepository
 
     await this.getPushSubscriptionsRef(userId).doc(subscriptionId).set(
       {
-        lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastSeenAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
     );

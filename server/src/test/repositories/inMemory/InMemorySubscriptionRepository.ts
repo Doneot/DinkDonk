@@ -10,6 +10,7 @@ import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
 
 import { isNonEmptyString } from "../../../shared/utils/validators.js";
+import { InMemorySubscriberStore } from "./InMemorySubscriberStore.js";
 
 export class InMemorySubscriptionRepository implements SubscriptionRepository {
   private readonly userSubscriptions = new Map<
@@ -17,9 +18,10 @@ export class InMemorySubscriptionRepository implements SubscriptionRepository {
     Map<string, Subscription>
   >();
 
-  private readonly streamerUsers = new Map<string, Set<string>>();
-
-  constructor(readonly events: DomainEventBus = createDomainEventBus(logger)) {}
+  constructor(
+    readonly events: DomainEventBus = createDomainEventBus(logger),
+    private readonly streamerUsers: InMemorySubscriberStore = new InMemorySubscriberStore(),
+  ) {}
 
   getSubscription(
     userId: string,
@@ -60,16 +62,9 @@ export class InMemorySubscriptionRepository implements SubscriptionRepository {
       notification_message: notificationMessage,
     });
 
-    let users = this.streamerUsers.get(streamerId);
+    const createdStreamer = !this.streamerUsers.has(streamerId);
 
-    const createdStreamer = users === undefined;
-
-    if (!users) {
-      users = new Set();
-      this.streamerUsers.set(streamerId, users);
-    }
-
-    users.add(userId);
+    this.streamerUsers.ensure(streamerId).add(userId);
 
     if (createdStreamer) {
       this.events.emit({ type: "streamerAdded", streamerId });
@@ -100,12 +95,15 @@ export class InMemorySubscriptionRepository implements SubscriptionRepository {
 
     subscriptions.delete(streamerId);
 
-    const users = this.streamerUsers.get(streamerId);
+    let usersLeft = 0;
 
-    if (users) {
+    if (this.streamerUsers.has(streamerId)) {
+      const users = this.streamerUsers.ensure(streamerId);
+
       users.delete(userId);
+      usersLeft = users.size;
 
-      if (users.size === 0) {
+      if (usersLeft === 0) {
         this.streamerUsers.delete(streamerId);
         this.events.emit({ type: "streamerEmpty", streamerId });
       }
@@ -113,7 +111,7 @@ export class InMemorySubscriptionRepository implements SubscriptionRepository {
 
     return Promise.resolve({
       success: true,
-      usersLeft: users?.size ?? 0,
+      usersLeft,
     });
   }
 
@@ -155,14 +153,7 @@ export class InMemorySubscriptionRepository implements SubscriptionRepository {
 
     subscriptions.set(subscription.id, subscription);
 
-    let users = this.streamerUsers.get(subscription.id);
-
-    if (!users) {
-      users = new Set();
-      this.streamerUsers.set(subscription.id, users);
-    }
-
-    users.add(userId);
+    this.streamerUsers.ensure(subscription.id).add(userId);
   }
 
   clear(): void {

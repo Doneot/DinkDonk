@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { REST, Routes } from "discord.js";
 import { assertDefined } from "./shared/utils/assert.js";
 import { env } from "./shared/config/env.js";
@@ -25,7 +25,7 @@ async function registerCommands(): Promise<void> {
   const commands = await Promise.all(
     commandFiles.map(async (file): Promise<unknown> => {
       const command = (await import(
-        path.join(commandsDirectory, file)
+        pathToFileURL(path.join(commandsDirectory, file)).href
       )) as CommandModule;
 
       return command.data.toJSON();

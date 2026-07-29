@@ -52,7 +52,9 @@ type CreateApiRouterOptions = {
 
   ensureFreshToken: express.RequestHandler;
 
-  webPushPublicKey?: string;
+  // Mandatory: envSchema requires WEB_PUSH_PUBLIC_KEY, so every deployment
+  // has one by the time routes are configured.
+  webPushPublicKey: string;
 };
 
 export function createApiRouter({
@@ -65,6 +67,10 @@ export function createApiRouter({
   const router = express.Router();
 
   router.use(ensureFreshToken);
+  // Applied once for the whole router rather than per-route: express.json()
+  // is a no-op for requests without a JSON content-type, so this doesn't
+  // affect the GET-only routes below.
+  router.use(express.json());
 
   router.get(
     "/status",
@@ -82,15 +88,6 @@ export function createApiRouter({
     "/notifications/web-push/public-key",
 
     (_req: Request, res: Response): void => {
-      if (!webPushPublicKey) {
-        res.status(503).json({
-          error: "service_unavailable",
-          message: "Web Push is not configured",
-        });
-
-        return;
-      }
-
       const payload = {
         publicKey: webPushPublicKey,
       } satisfies PublicKeyResponse;
@@ -195,8 +192,6 @@ export function createApiRouter({
   router.post(
     "/streamers/info",
 
-    express.json(),
-
     validateBody(batchStreamerInfoSchema),
 
     async (req, res) => {
@@ -231,8 +226,6 @@ export function createApiRouter({
   router.post(
     "/notifications/web-push/subscriptions",
 
-    express.json(),
-
     validateBody(savePushSubscriptionSchema),
 
     async (req, res) => {
@@ -247,14 +240,12 @@ export function createApiRouter({
         userAgent ? { userAgent } : {},
       );
 
-      res.status(result.success ? 200 : 400).json(result);
+      res.status(result.success ? 201 : 400).json(result);
     },
   );
 
   router.delete(
     "/notifications/web-push/subscriptions",
-
-    express.json(),
 
     validateBody(deletePushSubscriptionSchema),
 
@@ -276,8 +267,6 @@ export function createApiRouter({
   router.post(
     "/subscriptions",
 
-    express.json(),
-
     validateBody(subscribeSchema),
 
     async (req, res) => {
@@ -296,14 +285,12 @@ export function createApiRouter({
         streamerSubscriptionsTotal.inc({ action: "subscribed" });
       }
 
-      res.status(result.success ? 200 : 400).json(result);
+      res.status(result.success ? 201 : 400).json(result);
     },
   );
 
   router.delete(
     "/subscriptions",
-
-    express.json(),
 
     validateBody(subscribeSchema),
 
@@ -326,8 +313,6 @@ export function createApiRouter({
 
   router.post(
     "/subscriptions/set-message",
-
-    express.json(),
 
     validateBody(setMessageSchema),
 

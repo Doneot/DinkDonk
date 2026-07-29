@@ -1,7 +1,10 @@
 import type { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { TwitchClient } from "../../../../modules/twitch/infrastructure/TwitchClient.js";
+import {
+  TwitchApiError,
+  TwitchClient,
+} from "../../../../modules/twitch/infrastructure/TwitchClient.js";
 import { logger } from "../../../../shared/logger/logger.js";
 
 import { anyString } from "../../../helpers/matchers.js";
@@ -150,21 +153,26 @@ describe("TwitchClient", () => {
       request.mockRejectedValue(networkError("ECONNRESET"));
 
       const pending = client.getEventSubSubscriptions();
+      // Attach a handler immediately so the eventual rejection (after the
+      // fake-timer advance below) isn't reported as unhandled.
+      const assertion = expect(pending).rejects.toThrow(TwitchApiError);
 
       await vi.advanceTimersByTimeAsync(1_500);
 
-      await expect(pending).resolves.toEqual([]);
+      await assertion;
       expect(request).toHaveBeenCalledTimes(3);
       expect(error).toHaveBeenCalledOnce();
     });
 
-    it("does not retry a non-retryable client error", async () => {
+    it("does not retry a non-retryable client error, and surfaces it instead of an empty result", async () => {
       const error = vi.spyOn(logger, "error").mockReturnValue();
       const { client, request } = createClient();
 
       request.mockRejectedValue(httpError(400));
 
-      await expect(client.getEventSubSubscriptions()).resolves.toEqual([]);
+      await expect(client.getEventSubSubscriptions()).rejects.toThrow(
+        TwitchApiError,
+      );
       expect(request).toHaveBeenCalledOnce();
       expect(error.mock.calls[0]?.[0]).toMatchObject({
         endpoint: "eventsub/subscriptions",
@@ -223,13 +231,15 @@ describe("TwitchClient", () => {
       expect(error).not.toHaveBeenCalled();
     });
 
-    it("still logs a 404 on a non-DELETE request", async () => {
+    it("still logs and surfaces a 404 on a non-DELETE request", async () => {
       const error = vi.spyOn(logger, "error").mockReturnValue();
       const { client, request } = createClient();
 
       request.mockRejectedValue(httpError(404));
 
-      await expect(client.getEventSubSubscriptions()).resolves.toEqual([]);
+      await expect(client.getEventSubSubscriptions()).rejects.toThrow(
+        TwitchApiError,
+      );
       expect(error).toHaveBeenCalledOnce();
     });
   });

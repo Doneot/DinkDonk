@@ -5,7 +5,7 @@ import type { Tunnel } from "./Tunnel.js";
 
 export async function startNgrokTunnel(): Promise<Tunnel> {
   const listener = await ngrok.forward({
-    addr: 3000,
+    addr: env.port,
     authtoken: assertDefined(env.tunneling.ngrok.authToken, "Ngrok Auth Token"),
   });
 

@@ -46,19 +46,6 @@ describe("GET /api/notifications/web-push/public-key", () => {
       publicKey: TEST_WEB_PUSH_PUBLIC_KEY,
     });
   });
-
-  it("returns 503 when Web Push is not configured", async () => {
-    const { client } = await createClient({ webPushPublicKey: "" });
-
-    const response = await client
-      .get("/api/notifications/web-push/public-key")
-      .expect(503);
-
-    expect(response.body).toEqual({
-      error: "service_unavailable",
-      message: "Web Push is not configured",
-    });
-  });
 });
 
 describe("GET /api/notifications/channels", () => {
@@ -128,7 +115,7 @@ describe("POST /api/notifications/web-push/subscriptions", () => {
       .post("/api/notifications/web-push/subscriptions")
       .set("user-agent", "Vitest Browser")
       .send({ subscription: SUBSCRIPTION })
-      .expect(200);
+      .expect(201);
 
     expect(savePushResponseSchema.parse(response.body)).toEqual({
       success: true,
@@ -151,11 +138,11 @@ describe("POST /api/notifications/web-push/subscriptions", () => {
     await client
       .post("/api/notifications/web-push/subscriptions")
       .send({ subscription: SUBSCRIPTION })
-      .expect(200);
+      .expect(201);
     await client
       .post("/api/notifications/web-push/subscriptions")
       .send({ subscription: SUBSCRIPTION })
-      .expect(200);
+      .expect(201);
 
     await expect(
       ctx.repositories.pushSubscriptions.getPushSubscriptions("user-1"),
@@ -192,7 +179,7 @@ describe("DELETE /api/notifications/web-push/subscriptions", () => {
     await client
       .post("/api/notifications/web-push/subscriptions")
       .send({ subscription: SUBSCRIPTION })
-      .expect(200);
+      .expect(201);
 
     const response = await client
       .delete("/api/notifications/web-push/subscriptions")
@@ -213,7 +200,7 @@ describe("DELETE /api/notifications/web-push/subscriptions", () => {
     await client
       .post("/api/notifications/web-push/subscriptions")
       .send({ subscription: SUBSCRIPTION })
-      .expect(200);
+      .expect(201);
 
     await client
       .delete("/api/notifications/web-push/subscriptions")

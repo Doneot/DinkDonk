@@ -13,7 +13,7 @@ const REQUIRED_FIREBASE_KEYS = [
 function baseEnv(overrides: Record<string, string | undefined> = {}) {
   return {
     SERVER_URL: "http://localhost:3000",
-    SESSION_SECRET: "session-secret",
+    SESSION_SECRET: "session-secret-16-bytes-long!!!!",
     ENCRYPTION_KEY: "encryption-key-32-bytes-long!!!!",
     DISCORD_CLIENT_ID: "discord-client-id",
     DISCORD_CLIENT_SECRET: "discord-client-secret",
@@ -134,6 +134,44 @@ describe("EnvSchema", () => {
     "WEB_PUSH_PUBLIC_KEY",
   ])("rejects a missing %s", (key) => {
     expect(messagesFor(baseEnv({ [key]: undefined }))).not.toHaveLength(0);
+  });
+
+  it("rejects a SESSION_SECRET that is too short", () => {
+    expect(
+      messagesFor(baseEnv({ SESSION_SECRET: "too-short" })),
+    ).not.toHaveLength(0);
+  });
+
+  it("leaves METRICS_TOKEN undefined when unset", () => {
+    const parsed = EnvSchema.parse(baseEnv());
+
+    expect(parsed.METRICS_TOKEN).toBeUndefined();
+  });
+
+  it("accepts a METRICS_TOKEN of sufficient length", () => {
+    const parsed = EnvSchema.parse(
+      baseEnv({ METRICS_TOKEN: "a-real-metrics-token-1234567890" }),
+    );
+
+    expect(parsed.METRICS_TOKEN).toBe("a-real-metrics-token-1234567890");
+  });
+
+  it("rejects a METRICS_TOKEN that is too short", () => {
+    expect(
+      messagesFor(baseEnv({ METRICS_TOKEN: "too-short" })),
+    ).not.toHaveLength(0);
+  });
+
+  it("rejects a non-numeric BACKEND_PORT", () => {
+    expect(
+      messagesFor(baseEnv({ BACKEND_PORT: "not-a-number" })),
+    ).not.toHaveLength(0);
+  });
+
+  it("coerces a numeric BACKEND_PORT", () => {
+    const parsed = EnvSchema.parse(baseEnv({ BACKEND_PORT: "4100" }));
+
+    expect(parsed.BACKEND_PORT).toBe(4100);
   });
 
   it("rejects an unknown tunnel provider", () => {

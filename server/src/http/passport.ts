@@ -3,9 +3,25 @@ import { Strategy as DiscordStrategy, type Profile } from "passport-discord";
 import refresh from "passport-oauth2-refresh";
 import { env } from "../shared/config/env.js";
 import { assertDefined } from "../shared/utils/assert.js";
-import type { AuthUser } from "../modules/auth/domain/AuthUser.js";
+import { TokenDecryptionError } from "../shared/utils/crypto.js";
+import { logger } from "../shared/logger/logger.js";
+import type { AuthUser, SessionUser } from "../modules/auth/domain/AuthUser.js";
 import type { AuthUserRepository } from "../modules/auth/ports/AuthUserRepository.js";
 import type { VerifyCallback } from "passport-oauth2";
+
+// req.user only needs the profile fields; nothing downstream reads OAuth
+// tokens off it (createFreshTokenMiddleware re-fetches them from the
+// repository whenever it needs them), so they're dropped here rather than
+// living in the session-attached object for the rest of the request/session.
+function toSessionUser({
+  id,
+  username,
+  discriminator,
+  avatar,
+  fetchTime,
+}: AuthUser): SessionUser {
+  return { id, username, discriminator, avatar, fetchTime };
+}
 
 export function configurePassport(
   repository: AuthUserRepository,
@@ -24,16 +40,17 @@ export function configurePassport(
       try {
         const user = await repository.getAuthUser(id);
 
-        done(
-          null,
-          user
-            ? {
-                ...user,
-                id,
-              }
-            : null,
-        );
+        done(null, user ? toSessionUser(user) : null);
       } catch (error) {
+        if (error instanceof TokenDecryptionError) {
+          logger.warn(
+            { userId: id, error },
+            "Failed to decrypt stored tokens for session user; logging out",
+          );
+          done(null, false);
+          return;
+        }
+
         done(error, null);
       }
     },
@@ -89,7 +106,7 @@ export function configurePassport(
 
         await repository.updateAuthUser(id, userData);
 
-        done(null, user);
+        done(null, toSessionUser(user));
       } catch (error) {
         done(error);
       }

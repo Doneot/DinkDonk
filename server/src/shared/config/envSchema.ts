@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { booleanFromEnv, numberFromEnv, secretFromEnv } from "./envParsers.js";
+import {
+  booleanFromEnv,
+  numberFromEnv,
+  optionalSecretFromEnv,
+  secretFromEnv,
+} from "./envParsers.js";
 
 const BaseEnvSchema = z.object({
   NODE_ENV: z
@@ -8,18 +13,50 @@ const BaseEnvSchema = z.object({
 
   PORT: numberFromEnv(3000),
 
-  BACKEND_PORT: z.string().optional(),
+  BACKEND_PORT: z.coerce.number().int().positive().optional(),
 
   SERVER_URL: z.url().min(1),
 
   CLIENT_ORIGIN: z.string().optional(),
 
-  SESSION_SECRET: secretFromEnv("session_secret"),
-
-  // Used to encrypt OAuth access/refresh tokens at rest in Firestore.
-  ENCRYPTION_KEY: secretFromEnv("encryption_key").pipe(
-    z.string().min(16, "ENCRYPTION_KEY must be at least 16 characters"),
+  SESSION_SECRET: secretFromEnv("session_secret").pipe(
+    z.string().min(16, "SESSION_SECRET must be at least 16 characters"),
   ),
+
+  // Used to encrypt OAuth access/refresh tokens at rest in Firestore. Accepts
+  // a comma-separated list to support key rotation: the first key is used
+  // for new encryptions, while every listed key is tried in order when
+  // decrypting, so an old key can stay listed (after the new one) until all
+  // ciphertext written under it has naturally been rewritten, then be
+  // dropped.
+  ENCRYPTION_KEY: secretFromEnv("encryption_key")
+    .pipe(z.string().min(1))
+    .transform((value, ctx) => {
+      const keys = value
+        .split(",")
+        .map((key) => key.trim())
+        .filter((key) => key.length > 0);
+
+      if (keys.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "ENCRYPTION_KEY must not be empty",
+        });
+        return z.NEVER;
+      }
+
+      const tooShort = keys.find((key) => key.length < 16);
+
+      if (tooShort) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Each ENCRYPTION_KEY must be at least 16 characters",
+        });
+        return z.NEVER;
+      }
+
+      return keys;
+    }),
 
   DISCORD_CLIENT_ID: z.string().min(1),
 
@@ -58,6 +95,14 @@ const BaseEnvSchema = z.object({
   WEB_PUSH_SUBJECT: z.string().min(1),
 
   PROMETHEUS_ENABLED: booleanFromEnv,
+
+  // Optional: when set, /metrics requires `Authorization: Bearer <token>`.
+  // Left unset in deployments that instead rely on network isolation (e.g.
+  // Prometheus reaching the backend only over a private Docker network).
+  METRICS_TOKEN: optionalSecretFromEnv("metrics_token").refine(
+    (value) => value === undefined || value.length >= 16,
+    "METRICS_TOKEN must be at least 16 characters",
+  ),
 
   REQUEST_LOGGING_ENABLED: booleanFromEnv,
 

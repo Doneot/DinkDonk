@@ -20,8 +20,8 @@ import type { Repositories } from "../app/container/repositories.js";
 import type { TwitchStreamerProvider } from "../modules/twitch/ports/TwitchGateway.js";
 import type { DiscordService } from "../modules/discord/ports/DiscordService.js";
 
-import { assertDefined } from "../shared/utils/assert.js";
 import { createHealthRouter } from "./routes/healthRoutes.js";
+import { createMetricsAuth } from "./middleware/metricsAuth.js";
 
 type ConfigureRoutesOptions = {
   app: Express;
@@ -51,7 +51,11 @@ export function configureRoutes({
   );
 
   if (env.prometheus.enabled) {
-    app.use("/metrics", createMetricsRouter());
+    const metricsGuards = env.prometheus.metricsToken
+      ? [createMetricsAuth(env.prometheus.metricsToken)]
+      : [];
+
+    app.use("/metrics", ...metricsGuards, createMetricsRouter());
   }
 
   app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
@@ -73,10 +77,7 @@ export function configureRoutes({
 
     ensureFreshToken,
 
-    webPushPublicKey: assertDefined(
-      env.webPush.publicKey,
-      "Web Push Public Key",
-    ),
+    webPushPublicKey: env.webPush.publicKey,
   });
 
   // /api/v1 is a non-breaking alias of /api: same router instances, so a

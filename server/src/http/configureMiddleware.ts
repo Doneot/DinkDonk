@@ -95,6 +95,8 @@ export function configureMiddleware({
     ttlMs: 10 * 60_000,
   });
 
+  app.use(helmet());
+
   app.use(
     cors({
       origin: env.clientOrigin,
@@ -121,9 +123,9 @@ export function configureMiddleware({
 
   app.use(configuredPassport.session());
 
-  app.use(helmet());
-
   app.use(
+    "/eventsub",
+
     eventSubLimiter,
 
     createEventSubRouter({

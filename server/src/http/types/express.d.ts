@@ -1,10 +1,10 @@
 import "express-session";
-import type { AuthUser } from "../../modules/auth/domain/AuthUser.js";
+import type { SessionUser } from "../../modules/auth/domain/AuthUser.js";
 
 declare global {
   namespace Express {
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-    interface User extends AuthUser {}
+    interface User extends SessionUser {}
   }
 }
 

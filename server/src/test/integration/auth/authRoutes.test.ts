@@ -136,6 +136,13 @@ describe("GET /api/auth/user", () => {
 
     const response = await request(app).get("/api/auth/user").expect(200);
 
+    // Asserted against the raw body, not schema.parse()'s output: a Zod
+    // object schema silently strips unrecognized keys, so parsing first
+    // would hide a regression that leaked accessToken/refreshToken back into
+    // the response instead of catching it.
+    expect(response.body).not.toHaveProperty("accessToken");
+    expect(response.body).not.toHaveProperty("refreshToken");
+
     expect(userResponseSchema.parse(response.body)).toEqual({
       id: "user-1",
       username: AUTH_TEST_USER.username,
@@ -150,6 +157,11 @@ describe("GET /api/auth/user", () => {
     const { app, repositories } = await createAuthTestApp();
 
     const response = await request(app).get("/api/auth/user").expect(200);
+
+    // See the equivalent check above: asserted against the raw body so a
+    // future token leak can't hide behind schema.parse()'s key-stripping.
+    expect(response.body).not.toHaveProperty("accessToken");
+    expect(response.body).not.toHaveProperty("refreshToken");
 
     expect(userResponseSchema.parse(response.body)).toEqual({
       id: AUTH_TEST_USER.id,

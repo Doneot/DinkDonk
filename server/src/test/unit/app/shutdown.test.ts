@@ -140,7 +140,6 @@ describe("registerShutdownHooks", () => {
       "scheduler",
       "runtime",
       "sockets",
-      "http",
       "discord",
       "twitch",
     ]);
@@ -196,14 +195,14 @@ describe("registerShutdownHooks", () => {
       const closeAllConnections = vi.fn();
 
       const httpServer = {
-        // Never invokes the callback, simulating a client connection that
-        // never ends on its own.
-        close: () => {},
         closeAllConnections,
       } as unknown as http.Server;
 
       const sockets = {
-        close: vi.fn().mockResolvedValue(undefined),
+        // Never resolves, simulating a client connection that never ends on
+        // its own (io.close()'s callback only fires once every client is
+        // gone).
+        close: vi.fn(() => new Promise(() => {})),
       } as unknown as SocketServer;
 
       const container = {
@@ -235,20 +234,50 @@ describe("registerShutdownHooks", () => {
     }
   });
 
-  it("exits with a failure code when teardown throws", async () => {
+  it("continues tearing down remaining steps and exits with a failure code when one step rejects", async () => {
     vi.spyOn(logger, "info").mockReturnValue();
 
-    const error = vi.spyOn(logger, "error").mockReturnValue();
+    const warn = vi.spyOn(logger, "warn").mockReturnValue();
     const exit = stubExit();
 
-    const { runtime } = setup();
+    const { runtime, discordStop, twitchStop } = setup();
 
     runtime.dispose.mockRejectedValue(new Error("dispose failed"));
 
     await emitSignal(exit);
 
+    expect(warn).toHaveBeenCalledWith(
+      {
+        step: "runtime.dispose",
+        error: expect.any(Error) as Error,
+      },
+      "Shutdown step failed; continuing teardown",
+    );
+
+    // A failing step doesn't abort the rest of teardown.
+    expect(discordStop).toHaveBeenCalledOnce();
+    expect(twitchStop).toHaveBeenCalledOnce();
+
+    expect(exit).toHaveBeenCalledWith(1);
+  });
+
+  it("exits with a failure code if the shutdown handler itself throws unexpectedly", async () => {
+    vi.spyOn(logger, "info").mockReturnValue();
+    vi.spyOn(logger, "warn").mockReturnValue();
+
+    const error = vi.spyOn(logger, "error").mockReturnValue();
+    const exit = stubExit();
+
+    vi.spyOn(logger, "flush").mockImplementation(() => {
+      throw new Error("logging backend unavailable");
+    });
+
+    setup();
+
+    await emitSignal(exit);
+
     expect(error.mock.calls[0]?.[0]).toMatchObject({
-      message: "dispose failed",
+      message: "logging backend unavailable",
     });
     expect(exit).toHaveBeenCalledWith(1);
   });

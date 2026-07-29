@@ -12,8 +12,18 @@ export async function startSshTunnel(): Promise<Tunnel> {
       "-N",
       "-o",
       "ExitOnForwardFailure=yes",
+      // Never hangs waiting on an interactive prompt (password, unknown host
+      // key confirmation, etc.) - fails fast instead, which a headless,
+      // programmatically-spawned tunnel needs.
+      "-o",
+      "BatchMode=yes",
+      // Bounds how long the initial connection attempt itself can hang;
+      // otherwise a stalled handshake could sit past the 750ms window below
+      // and be mistaken for a successfully established tunnel.
+      "-o",
+      "ConnectTimeout=10",
       "-R",
-      "9000:localhost:3000",
+      `9000:localhost:${env.port}`,
       "dinkdonk-vps",
     ],
     {

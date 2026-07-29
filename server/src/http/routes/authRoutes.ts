@@ -45,23 +45,11 @@ export function createAuthRouter({
         canReceiveDM,
       });
 
-      // Rotate the session id on every successful login to prevent session
-      // fixation. Passport 0.6+ preserves req.session.passport across regenerate.
-      await new Promise<void>((resolve, reject) => {
-        req.session.regenerate((error: unknown) => {
-          if (error) {
-            reject(
-              error instanceof Error
-                ? error
-                : new Error("Session regeneration failed"),
-            );
-            return;
-          }
-
-          resolve();
-        });
-      });
-
+      // Session-fixation protection already happened: passport.authenticate's
+      // req.login() (invoked internally above, on a successful verify)
+      // regenerates the session id before writing req.session.passport.user.
+      // Regenerating again here would create a brand-new, empty session and
+      // silently discard that write, logging the user right back out.
       req.session.canReceiveDM = canReceiveDM;
 
       res.redirect(

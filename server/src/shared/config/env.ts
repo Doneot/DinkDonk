@@ -19,7 +19,7 @@ export const env = {
 
   isProduction: parsedEnv.NODE_ENV === "production",
 
-  port: parsedEnv.PORT || Number(parsedEnv.BACKEND_PORT || 3000),
+  port: parsedEnv.PORT || parsedEnv.BACKEND_PORT || 3000,
 
   serverUrl: parsedEnv.SERVER_URL,
 
@@ -59,6 +59,7 @@ export const env = {
   },
   prometheus: {
     enabled: parsedEnv.PROMETHEUS_ENABLED,
+    metricsToken: parsedEnv.METRICS_TOKEN,
   },
   requestLogging: {
     enabled: parsedEnv.REQUEST_LOGGING_ENABLED,

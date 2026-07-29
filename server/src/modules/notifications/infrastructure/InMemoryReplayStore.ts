@@ -50,6 +50,12 @@ export class InMemoryReplayStore implements ReplayStore {
     return Promise.resolve(true);
   }
 
+  forget(messageId: string): Promise<void> {
+    this.entries.delete(messageId);
+
+    return Promise.resolve();
+  }
+
   private cleanup(): void {
     const now = Date.now();
 

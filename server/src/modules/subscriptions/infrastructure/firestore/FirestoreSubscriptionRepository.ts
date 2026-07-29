@@ -16,21 +16,19 @@ import type { Subscription } from "../../domain/Subscription.js";
 import type { DomainEventBus } from "../../../../shared/events/DomainEventBus.js";
 
 import { isNonEmptyString } from "../../../../shared/utils/validators.js";
+import { UserRecordSchema } from "../../../users/infrastructure/firestore/records/UserRecord.js";
+import { toUser } from "../../../users/infrastructure/firestore/mappers/userMapper.js";
 
-/**
- * Normalizers (key to eliminating ESLint unsafe issues)
- */
+// Reuses FirestoreUserRepository's validated schema/mapper rather than an
+// unchecked cast, so a malformed user document surfaces as a Zod error
+// instead of silently coercing to an empty subscriptions array. A missing
+// document (a user's first-ever subscribe) parses the same way an empty
+// record would, since every field on UserRecordSchema has a default.
 function normalizeUserRecord(
   userId: string,
   data: DocumentData | undefined,
 ): User {
-  return {
-    id: userId,
-    canReceiveDM: Boolean(data?.canReceiveDM),
-    subscriptions: Array.isArray(data?.subscriptions)
-      ? (data.subscriptions as Subscription[])
-      : [],
-  };
+  return toUser(userId, UserRecordSchema.parse(data ?? {}));
 }
 
 export class FirestoreSubscriptionRepository implements SubscriptionRepository {
@@ -110,7 +108,7 @@ export class FirestoreSubscriptionRepository implements SubscriptionRepository {
       } as const;
     });
 
-    if ("createdStreamer" in result) {
+    if (result.success && result.createdStreamer) {
       this.events.emit({ type: "streamerAdded", streamerId });
     }
 
@@ -130,9 +128,13 @@ export class FirestoreSubscriptionRepository implements SubscriptionRepository {
     const subscriberRef = subscribersRef.doc(userId);
 
     const result = await userRef.firestore.runTransaction(async (tx) => {
-      const [userDoc, subscribers] = await Promise.all([
+      // An aggregate count plus a single existence check on this user's own
+      // subscriber doc avoids transferring every subscriber document just to
+      // compute how many remain.
+      const [userDoc, subscriberDoc, subscriberCount] = await Promise.all([
         tx.get(userRef),
-        tx.get(subscribersRef),
+        tx.get(subscriberRef),
+        tx.get(subscribersRef.count()),
       ]);
 
       if (!userDoc.exists) {
@@ -151,9 +153,8 @@ export class FirestoreSubscriptionRepository implements SubscriptionRepository {
 
       tx.delete(subscriberRef);
 
-      const usersLeft = subscribers.docs.filter(
-        (doc) => doc.id !== userId,
-      ).length;
+      const usersLeft =
+        subscriberCount.data().count - (subscriberDoc.exists ? 1 : 0);
 
       return {
         success: true,

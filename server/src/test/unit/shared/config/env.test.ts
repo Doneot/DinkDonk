@@ -84,6 +84,12 @@ describe("env", () => {
     expect(env.port).toBe(3000);
   });
 
+  it("fails fast instead of silently resolving to NaN when BACKEND_PORT isn't numeric", async () => {
+    await expect(
+      loadEnv({ PORT: "0", BACKEND_PORT: "not-a-number" }),
+    ).rejects.toThrow();
+  });
+
   it("defaults the client origin to the server url", async () => {
     const env = await loadEnv();
 
@@ -112,6 +118,23 @@ describe("env", () => {
     expect(env.firebase.serviceAccountPath).toBe(
       "/run/secrets/firebase_service_account",
     );
+  });
+
+  it("keeps a single ENCRYPTION_KEY as a one-element list", async () => {
+    const env = await loadEnv();
+
+    expect(env.encryptionKey).toEqual(["test-encryption-key-32-bytes-long!!"]);
+  });
+
+  it("splits a comma-separated ENCRYPTION_KEY for key rotation", async () => {
+    const env = await loadEnv({
+      ENCRYPTION_KEY: "new-key-32-bytes-long-aaaaaaaaaa, old-key-32-bytes-long-bbbbbbbbbb",
+    });
+
+    expect(env.encryptionKey).toEqual([
+      "new-key-32-bytes-long-aaaaaaaaaa",
+      "old-key-32-bytes-long-bbbbbbbbbb",
+    ]);
   });
 
   it("groups the third-party credentials it was given", async () => {

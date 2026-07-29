@@ -36,7 +36,8 @@ services:
       - twitch_client_secret
       - twitch_webhook_secret
       - session_secret
-      - admin_password
+      - encryption_key
+      - metrics_token
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -47,7 +48,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          'node -e "fetch(''http://127.0.0.1:3000/api/health'').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"',
+          'node -e "fetch(''http://127.0.0.1:3000/health/ready'').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"',
         ]
       interval: 30s
       timeout: 5s
@@ -79,5 +80,7 @@ secrets:
     file: ./secrets-staging/twitch-webhook-secret
   session_secret:
     file: ./secrets-staging/session-secret
-  admin_password:
-    file: ./secrets-staging/admin-password
+  encryption_key:
+    file: ./secrets-staging/encryption-key
+  metrics_token:
+    file: ./secrets-staging/metrics-token

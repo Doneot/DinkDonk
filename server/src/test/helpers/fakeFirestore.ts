@@ -200,9 +200,17 @@ export type FakeAggregateQuery = {
 export class FakeTransaction {
   get(reference: FakeDocumentReference): Promise<FakeDocumentSnapshot>;
   get(reference: FakeCollectionReference): Promise<{ docs: FakeDocumentSnapshot[] }>;
+  get(reference: FakeAggregateQuery): Promise<{ data: () => { count: number } }>;
   get(
-    reference: FakeDocumentReference | FakeCollectionReference,
-  ): Promise<FakeDocumentSnapshot | { docs: FakeDocumentSnapshot[] }> {
+    reference:
+      | FakeDocumentReference
+      | FakeCollectionReference
+      | FakeAggregateQuery,
+  ): Promise<
+    | FakeDocumentSnapshot
+    | { docs: FakeDocumentSnapshot[] }
+    | { data: () => { count: number } }
+  > {
     return reference.get();
   }
 

@@ -1,6 +1,7 @@
 import type { ChatInputCommandInteraction } from "discord.js";
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 import type { CommandContext } from "../modules/discord/domain/CommandContext.js";
+import { replyEphemeral, requireDMCapableUser } from "./shared/commandReplies.js";
 
 export const data = new SlashCommandBuilder()
   .setName("list")
@@ -12,20 +13,14 @@ export async function execute(
 ): Promise<void> {
   const { userRepository, twitch } = context;
 
-  const user = await userRepository.getUser(interaction.user.id);
+  const user = await requireDMCapableUser(interaction, userRepository);
 
-  const canReceiveDM = user?.canReceiveDM || false;
-
-  if (!canReceiveDM) {
-    await interaction.reply({
-      content: `❌ I can't DM you! Please check your DM settings.`,
-      flags: MessageFlags.Ephemeral,
-    });
+  if (!user) {
     return;
   }
 
-  if (!user?.subscriptions?.length) {
-    await interaction.reply("📭 You have no subscriptions yet.");
+  if (!user.subscriptions.length) {
+    await replyEphemeral(interaction, "📭 You have no subscriptions yet.");
     return;
   }
 
@@ -34,5 +29,5 @@ export async function execute(
   );
 
   const list = streamers.map((s) => s.display_name).join("\n");
-  await interaction.reply(`📺 Subscribed streamers:\n${list}`);
+  await replyEphemeral(interaction, `📺 Subscribed streamers:\n${list}`);
 }

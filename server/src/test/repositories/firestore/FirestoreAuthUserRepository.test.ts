@@ -1,8 +1,29 @@
 import { describe, expect, it } from "vitest";
 
 import { FirestoreAuthUserRepository } from "../../../modules/auth/infrastructure/firestore/FirestoreAuthUserRepository.js";
+import type { AuthUser } from "../../../modules/auth/domain/AuthUser.js";
 
+import { authUserRepositoryBehavior } from "../contracts/AuthUserRepository.behavior.js";
 import { FakeFirestore } from "../../helpers/fakeFirestore.js";
+
+authUserRepositoryBehavior("FirestoreAuthUserRepository", () => {
+  const firestore = new FakeFirestore();
+  const repository = new FirestoreAuthUserRepository(firestore.asFirestore());
+
+  return Object.assign(repository, {
+    seed(user: AuthUser): void {
+      const { id, ...record } = user;
+
+      firestore.write(`auth/${id}`, record);
+    },
+
+    clear(): void {
+      for (const path of firestore.paths("auth")) {
+        firestore.remove(path);
+      }
+    },
+  });
+});
 
 const RECORD = {
   username: "tester",
@@ -100,12 +121,29 @@ describe("FirestoreAuthUserRepository", () => {
       });
     });
 
-    it("creates the document when it does not exist yet", async () => {
+    it("creates the document when every required field is given at once", async () => {
       const { firestore, repository } = setup();
 
-      await repository.updateAuthUser("user-1", { username: "tester" });
+      await repository.updateAuthUser("user-1", RECORD);
 
-      expect(firestore.read("auth/user-1")).toEqual({ username: "tester" });
+      const stored = firestore.read("auth/user-1") as Record<string, unknown>;
+
+      expect(stored).toMatchObject({
+        username: RECORD.username,
+        discriminator: RECORD.discriminator,
+        fetchTime: RECORD.fetchTime,
+      });
+      expect(stored.accessToken).toMatch(/^enc:v1:/);
+    });
+
+    it("rejects a partial write that would leave a required field missing on a new document", async () => {
+      const { firestore, repository } = setup();
+
+      await expect(
+        repository.updateAuthUser("user-1", { username: "tester" }),
+      ).rejects.toThrow();
+
+      expect(firestore.read("auth/user-1")).toBeUndefined();
     });
 
     it.each(["", "   "])("rejects the blank user id %j", async (userId) => {

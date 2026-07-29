@@ -7,6 +7,7 @@ import type {
   TwitchStreamer,
 } from "../../twitch/domain/Twitch.js";
 import { buildStreamerLivePayload } from "../domain/buildStreamerLiveNotification.js";
+import { logger } from "../../../shared/logger/logger.js";
 
 // Bounds how many subscribers are notified concurrently so a very popular
 // streamer going live doesn't fire thousands of simultaneous Firestore reads
@@ -37,9 +38,20 @@ export class StreamNotificationService {
     for (let i = 0; i < userIds.length; i += NOTIFY_BATCH_SIZE) {
       const batch = userIds.slice(i, i + NOTIFY_BATCH_SIZE);
 
-      await Promise.all(
+      // allSettled, not all: one subscriber's bad record or a single failed
+      // notification call must not abort every later batch's delivery.
+      const results = await Promise.allSettled(
         batch.map((userId) => this.notifyUserForStreamer(userId, streamer)),
       );
+
+      for (const [index, result] of results.entries()) {
+        if (result.status === "rejected") {
+          logger.error(
+            { userId: batch[index], streamerId: streamer.id, error: result.reason },
+            "Failed to notify subscriber of stream going live",
+          );
+        }
+      }
     }
   }
 

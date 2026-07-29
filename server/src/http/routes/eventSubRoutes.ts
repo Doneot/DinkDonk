@@ -36,7 +36,7 @@ export function createEventSubRouter({
   const handlers = createEventSubHandlerRegistry(onNotification);
 
   router.post(
-    "/eventsub",
+    "/",
     express.raw({ type: "application/json" }),
     async (req, res): Promise<void> => {
       const raw = (req.body as Buffer).toString();
@@ -83,11 +83,19 @@ export function createEventSubRouter({
         return;
       }
 
-      const result = await dispatchEventSubNotification(
-        raw,
-        messageType,
-        handlers,
-      );
+      let result;
+
+      try {
+        result = await dispatchEventSubNotification(raw, messageType, handlers);
+      } catch (error) {
+        // Dispatch failed outright (as opposed to an individual subscriber's
+        // notification failing, which StreamNotificationService already
+        // isolates per-user): release the reservation so Twitch's retry of
+        // this same message id is actually reprocessed instead of being
+        // silently treated as an already-handled duplicate.
+        await replayStore.forget(messageId);
+        throw error;
+      }
 
       switch (result.status) {
         case 200:

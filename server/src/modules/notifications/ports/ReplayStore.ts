@@ -6,4 +6,12 @@ export interface ReplayStore {
    * Returns false if the ID already exists and has not expired.
    */
   rememberIfNew(messageId: string): Promise<boolean>;
+
+  /**
+   * Releases a previously-reserved message ID. Used when dispatching the
+   * notification for that ID failed outright, so Twitch's redelivery of the
+   * same message can actually be reprocessed instead of being silently
+   * treated as an already-handled duplicate.
+   */
+  forget(messageId: string): Promise<void>;
 }

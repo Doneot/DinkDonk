@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NotificationManager } from "../../../../modules/notifications/application/NotificationManager.js";
 import { StreamNotificationService } from "../../../../modules/notifications/application/StreamNotificationService.js";
@@ -12,6 +12,11 @@ import { buildUser } from "../../../builders/user.js";
 import { FakeTwitchStreamers } from "../../../helpers/fakeTwitch.js";
 import { InMemoryStreamerRepository } from "../../../repositories/inMemory/InMemoryStreamerRepository.js";
 import { InMemoryUserRepository } from "../../../repositories/inMemory/InMemoryUserRepository.js";
+import { logger } from "../../../../shared/logger/logger.js";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const event: TwitchEventSubStreamOnlineEvent = {
   broadcaster_user_id: "streamer-1",
@@ -200,18 +205,34 @@ describe("StreamNotificationService", () => {
     expect(notify.mock.calls[0]?.[0]).toMatchObject({ id: "user-1" });
   });
 
-  it("propagates a repository failure", async () => {
-    const { service, userRepository } = setup({
-      streamers: [buildStreamer({ id: "streamer-1", users: ["user-1"] })],
-      users: [buildUser({ id: "user-1" })],
+  it("isolates one subscriber's repository failure instead of failing the whole run", async () => {
+    const error = vi.spyOn(logger, "error").mockReturnValue();
+    const { service, notify, userRepository } = setup({
+      streamers: [
+        buildStreamer({ id: "streamer-1", users: ["user-1", "user-2"] }),
+      ],
+      users: [buildUser({ id: "user-1" }), buildUser({ id: "user-2" })],
     });
 
-    vi.spyOn(userRepository, "getUser").mockRejectedValue(
-      new Error("firestore unavailable"),
+    vi.spyOn(userRepository, "getUser").mockImplementation((id) =>
+      id === "user-1"
+        ? Promise.reject(new Error("firestore unavailable"))
+        : InMemoryUserRepository.prototype.getUser.call(userRepository, id),
     );
 
-    await expect(service.handleStreamOnline(event)).rejects.toThrow(
-      "firestore unavailable",
+    await expect(service.handleStreamOnline(event)).resolves.toBeUndefined();
+
+    // user-2's notification still goes out despite user-1's lookup failing.
+    expect(notify).toHaveBeenCalledOnce();
+    expect(notify.mock.calls[0]?.[0]).toMatchObject({ id: "user-2" });
+
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-1",
+        streamerId: "streamer-1",
+        error: expect.any(Error) as Error,
+      }),
+      "Failed to notify subscriber of stream going live",
     );
   });
 });

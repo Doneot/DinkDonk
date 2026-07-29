@@ -277,6 +277,33 @@ describe("POST /eventsub", () => {
       expect(received).toHaveLength(2);
     });
 
+    it("re-processes a redelivery after the first attempt's handler failed", async () => {
+      vi.spyOn(logger, "error").mockReturnValue();
+
+      let attempt = 0;
+      const { app, secret } = createEventSubTestApp({
+        onNotification: () => {
+          attempt += 1;
+
+          return attempt === 1
+            ? Promise.reject(new Error("transient failure"))
+            : Promise.resolve();
+        },
+      });
+      const payload = buildStreamOnlineEvent();
+      const messageId = crypto.randomUUID();
+
+      await sendNotification({ app, secret, payload, messageId }).expect(500);
+
+      // Twitch retries a delivery that didn't get a 2xx; since the first
+      // attempt's dispatch failure released the reservation, the retry with
+      // the same message id must reach the handler again rather than being
+      // silently treated as an already-handled duplicate.
+      await sendNotification({ app, secret, payload, messageId }).expect(204);
+
+      expect(attempt).toBe(2);
+    });
+
     it("does not reserve message ids for unverified requests", async () => {
       const { app, secret, received } = createEventSubTestApp();
       const payload = buildStreamOnlineEvent();

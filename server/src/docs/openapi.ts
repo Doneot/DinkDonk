@@ -94,8 +94,23 @@ const generatedOpenApiDocument = generator.generateDocument({
   },
 });
 
+// registerPaths only declares the "/api/..." routes, but configureRoutes
+// mounts the same router instances at "/api/v1/..." too (a non-breaking
+// alias - see the comment there). Mirror every registered path under
+// "/api/v1" as well, so the docs actually reflect what's reachable instead
+// of silently omitting the versioned alias.
+const v1AliasedPaths = Object.fromEntries(
+  Object.entries(generatedOpenApiDocument.paths ?? {})
+    .filter(([path]) => path.startsWith("/api/"))
+    .map(([path, operations]) => [`/api/v1${path.slice("/api".length)}`, operations]),
+);
+
 export const openApiDocument = {
   ...generatedOpenApiDocument,
+  paths: {
+    ...generatedOpenApiDocument.paths,
+    ...v1AliasedPaths,
+  },
   components: {
     ...generatedOpenApiDocument.components,
     securitySchemes: {

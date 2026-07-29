@@ -232,6 +232,44 @@ describe("SubscriptionCleanupService", () => {
       expect(getSubscriptions).toHaveBeenCalledOnce();
     });
 
+    it("reads a streamer's subscribers only once even with duplicate stream.online subscriptions", async () => {
+      const { service, streamerRepository } = setup({
+        subscriptions: [
+          buildEventSubSubscription({
+            id: "sub-1",
+            condition: { broadcaster_user_id: "streamer-1" },
+          }),
+          buildEventSubSubscription({
+            id: "sub-2",
+            condition: { broadcaster_user_id: "streamer-1" },
+          }),
+        ],
+        streamers: [buildStreamer({ id: "streamer-1", users: ["user-1"] })],
+      });
+
+      const getSubscriberIds = vi.spyOn(streamerRepository, "getSubscriberIds");
+
+      await service.garbageCollectSubscriptions();
+
+      expect(getSubscriberIds).toHaveBeenCalledOnce();
+    });
+
+    it("processes every streamer across a sweep spanning more than one batch", async () => {
+      const streamerCount = 30;
+      const subscriptions = Array.from({ length: streamerCount }, (_, i) =>
+        buildEventSubSubscription({
+          id: `sub-${i}`,
+          condition: { broadcaster_user_id: `streamer-${i}` },
+        }),
+      );
+
+      const { service, twitch } = setup({ subscriptions });
+
+      await service.garbageCollectSubscriptions();
+
+      expect(twitch.subscriptions).toEqual([]);
+    });
+
     it("releases the guard after a failing sweep", async () => {
       const { service, twitch } = setup();
 

@@ -57,6 +57,7 @@ function postEventSub(
 
 afterEach(() => {
   env.prometheus.enabled = false;
+  env.prometheus.metricsToken = undefined;
   env.requestLogging.enabled = false;
   vi.restoreAllMocks();
 });
@@ -75,6 +76,22 @@ describe("createApp", () => {
       const { app } = setup();
 
       const response = await request(app).get("/health/live").expect(200);
+
+      expect(response.headers["x-content-type-options"]).toBe("nosniff");
+      expect(response.headers["x-frame-options"]).toBeDefined();
+    });
+
+    it("applies the security headers from helmet even to CORS preflight responses", async () => {
+      // helmet must run ahead of cors in the middleware stack, otherwise the
+      // OPTIONS preflight that cors's middleware answers directly (short-
+      // circuiting the rest of the chain) never gets helmet's headers.
+      const { app } = setup();
+
+      const response = await request(app)
+        .options("/health/live")
+        .set("Origin", env.clientOrigin)
+        .set("Access-Control-Request-Method", "GET")
+        .expect(204);
 
       expect(response.headers["x-content-type-options"]).toBe("nosniff");
       expect(response.headers["x-frame-options"]).toBeDefined();
@@ -170,6 +187,22 @@ describe("createApp", () => {
       const { app } = setup();
 
       const response = await request(app).get("/metrics").expect(200);
+
+      expect(response.text).toContain("eventsub_requests_total");
+    });
+
+    it("requires a bearer token for metrics when one is configured", async () => {
+      env.prometheus.enabled = true;
+      env.prometheus.metricsToken = "a-real-metrics-token-1234567890";
+
+      const { app } = setup();
+
+      await request(app).get("/metrics").expect(401);
+
+      const response = await request(app)
+        .get("/metrics")
+        .set("Authorization", "Bearer a-real-metrics-token-1234567890")
+        .expect(200);
 
       expect(response.text).toContain("eventsub_requests_total");
     });

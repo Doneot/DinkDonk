@@ -1,6 +1,7 @@
 import type { ChatInputCommandInteraction } from "discord.js";
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 import type { CommandContext } from "../modules/discord/domain/CommandContext.js";
+import { replyEphemeral, requireDMCapableUser } from "./shared/commandReplies.js";
 
 export const data = new SlashCommandBuilder()
   .setName("subscribe")
@@ -31,24 +32,14 @@ export async function execute(
   const streamer = await twitch.getStreamer(username);
 
   if (!streamer) {
-    await interaction.reply({
-      content: `❌ Could not find streamer \`${username}\`.`,
-      flags: MessageFlags.Ephemeral,
-    });
+    await replyEphemeral(interaction, `❌ Could not find streamer \`${username}\`.`);
 
     return;
   }
 
-  const user = await userRepository.getUser(interaction.user.id);
+  const user = await requireDMCapableUser(interaction, userRepository);
 
-  const canReceiveDM = user?.canReceiveDM || false;
-
-  if (!canReceiveDM) {
-    await interaction.reply({
-      content: `❌ I can't DM you! Please check your DM settings.`,
-      flags: MessageFlags.Ephemeral,
-    });
-
+  if (!user) {
     return;
   }
 
@@ -58,7 +49,8 @@ export async function execute(
     notificationMessage || undefined,
   );
 
-  await interaction.reply(
+  await replyEphemeral(
+    interaction,
     res.success
       ? `✅ Subscribed to **${streamer.display_name}**!`
       : `❌ Cannot subscribe to **${streamer.display_name}**. Reason: ${res.reason}`,

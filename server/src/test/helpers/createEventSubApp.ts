@@ -42,6 +42,8 @@ export function createEventSubTestApp({
   app.use(requestId);
 
   app.use(
+    "/eventsub",
+
     createEventSubRouter({
       secret,
 

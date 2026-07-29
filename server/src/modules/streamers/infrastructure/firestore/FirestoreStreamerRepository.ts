@@ -62,9 +62,11 @@ export class FirestoreStreamerRepository implements StreamerRepository {
     const subscribersRef = this.subscribersOf(id);
 
     return this.streamers.firestore.runTransaction(async (tx) => {
-      const subscribers = await tx.get(subscribersRef);
+      // An aggregate count avoids transferring every subscriber document
+      // just to answer a yes/no emptiness question.
+      const countSnapshot = await tx.get(subscribersRef.count());
 
-      if (subscribers.docs.length > 0) {
+      if (countSnapshot.data().count > 0) {
         return false;
       }
 

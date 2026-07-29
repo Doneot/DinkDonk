@@ -36,7 +36,8 @@ services:
       - twitch_client_secret
       - twitch_webhook_secret
       - session_secret
-      - admin_password
+      - encryption_key
+      - metrics_token
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -47,7 +48,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          'node -e "fetch(''http://127.0.0.1:3000/api/health'').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"',
+          'node -e "fetch(''http://127.0.0.1:3000/health/ready'').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"',
         ]
       interval: 30s
       timeout: 5s
@@ -60,6 +61,8 @@ services:
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
+    secrets:
+      - metrics_token
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -113,7 +116,9 @@ secrets:
     file: ./secrets/twitch-webhook-secret
   session_secret:
     file: ./secrets/session-secret
-  admin_password:
-    file: ./secrets/admin-password
+  encryption_key:
+    file: ./secrets/encryption-key
+  metrics_token:
+    file: ./secrets/metrics-token
   grafana_admin_password:
     file: ./secrets/grafana-admin-password

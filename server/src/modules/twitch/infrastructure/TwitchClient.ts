@@ -41,6 +41,26 @@ export type TwitchClientOptions = {
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
+/**
+ * Thrown when a request exhausts its retries or fails non-retryably, so
+ * callers can tell "Twitch genuinely has no data for this" (an empty array)
+ * apart from "the request failed" - which previously looked identical,
+ * letting an API outage masquerade as e.g. "no such streamer" or "no active
+ * EventSub subscriptions" (the latter risked a cleanup sweep treating a
+ * transient outage as every streamer being subscriber-less).
+ */
+export class TwitchApiError extends Error {
+  constructor(
+    message: string,
+    readonly endpoint: string,
+    readonly method: string,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = "TwitchApiError";
+  }
+}
+
 type TwitchStream = {
   id: string;
 
@@ -173,7 +193,7 @@ export class TwitchClient
             "Twitch API request failed",
           );
 
-          return [];
+          throw new TwitchApiError(err.message, endpoint, method, status);
         }
 
         const retryAfterSeconds = Number(err.response?.headers?.["retry-after"]);

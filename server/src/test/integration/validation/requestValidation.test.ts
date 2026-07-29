@@ -82,6 +82,24 @@ describe("POST /api/streamers/info validation", () => {
   });
 });
 
+describe("malformed request bodies", () => {
+  it("returns a 400 instead of a 500 when the JSON body can't be parsed", async () => {
+    const { client } = await createClient();
+
+    // body-parser's JSON middleware (not the route's Zod schema) is what
+    // rejects this: it throws a plain http-errors SyntaxError carrying a
+    // real 400 status that errorHandler must forward instead of flattening
+    // to a generic 500.
+    const response = await client.agent
+      .post("/api/streamers/info")
+      .set("Content-Type", "application/json")
+      .send("{ not valid json");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({ error: "bad_request" });
+  });
+});
+
 describe("subscription payload validation", () => {
   it.each([
     ["POST", "/api/subscriptions"],

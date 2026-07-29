@@ -87,7 +87,10 @@ describe("unsubscribe command", () => {
     await execute(interaction, context);
 
     expect(unsubscribe).toHaveBeenCalledWith(TEST_USER_ID, "streamer-1");
-    expect(reply).toHaveBeenCalledWith("✅ Unsubscribed from **Streamer**.");
+    expect(reply).toHaveBeenCalledWith({
+      content: "✅ Unsubscribed from **Streamer**.",
+      flags: MessageFlags.Ephemeral,
+    });
   });
 
   it("reports the failure reason when unsubscribing fails", async () => {
@@ -107,8 +110,9 @@ describe("unsubscribe command", () => {
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith(
-      "❌ Cannot unsubscribe from **Streamer**. Reason: user_not_found",
-    );
+    expect(reply).toHaveBeenCalledWith({
+      content: "❌ Cannot unsubscribe from **Streamer**. Reason: user_not_found",
+      flags: MessageFlags.Ephemeral,
+    });
   });
 });

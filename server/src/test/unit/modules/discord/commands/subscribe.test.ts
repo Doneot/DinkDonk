@@ -92,7 +92,10 @@ describe("subscribe command", () => {
       "streamer-1",
       "custom message",
     );
-    expect(reply).toHaveBeenCalledWith("✅ Subscribed to **Streamer**!");
+    expect(reply).toHaveBeenCalledWith({
+      content: "✅ Subscribed to **Streamer**!",
+      flags: MessageFlags.Ephemeral,
+    });
   });
 
   it("reports the failure reason when subscribing fails", async () => {
@@ -112,8 +115,9 @@ describe("subscribe command", () => {
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith(
-      "❌ Cannot subscribe to **Streamer**. Reason: already_subscribed",
-    );
+    expect(reply).toHaveBeenCalledWith({
+      content: "❌ Cannot subscribe to **Streamer**. Reason: already_subscribed",
+      flags: MessageFlags.Ephemeral,
+    });
   });
 });

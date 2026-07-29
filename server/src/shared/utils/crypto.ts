@@ -6,17 +6,38 @@ import {
 } from "node:crypto";
 
 import { env } from "../config/env.js";
+import { assertDefined } from "./assert.js";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const PREFIX = "enc:v1:";
 
-let cachedKey: Buffer | undefined;
+/**
+ * Distinguishes a corrupt/undecryptable token from other kinds of failures
+ * (e.g. a Firestore outage), so callers can react differently - a rotated or
+ * corrupted encryption key should log the affected user out gracefully
+ * rather than surface as a raw 500 on every request that touches their
+ * session.
+ */
+export class TokenDecryptionError extends Error {
+  constructor(cause: unknown) {
+    super("Failed to decrypt stored token", { cause });
+    this.name = "TokenDecryptionError";
+  }
+}
 
-function getKey(): Buffer {
-  cachedKey ??= scryptSync(env.encryptionKey, "dinkdonk-token-encryption", 32);
+let cachedKeys: Buffer[] | undefined;
 
-  return cachedKey;
+// ENCRYPTION_KEY is a comma-separated list (validated by envSchema): the
+// first entry is the current key used for new encryptions, and every entry
+// is a candidate when decrypting, to support rotating in a new key without
+// breaking ciphertext written under the previous one.
+function getKeys(): Buffer[] {
+  cachedKeys ??= env.encryptionKey.map((key) =>
+    scryptSync(key, "dinkdonk-token-encryption", 32),
+  );
+
+  return cachedKeys;
 }
 
 /**
@@ -25,8 +46,10 @@ function getKey(): Buffer {
  * apart from values written before encryption was introduced.
  */
 export function encryptSecret(plaintext: string): string {
+  // envSchema guarantees at least one key.
+  const currentKey = assertDefined(getKeys()[0], "encryption key");
   const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGORITHM, getKey(), iv);
+  const cipher = createCipheriv(ALGORITHM, currentKey, iv);
 
   const ciphertext = Buffer.concat([
     cipher.update(plaintext, "utf8"),
@@ -55,18 +78,28 @@ export function decryptSecret(value: string): string {
     return value;
   }
 
-  const decipher = createDecipheriv(
-    ALGORITHM,
-    getKey(),
-    Buffer.from(ivPart, "base64"),
-  );
+  const iv = Buffer.from(ivPart, "base64");
+  const authTag = Buffer.from(tagPart, "base64");
+  const ciphertext = Buffer.from(dataPart, "base64");
 
-  decipher.setAuthTag(Buffer.from(tagPart, "base64"));
+  let lastError: unknown;
 
-  const plaintext = Buffer.concat([
-    decipher.update(Buffer.from(dataPart, "base64")),
-    decipher.final(),
-  ]);
+  for (const key of getKeys()) {
+    try {
+      const decipher = createDecipheriv(ALGORITHM, key, iv);
 
-  return plaintext.toString("utf8");
+      decipher.setAuthTag(authTag);
+
+      const plaintext = Buffer.concat([
+        decipher.update(ciphertext),
+        decipher.final(),
+      ]);
+
+      return plaintext.toString("utf8");
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw new TokenDecryptionError(lastError);
 }

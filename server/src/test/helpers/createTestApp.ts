@@ -37,7 +37,6 @@ export type CreateTestAppOptions = {
   authenticated?: boolean;
   authUser?: typeof DEFAULT_AUTH_USER;
   state?: TestState;
-  /** Pass an empty string to model a deployment without Web Push configured. */
   webPushPublicKey?: string;
 };
 

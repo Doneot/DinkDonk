@@ -206,7 +206,6 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     responses: {
       200: jsonResponse("Web Push public key", publicKeyResponseSchema),
       401: unauthorizedResponse,
-      503: jsonResponse("Web Push not configured", errorResponseSchema),
     },
   });
 
@@ -233,7 +232,7 @@ export function registerPaths(registry: OpenAPIRegistry): void {
       body: jsonBody(savePushSubscriptionSchema),
     },
     responses: {
-      200: jsonResponse("Save result", savePushResponseSchema),
+      201: jsonResponse("Save result", savePushResponseSchema),
       400: validationErrorResponse,
       401: unauthorizedResponse,
     },
@@ -323,7 +322,7 @@ export function registerPaths(registry: OpenAPIRegistry): void {
       body: jsonBody(subscribeSchema),
     },
     responses: {
-      200: jsonResponse("Subscribe result", subscribeResponseSchema),
+      201: jsonResponse("Subscribe result", subscribeResponseSchema),
       400: validationErrorResponse,
       401: unauthorizedResponse,
     },

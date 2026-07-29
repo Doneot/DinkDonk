@@ -19,7 +19,9 @@ describe("assertDefined", () => {
     ["undefined", undefined],
     ["null", null],
   ])("throws a named error for %s", (_label, value) => {
-    expect(() => assertDefined(value as unknown as string, "Token")).toThrow(
+    // No cast needed: assertDefined's type signature accepts `T | null |
+    // undefined`, matching what it actually checks at runtime.
+    expect(() => assertDefined<string>(value, "Token")).toThrow(
       "Missing value: Token",
     );
   });

@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { env } from "../../../../shared/config/env.js";
 import { logger } from "../../../../shared/logger/logger.js";
 
 type KillCallback = (error?: Error) => void;
@@ -46,6 +47,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   spawn.mockReset();
+  env.port = 3000;
 });
 
 describe("startSshTunnel", () => {
@@ -64,6 +66,10 @@ describe("startSshTunnel", () => {
         "-N",
         "-o",
         "ExitOnForwardFailure=yes",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
         "-R",
         "9000:localhost:3000",
         "dinkdonk-vps",
@@ -71,6 +77,35 @@ describe("startSshTunnel", () => {
       { stdio: "inherit" },
     ]);
     expect(tunnel.url).toBe("http://localhost:4000");
+  });
+
+  it("forwards to the configured server port instead of a hardcoded one", async () => {
+    env.port = 8080;
+
+    spawn.mockReturnValue(createChildProcess(4321));
+
+    const pending = startSshTunnel();
+
+    await settleStartupWindow();
+
+    await pending;
+
+    expect(spawn.mock.calls[0]).toEqual([
+      "ssh",
+      [
+        "-N",
+        "-o",
+        "ExitOnForwardFailure=yes",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-R",
+        "9000:localhost:8080",
+        "dinkdonk-vps",
+      ],
+      { stdio: "inherit" },
+    ]);
   });
 
   it("fails when ssh exits during the startup window", async () => {

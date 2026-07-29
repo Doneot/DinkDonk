@@ -33,7 +33,7 @@ describe("POST /api/subscriptions", () => {
     const response = await client
       .post("/api/subscriptions")
       .send({ streamerId: "streamer-1" })
-      .expect(200);
+      .expect(201);
 
     expect(subscribeResponseSchema.parse(response.body)).toEqual({
       success: true,
@@ -68,7 +68,7 @@ describe("POST /api/subscriptions", () => {
     const response = await client
       .post("/api/subscriptions")
       .send({ streamerId: "streamer-1" })
-      .expect(200);
+      .expect(201);
 
     expect(response.body).toEqual({ success: true, createdStreamer: false });
   });
@@ -93,7 +93,7 @@ describe("POST /api/subscriptions", () => {
     await client
       .post("/api/subscriptions")
       .send({ streamerId: "  streamer-1  " })
-      .expect(200);
+      .expect(201);
 
     await expect(
       ctx.repositories.subscriptions.getSubscription("user-1", "streamer-1"),

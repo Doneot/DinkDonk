@@ -49,18 +49,33 @@ export class FirestoreAuthUserRepository implements AuthUserRepository {
       throw new Error("Invalid user id");
     }
 
-    const validated = AuthUserUpdateSchema.parse(data);
+    const validatedUpdate = AuthUserUpdateSchema.parse(data);
 
-    const payload = {
-      ...validated,
-      ...(validated.accessToken !== undefined
-        ? { accessToken: encryptSecret(validated.accessToken) }
-        : {}),
-      ...(validated.refreshToken !== undefined
-        ? { refreshToken: encryptSecret(validated.refreshToken) }
-        : {}),
-    };
+    const docRef = this.users.doc(userId);
 
-    await this.users.doc(userId).set(payload, { merge: true });
+    await this.users.firestore.runTransaction(async (tx) => {
+      const doc = await tx.get(docRef);
+
+      // Validates the FULL record this write would result in - not just the
+      // partial payload - so a merge that would leave a required field (e.g.
+      // accessToken) missing fails loudly right here, instead of writing a
+      // corrupt partial document that only breaks the next time it's read.
+      AuthUserRecordSchema.parse({
+        ...(doc.exists ? doc.data() : {}),
+        ...validatedUpdate,
+      });
+
+      const payload = {
+        ...validatedUpdate,
+        ...(validatedUpdate.accessToken !== undefined
+          ? { accessToken: encryptSecret(validatedUpdate.accessToken) }
+          : {}),
+        ...(validatedUpdate.refreshToken !== undefined
+          ? { refreshToken: encryptSecret(validatedUpdate.refreshToken) }
+          : {}),
+      };
+
+      tx.set(docRef, payload, { merge: true });
+    });
   }
 }

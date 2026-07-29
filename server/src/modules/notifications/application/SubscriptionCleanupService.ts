@@ -4,6 +4,11 @@ import type { StreamerRepository } from "../../streamers/ports/StreamerRepositor
 
 import { eventSubSubscriptionsDeletedTotal } from "../../../infrastructure/metrics/prometheus.js";
 
+// Bounds how many streamers' subscriber lists are read concurrently in one
+// sweep, so a large backlog of stream.online subscriptions doesn't fire
+// hundreds of simultaneous Firestore reads in a single burst.
+const CLEANUP_BATCH_SIZE = 25;
+
 export class SubscriptionCleanupService {
   private gcRunning = false;
 
@@ -23,23 +28,35 @@ export class SubscriptionCleanupService {
       const streamOnlineSubscriptions =
         await this.getStreamOnlineSubscriptions();
 
-      for (const subscription of streamOnlineSubscriptions) {
-        const streamerId = subscription.condition?.broadcaster_user_id;
+      const streamerIds = [
+        ...new Set(
+          streamOnlineSubscriptions
+            .map((sub) => sub.condition?.broadcaster_user_id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
 
-        if (!streamerId) {
-          continue;
-        }
+      for (let i = 0; i < streamerIds.length; i += CLEANUP_BATCH_SIZE) {
+        const batch = streamerIds.slice(i, i + CLEANUP_BATCH_SIZE);
 
-        const subscriberIds = await this.streamers.getSubscriberIds(
-          streamerId,
+        const subscriberIdsByStreamer = await Promise.all(
+          batch.map((streamerId) => this.streamers.getSubscriberIds(streamerId)),
         );
 
-        if (subscriberIds.length === 0) {
-          // Reuse the list already fetched for this sweep instead of each
-          // empty streamer re-fetching the entire Twitch EventSub
-          // subscription list on its own.
-          await this.collectStreamer(streamerId, streamOnlineSubscriptions);
-        }
+        await Promise.all(
+          batch.map((streamerId, index) => {
+            const subscriberIds = subscriberIdsByStreamer[index] ?? [];
+
+            if (subscriberIds.length > 0) {
+              return Promise.resolve();
+            }
+
+            // Reuse the list already fetched for this sweep instead of each
+            // empty streamer re-fetching the entire Twitch EventSub
+            // subscription list on its own.
+            return this.collectStreamer(streamerId, streamOnlineSubscriptions);
+          }),
+        );
       }
     } finally {
       this.gcRunning = false;

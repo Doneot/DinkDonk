@@ -47,7 +47,10 @@ describe("list command", () => {
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith("📭 You have no subscriptions yet.");
+    expect(reply).toHaveBeenCalledWith({
+      content: "📭 You have no subscriptions yet.",
+      flags: MessageFlags.Ephemeral,
+    });
   });
 
   it("lists the display names of subscribed streamers", async () => {
@@ -74,6 +77,9 @@ describe("list command", () => {
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith("📺 Subscribed streamers:\nOne\nTwo");
+    expect(reply).toHaveBeenCalledWith({
+      content: "📺 Subscribed streamers:\nOne\nTwo",
+      flags: MessageFlags.Ephemeral,
+    });
   });
 });

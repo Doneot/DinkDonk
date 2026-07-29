@@ -30,6 +30,25 @@ describe("openApiDocument", () => {
     expect(paths.length).toBeGreaterThan(10);
   });
 
+  it("also documents the /api/v1 alias configureRoutes mounts alongside /api", () => {
+    const paths = Object.keys(openApiDocument.paths ?? {});
+
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        "/api/v1/auth/discord",
+        "/api/v1/auth/user",
+        "/api/v1/status",
+        "/api/v1/subscriptions",
+      ]),
+    );
+  });
+
+  it("does not alias non-/api routes (e.g. the unversioned EventSub webhook)", () => {
+    const paths = Object.keys(openApiDocument.paths ?? {});
+
+    expect(paths).not.toContain("/api/v1/eventsub");
+  });
+
   it("declares the cookie session security scheme", () => {
     expect(openApiDocument.components?.securitySchemes).toMatchObject({
       cookieAuth: { type: "apiKey", in: "cookie", name: "connect.sid" },

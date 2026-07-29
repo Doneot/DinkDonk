@@ -96,9 +96,10 @@ describe("set-message command", () => {
     expect(updateSubscription).toHaveBeenCalledWith(TEST_USER_ID, "streamer-1", {
       notification_message: "%s is live",
     });
-    expect(reply).toHaveBeenCalledWith(
-      "✅ Notification message updated for **Streamer**.",
-    );
+    expect(reply).toHaveBeenCalledWith({
+      content: "✅ Notification message updated for **Streamer**.",
+      flags: MessageFlags.Ephemeral,
+    });
   });
 
   it("reports the failure reason when the update fails", async () => {
@@ -122,8 +123,10 @@ describe("set-message command", () => {
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith(
-      "❌ Cannot update message for **Streamer**. Reason: subscription_not_found",
-    );
+    expect(reply).toHaveBeenCalledWith({
+      content:
+        "❌ Cannot update message for **Streamer**. Reason: subscription_not_found",
+      flags: MessageFlags.Ephemeral,
+    });
   });
 });

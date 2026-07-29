@@ -89,8 +89,12 @@ describe("FirestoreSubscriptionRepository", () => {
       });
     });
 
-    it("reports an existing streamer as not newly created", async () => {
+    it("reports an existing streamer as not newly created, and does not announce it", async () => {
       const { firestore, repository } = setup();
+
+      const listener = vi.fn();
+
+      repository.events.on("streamerAdded", listener);
 
       firestore.write("streamers/streamer-1", { id: "streamer-1" });
       firestore.write("streamers/streamer-1/subscribers/user-2", {
@@ -100,6 +104,8 @@ describe("FirestoreSubscriptionRepository", () => {
       await expect(
         repository.subscribe("user-1", "streamer-1"),
       ).resolves.toEqual({ success: true, createdStreamer: false });
+
+      expect(listener).not.toHaveBeenCalled();
 
       expect(subscriberIds(firestore, "streamer-1")).toEqual([
         "user-1",
@@ -165,14 +171,16 @@ describe("FirestoreSubscriptionRepository", () => {
       expect(firestore.paths("users")).toEqual([]);
     });
 
-    it("treats a malformed subscriptions field as empty", async () => {
+    it("rejects a malformed subscriptions field instead of silently treating it as empty", async () => {
       const { firestore, repository } = setup();
 
       firestore.write("users/user-1", { subscriptions: "not-an-array" });
 
+      // Now shares FirestoreUserRepository's validated schema/mapper, so a
+      // corrupt record surfaces loudly rather than being coerced away.
       await expect(
         repository.subscribe("user-1", "streamer-1"),
-      ).resolves.toMatchObject({ success: true });
+      ).rejects.toThrow();
     });
   });
 

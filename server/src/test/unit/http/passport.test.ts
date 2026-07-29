@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthUser } from "../../../modules/auth/domain/AuthUser.js";
 import { env } from "../../../shared/config/env.js";
+import { TokenDecryptionError } from "../../../shared/utils/crypto.js";
+import { logger } from "../../../shared/logger/logger.js";
 
 import { buildAuthUser } from "../../builders/auth.js";
 import { InMemoryAuthUserRepository } from "../../repositories/inMemory/InMemoryAuthUserRepository.js";
@@ -124,7 +126,7 @@ describe("configurePassport", () => {
       expect(sessionUser).toEqual({ id: "discord-user-1" });
     });
 
-    it("rehydrates the stored auth user", async () => {
+    it("rehydrates the stored auth user, without its OAuth tokens", async () => {
       const { repository } = setup();
       const user = buildAuthUser();
 
@@ -135,7 +137,15 @@ describe("configurePassport", () => {
       });
 
       expect(error).toBeNull();
-      expect(resolved).toEqual(user);
+      expect(resolved).toEqual({
+        id: user.id,
+        username: user.username,
+        discriminator: user.discriminator,
+        avatar: user.avatar,
+        fetchTime: user.fetchTime,
+      });
+      expect(resolved).not.toHaveProperty("accessToken");
+      expect(resolved).not.toHaveProperty("refreshToken");
     });
 
     it("resolves to null for an unknown session user", async () => {
@@ -162,6 +172,32 @@ describe("configurePassport", () => {
 
       expect(error).toBeInstanceOf(Error);
       expect(resolved).toBeNull();
+    });
+
+    it("logs the session out instead of erroring when stored tokens can't be decrypted", async () => {
+      const { repository } = setup();
+      const warn = vi.spyOn(logger, "warn").mockReturnValue();
+
+      vi.spyOn(repository, "getAuthUser").mockRejectedValue(
+        new TokenDecryptionError(new Error("bad auth tag")),
+      );
+
+      const [error, resolved] = await invoke((done) => {
+        void registered.deserialize?.({ id: "user-1" }, done);
+      });
+
+      // done(null, false) - not an error - is Passport's convention for
+      // "treat this session as unauthenticated", as opposed to done(error)
+      // which would surface as a 500 on every request using this session.
+      expect(error).toBeNull();
+      expect(resolved).toBe(false);
+      expect(warn).toHaveBeenCalledWith(
+        {
+          userId: "user-1",
+          error: expect.any(TokenDecryptionError) as TokenDecryptionError,
+        },
+        "Failed to decrypt stored tokens for session user; logging out",
+      );
     });
   });
 
@@ -198,7 +234,7 @@ describe("configurePassport", () => {
       expect(strategy.authorizationParams?.()).toEqual({ prompt: "none" });
     });
 
-    it("persists the profile and tokens on a successful login", async () => {
+    it("persists the tokens to the repository but keeps them off req.user", async () => {
       const { repository, strategy } = setup();
 
       const [error, user] = await invoke<AuthUser>((done) => {
@@ -209,9 +245,12 @@ describe("configurePassport", () => {
       expect(user).toMatchObject({
         id: "discord-user-1",
         username: "tester",
-        accessToken: "access-token",
-        refreshToken: "refresh-token",
       });
+      expect(user).not.toHaveProperty("accessToken");
+      expect(user).not.toHaveProperty("refreshToken");
+
+      // The tokens are still written to storage - only the session-attached
+      // req.user object omits them.
       await expect(
         repository.getAuthUser("discord-user-1"),
       ).resolves.toMatchObject({
