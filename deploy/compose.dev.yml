@@ -21,6 +21,13 @@ services:
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
+    # Default (info) logging repeats the full startup/TSDB-replay/compaction
+    # sequence on every restart; warn keeps that quiet while still surfacing
+    # anything actually wrong (failed scrapes, config reload errors, etc.).
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --log.level=warn
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:

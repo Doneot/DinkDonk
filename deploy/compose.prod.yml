@@ -61,6 +61,11 @@ services:
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
+    # See compose.dev.yml for why this is warn rather than the default.
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --log.level=warn
     secrets:
       - metrics_token
     volumes:
