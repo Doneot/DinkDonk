@@ -13,15 +13,17 @@ import { initializeValidatedRequest } from "../../http/middleware/validate.js";
 import { seedState } from "../fixtures/seedState.js";
 import { createTestContainer } from "./createTestContainer.js";
 import type { TestState } from "../fixtures/seedState.js";
+import type { Identity, SessionUser } from "../../modules/auth/domain/Identity.js";
+import { buildIdentity } from "../builders/auth.js";
+import type { InMemoryIdentityRepository } from "../repositories/inMemory/InMemoryIdentityRepository.js";
 
-const DEFAULT_AUTH_USER = Object.freeze({
+const DEFAULT_AUTH_USER = Object.freeze<SessionUser>({
   id: "user-1",
-  username: "tester",
-  discriminator: "0",
-  avatar: "",
-  accessToken: "access-token",
-  refreshToken: "refresh-token",
-  fetchTime: Date.now(),
+  email: "tester@example.com",
+  emailVerified: true,
+  name: "tester",
+  avatarUrl: null,
+  providers: ["discord"],
 });
 
 export interface TestContext {
@@ -38,6 +40,14 @@ export type CreateTestAppOptions = {
   authUser?: typeof DEFAULT_AUTH_USER;
   state?: TestState;
   webPushPublicKey?: string;
+  /**
+   * The identity backing the authenticated session, seeded into the
+   * identities repository so routes that resolve a linked Discord id (rather
+   * than assuming uid === discordId) have something real to look up.
+   * Defaults to a Discord-linked identity matching the auth user's id; pass
+   * `null` to simulate a session with no corresponding identity record.
+   */
+  identity?: Identity | null;
 };
 
 function mockAuthenticatedUser(user = DEFAULT_AUTH_USER) {
@@ -53,6 +63,17 @@ export async function createTestApp(
   const container = createTestContainer();
 
   await seedState(container, options.state);
+
+  const identity =
+    options.identity === undefined
+      ? buildIdentity({ uid: (options.authUser ?? DEFAULT_AUTH_USER).id })
+      : options.identity;
+
+  if (identity) {
+    (
+      container.repositories.identities as InMemoryIdentityRepository
+    ).seed(identity);
+  }
 
   const app = express();
 

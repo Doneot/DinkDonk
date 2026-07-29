@@ -1,5 +1,5 @@
 import "express-session";
-import type { SessionUser } from "../../modules/auth/domain/AuthUser.js";
+import type { SessionUser } from "../../modules/auth/domain/Identity.js";
 
 declare global {
   namespace Express {

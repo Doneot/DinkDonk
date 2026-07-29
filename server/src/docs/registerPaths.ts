@@ -83,6 +83,8 @@ const unauthorizedResponse = jsonResponse("Unauthorized", errorResponseSchema);
 
 const notFoundResponse = jsonResponse("Not found", errorResponseSchema);
 
+const conflictResponse = jsonResponse("Conflict", errorResponseSchema);
+
 const internalErrorResponse = jsonResponse(
   "Internal server error",
   errorResponseSchema,
@@ -137,11 +139,23 @@ export function registerPaths(registry: OpenAPIRegistry): void {
 
   registry.registerPath({
     method: "get",
+    path: "/api/auth/discord/link",
+    summary: "Connect Discord to the authenticated account",
+    security: authSecurity,
+    responses: {
+      302: redirectResponse,
+      401: unauthorizedResponse,
+    },
+  });
+
+  registry.registerPath({
+    method: "get",
     path: "/api/auth/discord/callback",
     summary: "Discord OAuth callback",
     responses: {
       302: redirectResponse,
       401: unauthorizedResponse,
+      409: conflictResponse,
       500: internalErrorResponse,
     },
   });

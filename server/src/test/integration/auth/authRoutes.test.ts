@@ -7,6 +7,7 @@ import { userResponseSchema } from "../../../http/schemas/responses.js";
 import { env } from "../../../shared/config/env.js";
 
 import { buildUser } from "../../builders/user.js";
+import { buildIdentity } from "../../builders/auth.js";
 
 const DISCORD_AUTHORIZE_URL = "https://discord.com/oauth2/authorize";
 
@@ -29,11 +30,39 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("GET /api/auth/providers", () => {
+  it("lists discord, google, and twitch when all are configured", async () => {
+    const { app } = await createAuthTestApp();
+
+    const response = await request(app).get("/api/auth/providers").expect(200);
+
+    expect(response.body).toEqual({ providers: ["discord", "google", "twitch"] });
+  });
+});
+
 describe("GET /api/auth/discord", () => {
   it("hands the browser off to Discord", async () => {
     const { app } = await createAuthTestApp();
 
     const response = await request(app).get("/api/auth/discord").expect(302);
+
+    expect(response.headers.location).toBe(DISCORD_AUTHORIZE_URL);
+  });
+});
+
+describe("GET /api/auth/discord/link", () => {
+  it("rejects an anonymous request", async () => {
+    const { app } = await createAuthTestApp({ authenticated: false });
+
+    await request(app).get("/api/auth/discord/link").expect(401);
+  });
+
+  it("hands an authenticated browser off to Discord", async () => {
+    const { app } = await createAuthTestApp();
+
+    const response = await request(app)
+      .get("/api/auth/discord/link")
+      .expect(302);
 
     expect(response.headers.location).toBe(DISCORD_AUTHORIZE_URL);
   });
@@ -124,6 +153,64 @@ describe("GET /api/auth/discord/callback", () => {
   });
 });
 
+describe("GET /api/auth/google/callback", () => {
+  it("does not ask Discord about DM capability for a Google-only identity", async () => {
+    const { app, repositories, discord } = await createAuthTestApp({
+      identity: buildIdentity({
+        uid: "user-1",
+        discord: undefined,
+        google: {
+          id: "google-1",
+          email: "tester@example.com",
+          name: "tester",
+          picture: "",
+        },
+      }),
+    });
+
+    const canSend = vi.spyOn(discord, "canSendDirectMessage");
+
+    const response = await request(app)
+      .get("/api/auth/google/callback")
+      .expect(302);
+
+    expect(response.headers.location).toBe("http://localhost:5000/dashboard");
+    expect(canSend).not.toHaveBeenCalled();
+    await expect(repositories.users.getUser("user-1")).resolves.toMatchObject({
+      canReceiveDM: false,
+    });
+  });
+});
+
+describe("GET /api/auth/twitch/callback", () => {
+  it("does not ask Discord about DM capability for a Twitch-only identity", async () => {
+    const { app, repositories, discord } = await createAuthTestApp({
+      identity: buildIdentity({
+        uid: "user-1",
+        discord: undefined,
+        twitch: {
+          id: "twitch-1",
+          login: "tester",
+          displayName: "tester",
+          profileImageUrl: "",
+        },
+      }),
+    });
+
+    const canSend = vi.spyOn(discord, "canSendDirectMessage");
+
+    const response = await request(app)
+      .get("/api/auth/twitch/callback")
+      .expect(302);
+
+    expect(response.headers.location).toBe("http://localhost:5000/dashboard");
+    expect(canSend).not.toHaveBeenCalled();
+    await expect(repositories.users.getUser("user-1")).resolves.toMatchObject({
+      canReceiveDM: false,
+    });
+  });
+});
+
 describe("GET /api/auth/user", () => {
   it("merges the session identity with the stored user record", async () => {
     const { app } = await createAuthTestApp({
@@ -145,9 +232,11 @@ describe("GET /api/auth/user", () => {
 
     expect(userResponseSchema.parse(response.body)).toEqual({
       id: "user-1",
-      username: AUTH_TEST_USER.username,
-      discriminator: AUTH_TEST_USER.discriminator,
-      avatar: AUTH_TEST_USER.avatar,
+      email: AUTH_TEST_USER.email,
+      emailVerified: AUTH_TEST_USER.emailVerified,
+      name: AUTH_TEST_USER.name,
+      avatarUrl: AUTH_TEST_USER.avatarUrl,
+      providers: AUTH_TEST_USER.providers,
       canReceiveDM: true,
       subscriptions: [],
     });
@@ -165,9 +254,11 @@ describe("GET /api/auth/user", () => {
 
     expect(userResponseSchema.parse(response.body)).toEqual({
       id: AUTH_TEST_USER.id,
-      username: AUTH_TEST_USER.username,
-      discriminator: AUTH_TEST_USER.discriminator,
-      avatar: AUTH_TEST_USER.avatar,
+      email: AUTH_TEST_USER.email,
+      emailVerified: AUTH_TEST_USER.emailVerified,
+      name: AUTH_TEST_USER.name,
+      avatarUrl: AUTH_TEST_USER.avatarUrl,
+      providers: AUTH_TEST_USER.providers,
       canReceiveDM: true,
       subscriptions: [],
     });

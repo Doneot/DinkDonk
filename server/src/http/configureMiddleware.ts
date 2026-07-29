@@ -17,7 +17,7 @@ import { InMemoryReplayStore } from "../modules/notifications/infrastructure/InM
 import { FirestoreSessionRepository } from "../modules/auth/infrastructure/firestore/FirestoreSessionRepository.js";
 import { configurePassport } from "./passport.js";
 
-import type { AuthUserRepository } from "../modules/auth/ports/AuthUserRepository.js";
+import type { IdentityRepository } from "../modules/auth/ports/IdentityRepository.js";
 import type { StreamNotificationService } from "../modules/notifications/application/StreamNotificationService.js";
 
 import { assertDefined } from "../shared/utils/assert.js";
@@ -51,7 +51,7 @@ const eventSubLimiter = rateLimit({
 type ConfigureMiddlewareOptions = {
   app: Express;
   sessionMiddleware: RequestHandler;
-  authUserRepository: AuthUserRepository;
+  identityRepository: IdentityRepository;
   services: {
     streamNotification: StreamNotificationService;
   };
@@ -87,10 +87,10 @@ export function createSessionMiddleware(firestore: Firestore): RequestHandler {
 export function configureMiddleware({
   app,
   sessionMiddleware,
-  authUserRepository,
+  identityRepository,
   services,
 }: ConfigureMiddlewareOptions) {
-  const configuredPassport = configurePassport(authUserRepository);
+  const configuredPassport = configurePassport(identityRepository);
   const replayStore = new InMemoryReplayStore({
     ttlMs: 10 * 60_000,
   });

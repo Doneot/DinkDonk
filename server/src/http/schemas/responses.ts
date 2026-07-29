@@ -99,13 +99,21 @@ export const updateSubscriptionResponseSchema = z.union([
   }),
 ]);
 
+const providerSchema = z.enum(["discord", "google", "twitch"]);
+
 export const userResponseSchema = z.object({
   id: z.string().min(1),
-  username: z.string().optional(),
-  discriminator: z.string().optional(),
-  avatar: z.string().optional(),
+  email: z.string().nullable().optional(),
+  emailVerified: z.boolean().optional(),
+  name: z.string().optional(),
+  avatarUrl: z.string().nullable().optional(),
+  providers: z.array(providerSchema).optional(),
   canReceiveDM: z.boolean().optional(),
   subscriptions: z.array(subscriptionResponseSchema).optional(),
+});
+
+export const authProvidersResponseSchema = z.object({
+  providers: z.array(providerSchema),
 });
 
 export type StatusResponse = z.infer<typeof statusResponseSchema>;
@@ -119,3 +127,4 @@ export type StreamerSummaryResponse = z.infer<
   typeof streamerSummaryResponseSchema
 >;
 export type UserResponse = z.infer<typeof userResponseSchema>;
+export type AuthProvidersResponse = z.infer<typeof authProvidersResponseSchema>;

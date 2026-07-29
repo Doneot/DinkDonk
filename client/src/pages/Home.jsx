@@ -14,7 +14,7 @@ const Home = () => {
         to="/login"
         className="bg-white text-purple-700 font-semibold px-6 py-3 rounded-xl shadow-md hover:scale-105 transition"
       >
-        Start Now / Login with Discord
+        Start Now / Log In
       </Link>
     </div>
   );

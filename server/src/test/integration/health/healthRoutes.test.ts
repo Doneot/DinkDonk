@@ -6,18 +6,18 @@ import { createHealthRouter } from "../../../http/routes/healthRoutes.js";
 import { createMetricsRouter } from "../../../http/routes/metricsRoutes.js";
 import { logger } from "../../../shared/logger/logger.js";
 
-import { InMemoryAuthUserRepository } from "../../repositories/inMemory/InMemoryAuthUserRepository.js";
+import { InMemoryIdentityRepository } from "../../repositories/inMemory/InMemoryIdentityRepository.js";
 
 function createHealthApp(
   overrides: { discordReady?: boolean; twitchReady?: boolean } = {},
 ) {
-  const authUserRepository = new InMemoryAuthUserRepository();
+  const identityRepository = new InMemoryIdentityRepository();
   const app = express();
 
   app.use(
     "/health",
     createHealthRouter({
-      authUserRepository,
+      identityRepository,
       ...(overrides.discordReady !== undefined
         ? { discord: { isReady: overrides.discordReady } }
         : {}),
@@ -27,7 +27,7 @@ function createHealthApp(
     }),
   );
 
-  return { app, authUserRepository };
+  return { app, identityRepository };
 }
 
 afterEach(() => {
@@ -51,9 +51,9 @@ describe("GET /health/ready", () => {
 
   it("reports unavailable when the datastore connection check fails", async () => {
     const error = vi.spyOn(logger, "error").mockReturnValue();
-    const { app, authUserRepository } = createHealthApp();
+    const { app, identityRepository } = createHealthApp();
 
-    vi.spyOn(authUserRepository, "checkConnection").mockRejectedValue(
+    vi.spyOn(identityRepository, "checkConnection").mockRejectedValue(
       new Error("firestore unavailable"),
     );
 

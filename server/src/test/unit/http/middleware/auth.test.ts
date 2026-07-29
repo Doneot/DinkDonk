@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AuthUser } from "../../../../modules/auth/domain/AuthUser.js";
+import type {
+  Identity,
+  Provider,
+  SessionUser,
+} from "../../../../modules/auth/domain/Identity.js";
 import { UnauthorizedError } from "../../../../http/errors/UnauthorizedError.js";
 import { env } from "../../../../shared/config/env.js";
 import { logger } from "../../../../shared/logger/logger.js";
 
-import { buildAuthUser } from "../../../builders/auth.js";
-import { InMemoryAuthUserRepository } from "../../../repositories/inMemory/InMemoryAuthUserRepository.js";
+import { buildIdentity, buildSessionUser } from "../../../builders/auth.js";
+import { InMemoryIdentityRepository } from "../../../repositories/inMemory/InMemoryIdentityRepository.js";
 import {
   createMockRequest,
   createMockResponse,
@@ -41,15 +45,22 @@ const { createFreshTokenMiddleware, requireAuthenticated, requireUser } =
 
 const STALE_FETCH_TIME = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-function authenticatedRequest(user: AuthUser) {
-  return createMockRequest({ user: user });
+function sessionUserFor(
+  identity: Identity,
+  providers: Provider[] = ["discord"],
+): SessionUser {
+  return buildSessionUser({ id: identity.uid, providers });
 }
 
-function setup(user: AuthUser | null = buildAuthUser()) {
-  const repository = new InMemoryAuthUserRepository();
+function authenticatedRequest(user: SessionUser) {
+  return createMockRequest({ user });
+}
 
-  if (user) {
-    repository.seed(user);
+function setup(identity: Identity | null = buildIdentity()) {
+  const repository = new InMemoryIdentityRepository();
+
+  if (identity) {
+    repository.seed(identity);
   }
 
   return {
@@ -60,6 +71,7 @@ function setup(user: AuthUser | null = buildAuthUser()) {
 
 beforeEach(() => {
   vi.spyOn(logger, "error").mockReturnValue();
+  vi.spyOn(logger, "warn").mockReturnValue();
 });
 
 afterEach(() => {
@@ -70,7 +82,7 @@ afterEach(() => {
 
 describe("requireUser", () => {
   it("returns the authenticated user", () => {
-    const user = buildAuthUser();
+    const user = buildSessionUser();
 
     expect(requireUser(authenticatedRequest(user))).toBe(user);
   });
@@ -85,7 +97,7 @@ describe("requireAuthenticated", () => {
     const next = createNext();
 
     requireAuthenticated(
-      authenticatedRequest(buildAuthUser()),
+      authenticatedRequest(buildSessionUser()),
       createMockResponse(),
       next,
     );
@@ -106,52 +118,74 @@ describe("requireAuthenticated", () => {
 
 describe("createFreshTokenMiddleware", () => {
   it("continues when the stored token is still fresh", async () => {
-    const user = buildAuthUser({ fetchTime: Date.now() });
-    const { middleware } = setup(user);
+    const identity = buildIdentity({
+      discord: { ...buildIdentity().discord!, fetchTime: Date.now() },
+    });
+    const { middleware } = setup(identity);
     const next = createNext();
     const res = createMockResponse();
 
-    await middleware(authenticatedRequest(user), res, next);
+    await middleware(authenticatedRequest(sessionUserFor(identity)), res, next);
 
     expect(next.calls).toEqual([undefined]);
     expect(requestNewAccessToken).not.toHaveBeenCalled();
-    expect(res.redirectedTo).toBeUndefined();
   });
 
-  it("redirects to Discord login when the user is unknown", async () => {
+  it("skips entirely for a session with no linked Discord provider", async () => {
+    const { repository, middleware } = setup(null);
+    const getIdentity = vi.spyOn(repository, "getIdentity");
+    const next = createNext();
+
+    const user = buildSessionUser({ id: "google-only-user", providers: [] });
+
+    await middleware(authenticatedRequest(user), createMockResponse(), next);
+
+    expect(next.calls).toEqual([undefined]);
+    expect(getIdentity).not.toHaveBeenCalled();
+  });
+
+  it("continues without refreshing when the identity record is missing", async () => {
     const { middleware } = setup(null);
     const next = createNext();
-    const res = createMockResponse();
 
-    await middleware(authenticatedRequest(buildAuthUser()), res, next);
+    await middleware(
+      authenticatedRequest(buildSessionUser({ id: "ghost" })),
+      createMockResponse(),
+      next,
+    );
 
-    expect(res.redirectedTo).toBe("/api/auth/discord");
-    expect(next.calls).toHaveLength(0);
+    expect(next.calls).toEqual([undefined]);
+    expect(requestNewAccessToken).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ["access token", { accessToken: "" }],
-    ["refresh token", { refreshToken: "" }],
-  ])("redirects to Discord login when the %s is missing", async (_, patch) => {
-    const user = buildAuthUser({ fetchTime: Date.now(), ...patch });
-    const { middleware } = setup(user);
-    const res = createMockResponse();
+  it("continues when the session claims Discord but the identity has none linked", async () => {
+    const identity = buildIdentity({ discord: undefined });
+    const { middleware } = setup(identity);
+    const next = createNext();
 
-    await middleware(authenticatedRequest(user), res, createNext());
+    await middleware(
+      authenticatedRequest(sessionUserFor(identity)),
+      createMockResponse(),
+      next,
+    );
 
-    expect(res.redirectedTo).toBe("/api/auth/discord");
+    expect(next.calls).toEqual([undefined]);
+    expect(requestNewAccessToken).not.toHaveBeenCalled();
   });
 
-  it("treats a user that has never been refreshed as stale", async () => {
-    const user = buildAuthUser({ fetchTime: 0 });
-    const { middleware } = setup(user);
+  it("treats a credential that has never been refreshed as stale", async () => {
+    const base = buildIdentity();
+    const identity = buildIdentity({
+      discord: { ...base.discord!, fetchTime: 0 },
+    });
+    const { middleware } = setup(identity);
 
     requestNewAccessToken.mockImplementation((_strategy, _token, done) => {
       done(null, "new-access-token", "new-refresh-token");
     });
 
     await middleware(
-      authenticatedRequest(user),
+      authenticatedRequest(sessionUserFor(identity)),
       createMockResponse(),
       createNext(),
     );
@@ -160,52 +194,67 @@ describe("createFreshTokenMiddleware", () => {
   });
 
   it("refreshes a stale token and persists the new credentials", async () => {
-    const user = buildAuthUser({ fetchTime: STALE_FETCH_TIME });
-    const { middleware, repository } = setup(user);
+    const base = buildIdentity();
+    const identity = buildIdentity({
+      discord: { ...base.discord!, fetchTime: STALE_FETCH_TIME },
+    });
+    const { middleware, repository } = setup(identity);
     const next = createNext();
 
     requestNewAccessToken.mockImplementation((_strategy, _token, done) => {
       done(null, "new-access-token", "new-refresh-token");
     });
 
-    await middleware(authenticatedRequest(user), createMockResponse(), next);
+    await middleware(
+      authenticatedRequest(sessionUserFor(identity)),
+      createMockResponse(),
+      next,
+    );
 
     expect(requestNewAccessToken.mock.calls[0]?.[0]).toBe("discord");
     expect(requestNewAccessToken.mock.calls[0]?.[1]).toBe("refresh-token");
     expect(next.calls).toEqual([undefined]);
 
-    const stored = await repository.getAuthUser(user.id);
+    const stored = await repository.getIdentity(identity.uid);
 
-    expect(stored).toMatchObject({
+    expect(stored?.discord).toMatchObject({
       accessToken: "new-access-token",
       refreshToken: "new-refresh-token",
     });
-    expect(stored?.fetchTime).toBeGreaterThan(STALE_FETCH_TIME);
+    expect(stored?.discord?.fetchTime).toBeGreaterThan(STALE_FETCH_TIME);
   });
 
   it("keeps the existing refresh token when Discord omits a new one", async () => {
-    const user = buildAuthUser({ fetchTime: STALE_FETCH_TIME });
-    const { middleware, repository } = setup(user);
+    const base = buildIdentity();
+    const identity = buildIdentity({
+      discord: { ...base.discord!, fetchTime: STALE_FETCH_TIME },
+    });
+    const { middleware, repository } = setup(identity);
 
     requestNewAccessToken.mockImplementation((_strategy, _token, done) => {
       done(null, "new-access-token", undefined);
     });
 
     await middleware(
-      authenticatedRequest(user),
+      authenticatedRequest(sessionUserFor(identity)),
       createMockResponse(),
       createNext(),
     );
 
-    expect(await repository.getAuthUser(user.id)).toMatchObject({
+    const stored = await repository.getIdentity(identity.uid);
+
+    expect(stored?.discord).toMatchObject({
       accessToken: "new-access-token",
       refreshToken: "refresh-token",
     });
   });
 
   it("refreshes once for concurrent requests from the same user", async () => {
-    const user = buildAuthUser({ fetchTime: STALE_FETCH_TIME });
-    const { middleware } = setup(user);
+    const base = buildIdentity();
+    const identity = buildIdentity({
+      discord: { ...base.discord!, fetchTime: STALE_FETCH_TIME },
+    });
+    const { middleware } = setup(identity);
 
     let release: (() => void) | undefined;
     const pending = new Promise<void>((resolve) => {
@@ -217,17 +266,10 @@ describe("createFreshTokenMiddleware", () => {
 
     const firstNext = createNext();
     const secondNext = createNext();
+    const user = authenticatedRequest(sessionUserFor(identity));
 
-    const first = middleware(
-      authenticatedRequest(user),
-      createMockResponse(),
-      firstNext,
-    );
-    const second = middleware(
-      authenticatedRequest(user),
-      createMockResponse(),
-      secondNext,
-    );
+    const first = middleware(user, createMockResponse(), firstNext);
+    const second = middleware(user, createMockResponse(), secondNext);
 
     await pending;
     release?.();
@@ -240,33 +282,33 @@ describe("createFreshTokenMiddleware", () => {
   });
 
   it("does not refresh again once the stored token is fresh", async () => {
-    const user = buildAuthUser({ fetchTime: STALE_FETCH_TIME });
-    const { middleware } = setup(user);
+    const base = buildIdentity();
+    const identity = buildIdentity({
+      discord: { ...base.discord!, fetchTime: STALE_FETCH_TIME },
+    });
+    const { middleware } = setup(identity);
+    const user = authenticatedRequest(sessionUserFor(identity));
 
     requestNewAccessToken.mockImplementation((_strategy, _token, done) => {
       done(null, "new-access-token", "new-refresh-token");
     });
 
-    await middleware(
-      authenticatedRequest(user),
-      createMockResponse(),
-      createNext(),
-    );
-    await middleware(
-      authenticatedRequest(user),
-      createMockResponse(),
-      createNext(),
-    );
+    await middleware(user, createMockResponse(), createNext());
+    await middleware(user, createMockResponse(), createNext());
 
     expect(requestNewAccessToken).toHaveBeenCalledOnce();
   });
 
-  it("logs the user out and redirects when the refresh fails", async () => {
-    const user = buildAuthUser({ fetchTime: STALE_FETCH_TIME });
-    const { middleware } = setup(user);
-    const req = authenticatedRequest(user);
+  it("logs a warning and continues (no logout) when the refresh fails", async () => {
+    const base = buildIdentity();
+    const identity = buildIdentity({
+      discord: { ...base.discord!, fetchTime: STALE_FETCH_TIME },
+    });
+    const { middleware } = setup(identity);
+    const req = authenticatedRequest(sessionUserFor(identity));
     const res = createMockResponse();
     const next = createNext();
+    const warn = vi.spyOn(logger, "warn").mockReturnValue();
 
     requestNewAccessToken.mockImplementation((_strategy, _token, done) => {
       done(new Error("invalid_grant"));
@@ -274,66 +316,68 @@ describe("createFreshTokenMiddleware", () => {
 
     await middleware(req, res, next);
 
-    expect(req.logoutCalls).toBe(1);
-    expect(req.sessionDestroyCalls).toBe(1);
-    expect(res.clearedCookies).toEqual(["connect.sid"]);
-    expect(res.redirectedTo).toBe("http://localhost:5000");
-    expect(next.calls).toHaveLength(0);
+    expect(req.logoutCalls).toBe(0);
+    expect(res.redirectedTo).toBeUndefined();
+    expect(next.calls).toEqual([undefined]);
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: identity.uid,
+        error: expect.any(Error) as Error,
+      }),
+      "Discord token refresh failed; continuing without it",
+    );
   });
 
-  it("redirects to the server url in production", async () => {
-    const user = buildAuthUser({ fetchTime: STALE_FETCH_TIME });
-    const { middleware } = setup(user);
-    const res = createMockResponse();
-
-    env.isProduction = true;
-
-    requestNewAccessToken.mockImplementation((_strategy, _token, done) => {
-      done(new Error("invalid_grant"));
+  it("wraps a non-Error refresh failure and still continues", async () => {
+    const base = buildIdentity();
+    const identity = buildIdentity({
+      discord: { ...base.discord!, fetchTime: STALE_FETCH_TIME },
     });
-
-    await middleware(authenticatedRequest(user), res, createNext());
-
-    expect(res.redirectedTo).toBe(env.serverUrl);
-  });
-
-  it("wraps a non-Error refresh failure", async () => {
-    const user = buildAuthUser({ fetchTime: STALE_FETCH_TIME });
-    const { middleware } = setup(user);
-    const error = vi.spyOn(logger, "error").mockReturnValue();
+    const { middleware } = setup(identity);
+    const warn = vi.spyOn(logger, "warn").mockReturnValue();
+    const next = createNext();
 
     requestNewAccessToken.mockImplementation((_strategy, _token, done) => {
       done({ statusCode: 401, data: "invalid_grant" });
     });
 
     await middleware(
-      authenticatedRequest(user),
+      authenticatedRequest(sessionUserFor(identity)),
       createMockResponse(),
-      createNext(),
+      next,
     );
 
-    expect(error.mock.calls[0]?.[0]).toMatchObject({
-      userId: user.id,
-      message: stringContaining("Discord refresh error"),
+    expect(next.calls).toEqual([undefined]);
+    expect(warn.mock.calls[0]?.[0]).toMatchObject({
+      userId: identity.uid,
+      error: expect.objectContaining({
+        message: stringContaining("Discord refresh error"),
+      }) as Error,
     });
   });
 
-  it("fails when Discord returns no access token", async () => {
-    const user = buildAuthUser({ fetchTime: STALE_FETCH_TIME });
-    const { middleware } = setup(user);
+  it("continues when Discord returns no access token", async () => {
+    const base = buildIdentity();
+    const identity = buildIdentity({
+      discord: { ...base.discord!, fetchTime: STALE_FETCH_TIME },
+    });
+    const { middleware } = setup(identity);
     const res = createMockResponse();
-    const error = vi.spyOn(logger, "error").mockReturnValue();
+    const warn = vi.spyOn(logger, "warn").mockReturnValue();
+    const next = createNext();
 
     requestNewAccessToken.mockImplementation((_strategy, _token, done) => {
       done(null, undefined);
     });
 
-    await middleware(authenticatedRequest(user), res, createNext());
+    await middleware(authenticatedRequest(sessionUserFor(identity)), res, next);
 
-    expect(error.mock.calls[0]?.[0]).toMatchObject({
-      message: "Missing access token from Discord refresh response",
+    expect(warn.mock.calls[0]?.[0]).toMatchObject({
+      error: expect.objectContaining({
+        message: "Missing access token from Discord refresh response",
+      }) as Error,
     });
-    expect(res.redirectedTo).toBe("http://localhost:5000");
+    expect(next.calls).toEqual([undefined]);
   });
 
   it("rejects an anonymous request before touching the repository", async () => {
@@ -344,19 +388,25 @@ describe("createFreshTokenMiddleware", () => {
     ).rejects.toThrow(UnauthorizedError);
   });
 
-  it("logs out when the repository lookup throws", async () => {
-    const user = buildAuthUser();
-    const { middleware, repository } = setup(user);
-    const req = authenticatedRequest(user);
+  it("logs an error and continues when the repository lookup throws", async () => {
+    const identity = buildIdentity();
+    const { middleware, repository } = setup(identity);
+    const req = authenticatedRequest(sessionUserFor(identity));
     const res = createMockResponse();
+    const error = vi.spyOn(logger, "error").mockReturnValue();
+    const next = createNext();
 
-    vi.spyOn(repository, "getAuthUser").mockRejectedValue(
+    vi.spyOn(repository, "getIdentity").mockRejectedValue(
       new Error("firestore unavailable"),
     );
 
-    await middleware(req, res, createNext());
+    await middleware(req, res, next);
 
-    expect(req.logoutCalls).toBe(1);
-    expect(res.redirectedTo).toBe("http://localhost:5000");
+    expect(req.logoutCalls).toBe(0);
+    expect(next.calls).toEqual([undefined]);
+    expect(error.mock.calls[0]?.[0]).toMatchObject({
+      userId: identity.uid,
+      error: expect.any(Error) as Error,
+    });
   });
 });

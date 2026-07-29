@@ -144,6 +144,7 @@ describe("env", () => {
       clientId: "twitch-client-id",
       clientSecret: "twitch-client-secret",
       webhookSecret: "twitch-webhook-secret",
+      loginEnabled: true,
     });
     expect(env.webPush).toEqual({
       publicKey: "web-push-public-key",

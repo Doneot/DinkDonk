@@ -142,6 +142,50 @@ describe("EnvSchema", () => {
     ).not.toHaveLength(0);
   });
 
+  it("leaves GOOGLE_CLIENT_ID/SECRET undefined when both unset", () => {
+    const parsed = EnvSchema.parse(baseEnv());
+
+    expect(parsed.GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(parsed.GOOGLE_CLIENT_SECRET).toBeUndefined();
+  });
+
+  it("accepts GOOGLE_CLIENT_ID/SECRET when both are set", () => {
+    const parsed = EnvSchema.parse(
+      baseEnv({
+        GOOGLE_CLIENT_ID: "google-client-id",
+        GOOGLE_CLIENT_SECRET: "google-client-secret",
+      }),
+    );
+
+    expect(parsed.GOOGLE_CLIENT_ID).toBe("google-client-id");
+    expect(parsed.GOOGLE_CLIENT_SECRET).toBe("google-client-secret");
+  });
+
+  it.each(["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"])(
+    "rejects %s set without its counterpart",
+    (key) => {
+      expect(
+        messagesFor(baseEnv({ [key]: "only-one-set" })),
+      ).toContain(
+        "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must both be set, or both left unset",
+      );
+    },
+  );
+
+  it("defaults TWITCH_LOGIN_ENABLED to false when unset", () => {
+    const parsed = EnvSchema.parse(baseEnv());
+
+    expect(parsed.TWITCH_LOGIN_ENABLED).toBe(false);
+  });
+
+  it("reads an explicit TWITCH_LOGIN_ENABLED", () => {
+    const parsed = EnvSchema.parse(
+      baseEnv({ TWITCH_LOGIN_ENABLED: "true" }),
+    );
+
+    expect(parsed.TWITCH_LOGIN_ENABLED).toBe(true);
+  });
+
   it("leaves METRICS_TOKEN undefined when unset", () => {
     const parsed = EnvSchema.parse(baseEnv());
 

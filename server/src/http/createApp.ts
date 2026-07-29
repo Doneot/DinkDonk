@@ -41,7 +41,7 @@ export function createApp({
   configureMiddleware({
     app,
     sessionMiddleware,
-    authUserRepository: repositories.authUsers,
+    identityRepository: repositories.identities,
     services,
   });
 

@@ -1,8 +1,7 @@
 import type express from "express";
 import refresh from "passport-oauth2-refresh";
-import { env } from "../../shared/config/env.js";
 import { logger } from "../../shared/logger/logger.js";
-import type { AuthUserRepository } from "../../modules/auth/ports/AuthUserRepository.js";
+import type { IdentityRepository } from "../../modules/auth/ports/IdentityRepository.js";
 
 import { UnauthorizedError } from "../errors/UnauthorizedError.js";
 
@@ -34,33 +33,48 @@ export function requireAuthenticated(
   next();
 }
 
+/**
+ * Keeps a signed-in Discord user's stored OAuth token from silently
+ * expiring. Nothing in this codebase actually calls Discord's API with the
+ * user's own token (DM delivery goes through the bot's own token in
+ * DiscordBot.ts), so this is purely best-effort housekeeping: a refresh
+ * failure is logged and the request proceeds rather than forcing a logout,
+ * and a session with no linked Discord credential (Google/Twitch/classic
+ * sign-ins, once those exist) skips this entirely.
+ */
 export function createFreshTokenMiddleware(
-  repository: AuthUserRepository,
+  repository: IdentityRepository,
 ): (
   req: express.Request,
   res: express.Response,
   next: express.NextFunction,
 ) => Promise<void> {
-  const locks = new Map<string, Promise<TokenRefreshResult>>();
+  const locks = new Map<string, Promise<void>>();
 
   return async function ensureFreshDiscordToken(
     req: express.Request,
     res: express.Response,
     next: express.NextFunction,
   ): Promise<void> {
-    const { id: userId } = requireUser(req);
+    const { id: uid, providers } = requireUser(req);
+
+    if (!providers.includes("discord")) {
+      next();
+
+      return;
+    }
 
     try {
-      const user = await repository.getAuthUser(userId);
+      const identity = await repository.getIdentity(uid);
+      const discord = identity?.discord;
 
-      if (!user?.accessToken || !user?.refreshToken) {
-        res.redirect("/api/auth/discord");
+      if (!discord) {
+        next();
 
         return;
       }
 
-      const tokenIsFresh =
-        Date.now() - (user.fetchTime || 0) <= MAX_TOKEN_AGE_MS;
+      const tokenIsFresh = Date.now() - discord.fetchTime <= MAX_TOKEN_AGE_MS;
 
       if (tokenIsFresh) {
         next();
@@ -68,53 +82,52 @@ export function createFreshTokenMiddleware(
         return;
       }
 
-      if (!locks.has(userId)) {
+      if (!locks.has(uid)) {
         locks.set(
-          userId,
+          uid,
 
-          refreshDiscordToken(user.refreshToken)
-            .then(async (tokens): Promise<TokenRefreshResult> => {
-              await repository.updateAuthUser(userId, {
+          refreshDiscordToken(discord.refreshToken)
+            .then((tokens) =>
+              repository.updateDiscordCredential(uid, {
                 ...tokens,
 
                 fetchTime: Date.now(),
-              });
+              }),
+            )
+            .catch((error: unknown) => {
+              logger.warn(
+                {
+                  requestId: req.requestId,
 
-              return tokens;
+                  userId: uid,
+
+                  error,
+                },
+                "Discord token refresh failed; continuing without it",
+              );
             })
-
             .finally(() => {
-              locks.delete(userId);
+              locks.delete(uid);
             }),
         );
       }
 
-      await locks.get(userId);
+      await locks.get(uid);
 
       next();
     } catch (error) {
-      const err = error as Error;
-
       logger.error(
         {
           requestId: req.requestId,
 
-          userId,
+          userId: uid,
 
-          message: err.message,
+          error,
         },
-        "Discord token refresh failed",
+        "Failed to check Discord token freshness",
       );
 
-      req.logout(() => {
-        req.session.destroy(() => {
-          res.clearCookie("connect.sid");
-
-          res.redirect(
-            env.isProduction ? env.serverUrl : "http://localhost:5000",
-          );
-        });
-      });
+      next();
     }
   };
 }

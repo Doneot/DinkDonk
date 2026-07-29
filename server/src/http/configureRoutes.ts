@@ -39,12 +39,12 @@ export function configureRoutes({
   twitch,
   discord,
 }: ConfigureRoutesOptions): void {
-  const ensureFreshToken = createFreshTokenMiddleware(repositories.authUsers);
+  const ensureFreshToken = createFreshTokenMiddleware(repositories.identities);
 
   app.use(
     "/health",
     createHealthRouter({
-      authUserRepository: repositories.authUsers,
+      identityRepository: repositories.identities,
       discord,
       twitch,
     }),
@@ -62,6 +62,8 @@ export function configureRoutes({
 
   const authRouter = createAuthRouter({
     repository: repositories.users,
+
+    identities: repositories.identities,
 
     discord,
 

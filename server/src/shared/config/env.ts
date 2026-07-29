@@ -37,12 +37,17 @@ export const env = {
     clientId: parsedEnv.TWITCH_CLIENT_ID,
     clientSecret: parsedEnv.TWITCH_CLIENT_SECRET,
     webhookSecret: parsedEnv.TWITCH_WEBHOOK_SECRET,
+    loginEnabled: parsedEnv.TWITCH_LOGIN_ENABLED,
   },
   discord: {
     token: parsedEnv.DISCORD_TOKEN,
     clientId: parsedEnv.DISCORD_CLIENT_ID,
     clientSecret: parsedEnv.DISCORD_CLIENT_SECRET,
     guildId: parsedEnv.DISCORD_GUILD_ID,
+  },
+  google: {
+    clientId: parsedEnv.GOOGLE_CLIENT_ID,
+    clientSecret: parsedEnv.GOOGLE_CLIENT_SECRET,
   },
   firebase: {
     serviceAccountPath: parsedEnv.GOOGLE_APPLICATION_CREDENTIALS,

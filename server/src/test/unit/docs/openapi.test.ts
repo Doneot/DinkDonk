@@ -55,7 +55,10 @@ describe("openApiDocument", () => {
     });
   });
 
-  it("does not publish the internal AuthUser record schema (it carries OAuth token field names)", () => {
-    expect(openApiDocument.components?.schemas).not.toHaveProperty("AuthUser");
+  it("does not publish the internal Identity record schema (it carries OAuth token field names)", () => {
+    expect(openApiDocument.components?.schemas).not.toHaveProperty("Identity");
+    expect(openApiDocument.components?.schemas).not.toHaveProperty(
+      "AuthUser",
+    );
   });
 });

@@ -1,7 +1,7 @@
 import request from "supertest";
 import type { Express, NextFunction, Request, Response } from "express";
 
-import type { AuthUser } from "../../modules/auth/domain/AuthUser.js";
+import type { SessionUser } from "../../modules/auth/domain/Identity.js";
 import type { Repositories } from "../../app/container/repositories.js";
 
 export class TestClient {
@@ -9,7 +9,7 @@ export class TestClient {
 
   private initialized = false;
 
-  private authUser?: AuthUser | undefined;
+  private authUser?: SessionUser | undefined;
 
   public constructor(
     public readonly app: Express,
@@ -32,7 +32,7 @@ export class TestClient {
     });
   }
 
-  public setAuthUser(user: AuthUser | undefined): void {
+  public setAuthUser(user: SessionUser | undefined): void {
     this.authUser = user;
   }
 

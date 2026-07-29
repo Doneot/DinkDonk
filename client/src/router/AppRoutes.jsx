@@ -3,7 +3,7 @@ import RedirectIfAuthenticated from '../components/RedirectIfAuthenticated';
 import ProtectedRoute from '../components/ProtectedRoute';
 import Home from '../pages/Home';
 import Dashboard from '../pages/Dashboard';
-import LoginRedirect from '../pages/LoginRedirect';
+import Login from '../pages/Login';
 import TermsOfService from '../pages/TermsOfService';
 import PrivacyPolicy from '../pages/PrivacyPolicy';
 import Footer from '../components/Footer';
@@ -25,7 +25,14 @@ export default function AppRoutes() {
         <Routes>
           <Route path="/" element={<RedirectIfAuthenticated><Home /></RedirectIfAuthenticated>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/login" element={<LoginRedirect />} />
+          <Route
+            path="/login"
+            element={
+              <RedirectIfAuthenticated>
+                <Login />
+              </RedirectIfAuthenticated>
+            }
+          />
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         </Routes>

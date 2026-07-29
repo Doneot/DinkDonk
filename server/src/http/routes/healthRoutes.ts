@@ -1,6 +1,6 @@
 import express from "express";
 
-import type { AuthUserRepository } from "../../modules/auth/ports/AuthUserRepository.js";
+import type { IdentityRepository } from "../../modules/auth/ports/IdentityRepository.js";
 import { logger } from "../../shared/logger/logger.js";
 
 type ReadinessCheckable = {
@@ -8,13 +8,13 @@ type ReadinessCheckable = {
 };
 
 type CreateHealthRouterOptions = {
-  authUserRepository: AuthUserRepository;
+  identityRepository: IdentityRepository;
   discord?: ReadinessCheckable;
   twitch?: ReadinessCheckable;
 };
 
 export function createHealthRouter({
-  authUserRepository,
+  identityRepository,
   discord,
   twitch,
 }: CreateHealthRouterOptions) {
@@ -26,7 +26,7 @@ export function createHealthRouter({
 
   router.get("/ready", async (_, res) => {
     try {
-      await authUserRepository.checkConnection();
+      await identityRepository.checkConnection();
 
       const notReady = [
         discord?.isReady === false ? "discord" : null,

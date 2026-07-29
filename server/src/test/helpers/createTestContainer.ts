@@ -4,7 +4,7 @@ import type { TwitchStreamerProvider } from "../../modules/twitch/ports/TwitchGa
 import { createDomainEventBus } from "../../shared/events/DomainEventBus.js";
 import { logger } from "../../shared/logger/logger.js";
 
-import { InMemoryAuthUserRepository } from "../repositories/inMemory/InMemoryAuthUserRepository.js";
+import { InMemoryIdentityRepository } from "../repositories/inMemory/InMemoryIdentityRepository.js";
 import { InMemoryPushSubscriptionRepository } from "../repositories/inMemory/InMemoryPushSubscriptionRepository.js";
 import { InMemoryStreamerRepository } from "../repositories/inMemory/InMemoryStreamerRepository.js";
 import { InMemorySubscriberStore } from "../repositories/inMemory/InMemorySubscriberStore.js";
@@ -28,7 +28,7 @@ export function createTestContainer(): TestContainer {
 
   const repositories: Repositories = {
     users: new InMemoryUserRepository(),
-    authUsers: new InMemoryAuthUserRepository(),
+    identities: new InMemoryIdentityRepository(),
     streamers: new InMemoryStreamerRepository(events, subscribers),
     subscriptions: new InMemorySubscriptionRepository(events, subscribers),
     pushSubscriptions: new InMemoryPushSubscriptionRepository(),

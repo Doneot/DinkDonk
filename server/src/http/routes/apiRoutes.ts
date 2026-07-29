@@ -141,7 +141,10 @@ export function createApiRouter({
 
     async (req, res) => {
       const user = requireUser(req);
-      const canReceiveDM = await discord.canSendDirectMessage(user.id);
+      const identity = await repositories.identities.getIdentity(user.id);
+      const canReceiveDM = identity?.discord
+        ? await discord.canSendDirectMessage(identity.discord.id)
+        : false;
 
       discordDmChecksTotal.inc();
 

@@ -66,11 +66,26 @@ const BaseEnvSchema = z.object({
 
   DISCORD_GUILD_ID: z.string().optional(),
 
+  // Optional: Google sign-in is disabled (routes not mounted) when either is
+  // unset, so existing deployments aren't broken by requiring new credentials.
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+
+  GOOGLE_CLIENT_SECRET: optionalSecretFromEnv("google_client_secret"),
+
   TWITCH_CLIENT_ID: z.string().min(1),
 
   TWITCH_CLIENT_SECRET: secretFromEnv("twitch_client_secret"),
 
   TWITCH_WEBHOOK_SECRET: secretFromEnv("twitch_webhook_secret"),
+
+  // Twitch sign-in reuses the same app/credentials as EventSub above (one
+  // Twitch app registration can serve both a client-credentials grant for
+  // server-to-server calls and an authorization-code grant for user login -
+  // it just needs the login callback URL added to that app's redirect list).
+  // Since TWITCH_CLIENT_ID/SECRET are always set, this needs its own
+  // off-by-default flag so upgrading existing deployments doesn't silently
+  // enable Twitch login before its redirect URL has been registered.
+  TWITCH_LOGIN_ENABLED: booleanFromEnv,
 
   UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN: booleanFromEnv,
 
@@ -152,4 +167,13 @@ export const EnvSchema = BaseEnvSchema.superRefine((env, ctx) => {
       });
     }
   }
+
+  if (Boolean(env.GOOGLE_CLIENT_ID) !== Boolean(env.GOOGLE_CLIENT_SECRET)) {
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must both be set, or both left unset",
+    });
+  }
+
 });
