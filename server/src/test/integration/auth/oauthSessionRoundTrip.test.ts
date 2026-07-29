@@ -198,6 +198,8 @@ describe("Discord OAuth + session round trip (real passport, real express-sessio
     expect(linkSpy).toHaveBeenCalledWith(
       "discord-user-1",
       expect.objectContaining({ id: "discord-user-1" }),
+      null,
+      false,
     );
     expect(upsertSpy).not.toHaveBeenCalled();
 

@@ -31,8 +31,19 @@ export interface IdentityRepository {
    * so that automatic matching wouldn't have linked them. Throws
    * ConflictError if this Discord account is already linked to a different
    * uid.
+   *
+   * Backfills the account's own email/emailVerified from this Discord
+   * profile only when it doesn't already have one - an account that already
+   * has an established email keeps it, since overwriting it here could also
+   * silently reassign an identityLinks/email:* index entry already claimed by
+   * a different account onto this one.
    */
-  linkDiscordIdentity(uid: string, profile: DiscordCredential): Promise<Identity>;
+  linkDiscordIdentity(
+    uid: string,
+    profile: DiscordCredential,
+    email: string | null,
+    emailVerified: boolean,
+  ): Promise<Identity>;
 
   /**
    * Merges a partial Discord credential patch (e.g. rotated tokens) into an

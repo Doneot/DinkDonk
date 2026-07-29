@@ -7,6 +7,7 @@ import {
 } from "../../../http/schemas/responses.js";
 
 import { buildUser } from "../../builders/user.js";
+import { buildIdentity } from "../../builders/auth.js";
 import { createTestApp } from "../../helpers/createTestApp.js";
 import { TestClient } from "../../helpers/TestClient.js";
 
@@ -129,5 +130,32 @@ describe("POST /api/can-receive-dm", () => {
     await client.post("/api/can-receive-dm").expect(500);
 
     vi.restoreAllMocks();
+  });
+
+  it("reports false without asking Discord for a Google/Twitch-only identity", async () => {
+    const { ctx, client } = await createClient({
+      identity: buildIdentity({
+        uid: "user-1",
+        discord: undefined,
+        google: {
+          id: "google-1",
+          email: "tester@example.com",
+          name: "tester",
+          picture: "",
+        },
+      }),
+    });
+
+    const canSend = vi.spyOn(ctx.discord, "canSendDirectMessage");
+
+    const response = await client.post("/api/can-receive-dm").expect(200);
+
+    expect(canReceiveDmResponseSchema.parse(response.body)).toEqual({
+      canReceiveDM: false,
+    });
+    expect(canSend).not.toHaveBeenCalled();
+    await expect(
+      ctx.repositories.users.getUser("user-1"),
+    ).resolves.toMatchObject({ canReceiveDM: false });
   });
 });

@@ -82,6 +82,8 @@ export class InMemoryIdentityRepository implements IdentityRepository {
   linkDiscordIdentity(
     uid: string,
     profile: DiscordCredential,
+    email: string | null,
+    emailVerified: boolean,
   ): Promise<Identity> {
     const discordLinkKey = `discord:${profile.id}`;
     const linkedUid = this.links.get(discordLinkKey);
@@ -100,7 +102,15 @@ export class InMemoryIdentityRepository implements IdentityRepository {
       return Promise.reject(new Error(`No identity found for uid ${uid}`));
     }
 
-    const identity: Identity = { ...existing, discord: profile };
+    // Mirrors FirestoreIdentityRepository: only backfills the account's own
+    // email when it doesn't already have one, and never touches the
+    // email link index.
+    const identity: Identity = {
+      ...existing,
+      email: existing.email ?? email,
+      emailVerified: existing.email ? existing.emailVerified : emailVerified,
+      discord: profile,
+    };
 
     this.identities.set(uid, identity);
     this.links.set(discordLinkKey, uid);

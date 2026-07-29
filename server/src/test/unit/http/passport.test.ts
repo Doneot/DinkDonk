@@ -23,7 +23,7 @@ type StrategyOptions = {
   callbackURL: string;
 };
 type FakeRequest = {
-  session: { linkDiscordUid?: string };
+  session: { linkDiscordUid?: string; linkDiscordUidExpiresAt?: number };
 };
 type VerifyCallback = (
   req: FakeRequest,
@@ -504,7 +504,12 @@ describe("configurePassport", () => {
         }),
       );
 
-      const req: FakeRequest = { session: { linkDiscordUid: "existing-uid" } };
+      const req: FakeRequest = {
+        session: {
+          linkDiscordUid: "existing-uid",
+          linkDiscordUidExpiresAt: Date.now() + 60_000,
+        },
+      };
 
       const [error, user] = await invoke<SessionUser>((done) => {
         void strategy.verify(req, "access-token", "refresh-token", PROFILE, done);
@@ -523,18 +528,55 @@ describe("configurePassport", () => {
       });
     });
 
-    it("clears linkDiscordUid from the session after consuming it", async () => {
+    it("clears linkDiscordUid and its expiry from the session after consuming it", async () => {
       const { repository, strategy } = setup();
 
       repository.seed(buildIdentity({ uid: "existing-uid", discord: undefined }));
 
-      const req: FakeRequest = { session: { linkDiscordUid: "existing-uid" } };
+      const req: FakeRequest = {
+        session: {
+          linkDiscordUid: "existing-uid",
+          linkDiscordUidExpiresAt: Date.now() + 60_000,
+        },
+      };
 
       await invoke((done) => {
         void strategy.verify(req, "access-token", "refresh-token", PROFILE, done);
       });
 
       expect(req.session.linkDiscordUid).toBeUndefined();
+      expect(req.session.linkDiscordUidExpiresAt).toBeUndefined();
+    });
+
+    it("falls back to a normal login instead of linking once the intent has expired", async () => {
+      const { repository, strategy } = setup();
+
+      // An abandoned "Connect Discord" round trip: the uid was stashed but
+      // its TTL has already passed, so this must NOT be treated as a link -
+      // otherwise a stale flag from a closed tab would silently hijack a
+      // later, unrelated Discord login in the same browser session.
+      repository.seed(
+        buildIdentity({ uid: "existing-uid", discord: undefined }),
+      );
+
+      const req: FakeRequest = {
+        session: {
+          linkDiscordUid: "existing-uid",
+          linkDiscordUidExpiresAt: Date.now() - 1,
+        },
+      };
+
+      const [error, user] = await invoke<SessionUser>((done) => {
+        void strategy.verify(req, "access-token", "refresh-token", PROFILE, done);
+      });
+
+      expect(error).toBeNull();
+      // Falls through to upsertDiscordIdentity, which mints its own uid
+      // (equal to the Discord profile id) rather than linking onto
+      // "existing-uid".
+      expect(user).toMatchObject({ id: "discord-user-1" });
+      expect(req.session.linkDiscordUid).toBeUndefined();
+      expect(req.session.linkDiscordUidExpiresAt).toBeUndefined();
     });
 
     it("reports a linking conflict to passport", async () => {
@@ -546,7 +588,12 @@ describe("configurePassport", () => {
         new Error("already linked to a different account"),
       );
 
-      const req: FakeRequest = { session: { linkDiscordUid: "existing-uid" } };
+      const req: FakeRequest = {
+        session: {
+          linkDiscordUid: "existing-uid",
+          linkDiscordUidExpiresAt: Date.now() + 60_000,
+        },
+      };
 
       const [error] = await invoke((done) => {
         void strategy.verify(req, "access-token", "refresh-token", PROFILE, done);

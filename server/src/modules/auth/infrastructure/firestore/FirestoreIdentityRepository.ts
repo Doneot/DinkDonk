@@ -135,6 +135,8 @@ export class FirestoreIdentityRepository implements IdentityRepository {
   async linkDiscordIdentity(
     uid: string,
     profile: DiscordCredential,
+    email: string | null,
+    emailVerified: boolean,
   ): Promise<Identity> {
     const discordLinkRef = this.identityLinks.doc(discordLinkId(profile.id));
 
@@ -158,8 +160,18 @@ export class FirestoreIdentityRepository implements IdentityRepository {
 
       const existing = IdentityRecordSchema.parse(existingDoc.data());
 
+      // Only backfills the account's own email when it doesn't already have
+      // one - an established email is left alone rather than overwritten by
+      // whatever this newly-linked Discord profile reports (deliberately not
+      // touching the identityLinks/email:* index either way: that index is
+      // what future logins resolve an account by, and this is an explicit,
+      // one-off connect action rather than an automatic email-match merge).
       const merged = IdentityRecordSchema.parse({
         ...existing,
+        email: existing.email ?? email,
+        emailVerified: existing.email
+          ? existing.emailVerified
+          : emailVerified,
         discord: {
           ...profile,
           accessToken: encryptSecret(profile.accessToken),

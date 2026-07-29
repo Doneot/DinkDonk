@@ -35,6 +35,14 @@ export const isGoogleSignInEnabled = Boolean(
 // their Twitch app.
 export const isTwitchSignInEnabled = env.twitch.loginEnabled;
 
+// How long a "Connect Discord" round trip has to complete before its stashed
+// req.session.linkDiscordUid is treated as stale rather than honored. Without
+// this, abandoning the flow after being redirected to Discord (closing the
+// tab, never authorizing) would leave that uid sitting in the session for the
+// rest of its 30-day lifetime, silently turning some later, unrelated Discord
+// login attempt in the same browser into a link instead of a fresh sign-in.
+export const LINK_DISCORD_INTENT_TTL_MS = 10 * 60 * 1000;
+
 // req.user only needs display/identity fields; nothing downstream reads
 // OAuth tokens off it (createFreshTokenMiddleware re-fetches them from the
 // repository whenever it needs them), so they're dropped here rather than
@@ -163,16 +171,23 @@ export function configurePassport(
         };
 
         const linkingUid = req.session.linkDiscordUid;
+        const linkIntentExpired =
+          !req.session.linkDiscordUidExpiresAt ||
+          Date.now() > req.session.linkDiscordUidExpiresAt;
 
-        if (linkingUid) {
-          // Consumed once: this round trip is done with it either way, and
-          // leaving it set would silently turn a later, unrelated Discord
-          // login attempt in the same browser session into a link attempt.
-          delete req.session.linkDiscordUid;
+        // Consumed once regardless of outcome: this round trip is done with
+        // it either way, and leaving it set would silently turn a later,
+        // unrelated Discord login attempt in the same browser session into a
+        // link attempt.
+        delete req.session.linkDiscordUid;
+        delete req.session.linkDiscordUidExpiresAt;
 
+        if (linkingUid && !linkIntentExpired) {
           const identity = await repository.linkDiscordIdentity(
             linkingUid,
             credential,
+            profile.email ?? null,
+            profile.verified ?? false,
           );
 
           done(null, toSessionUser(identity));

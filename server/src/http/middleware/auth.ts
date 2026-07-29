@@ -39,8 +39,8 @@ export function requireAuthenticated(
  * user's own token (DM delivery goes through the bot's own token in
  * DiscordBot.ts), so this is purely best-effort housekeeping: a refresh
  * failure is logged and the request proceeds rather than forcing a logout,
- * and a session with no linked Discord credential (Google/Twitch/classic
- * sign-ins, once those exist) skips this entirely.
+ * and a session with no linked Discord credential (a Google- or Twitch-only
+ * sign-in) skips this entirely.
  */
 export function createFreshTokenMiddleware(
   repository: IdentityRepository,

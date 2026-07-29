@@ -337,12 +337,15 @@ export function identityRepositoryBehavior(
       const identity = await repository.linkDiscordIdentity(
         "existing-uid",
         credential,
+        "discord-email@example.com",
+        true,
       );
 
       expect(identity.uid).toBe("existing-uid");
       expect(identity.discord).toEqual(credential);
       // The account's own email/other linked providers must survive - this
-      // is an addition, not a replacement of the account's identity.
+      // is an addition, not a replacement of the account's identity. The
+      // Discord profile's own (different) email must NOT overwrite it.
       expect(identity.email).toBe("google-email@example.com");
       expect(identity.google?.id).toBe("google-1");
 
@@ -350,6 +353,29 @@ export function identityRepositoryBehavior(
       await expect(
         repository.upsertDiscordIdentity(credential, null, false),
       ).resolves.toMatchObject({ uid: "existing-uid" });
+    });
+
+    it("backfills the account's email from Discord only when it doesn't already have one", async () => {
+      const repository = createRepository();
+
+      repository.seed(
+        buildIdentity({
+          uid: "existing-uid",
+          email: null,
+          emailVerified: false,
+          discord: undefined,
+        }),
+      );
+
+      const identity = await repository.linkDiscordIdentity(
+        "existing-uid",
+        buildDiscordCredential({ id: "discord-1" }),
+        "discord-email@example.com",
+        true,
+      );
+
+      expect(identity.email).toBe("discord-email@example.com");
+      expect(identity.emailVerified).toBe(true);
     });
 
     it("rejects linking a Discord account already linked to a different account", async () => {
@@ -366,6 +392,8 @@ export function identityRepositoryBehavior(
         repository.linkDiscordIdentity(
           "uid-2",
           buildDiscordCredential({ id: "discord-1" }),
+          null,
+          false,
         ),
       ).rejects.toThrow();
 
@@ -382,6 +410,8 @@ export function identityRepositoryBehavior(
         repository.linkDiscordIdentity(
           "missing",
           buildDiscordCredential({ id: "discord-1" }),
+          null,
+          false,
         ),
       ).rejects.toThrow();
     });
@@ -399,6 +429,8 @@ export function identityRepositoryBehavior(
       const identity = await repository.linkDiscordIdentity(
         "existing-uid",
         buildDiscordCredential({ id: "discord-1", username: "new-name" }),
+        null,
+        false,
       );
 
       expect(identity.discord?.username).toBe("new-name");

@@ -3,7 +3,11 @@ import passport from "passport";
 import type { RequestHandler, Router } from "express";
 import { env } from "../../shared/config/env.js";
 import { requireAuthenticated, requireUser } from "../middleware/auth.js";
-import { isGoogleSignInEnabled, isTwitchSignInEnabled } from "../passport.js";
+import {
+  isGoogleSignInEnabled,
+  isTwitchSignInEnabled,
+  LINK_DISCORD_INTENT_TTL_MS,
+} from "../passport.js";
 import type { DiscordService } from "../../modules/discord/ports/DiscordService.js";
 import type { UserRepository } from "../../modules/users/ports/UserRepository.js";
 import type { IdentityRepository } from "../../modules/auth/ports/IdentityRepository.js";
@@ -113,6 +117,7 @@ export function createAuthRouter({
 
     (req, _res, next) => {
       req.session.linkDiscordUid = requireUser(req).id;
+      req.session.linkDiscordUidExpiresAt = Date.now() + LINK_DISCORD_INTENT_TTL_MS;
 
       next();
     },
