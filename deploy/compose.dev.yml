@@ -54,6 +54,9 @@ services:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      # The image references this default avatar but doesn't actually ship
+      # it, logging an error on every request that falls back to it.
+      - ./monitoring/grafana/assets/user_profile.png:/usr/share/grafana/public/img/user_profile.png:ro
     ports:
       - "3001:3000"
 

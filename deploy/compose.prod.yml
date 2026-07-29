@@ -92,6 +92,7 @@ services:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/assets/user_profile.png:/usr/share/grafana/public/img/user_profile.png:ro
     expose:
       - "3000"
     networks:
