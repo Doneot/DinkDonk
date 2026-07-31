@@ -47,7 +47,7 @@ export async function disableWebPushNotifications() {
   const subscription = await getExistingPushSubscription();
   if (!subscription) return false;
   await api.delete("/notifications/web-push/subscriptions", {
-    data: { subscription },
+    params: { endpoint: subscription.endpoint },
   });
   await subscription.unsubscribe();
   return true;

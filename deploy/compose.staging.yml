@@ -27,6 +27,9 @@ services:
       context: ../server
       dockerfile: Dockerfile.prod
     restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
     env_file:
       - .env.staging
     secrets:
@@ -42,6 +45,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase_service_account
+      REDIS_URL: redis://redis:6379
     expose:
       - "3000"
     healthcheck:
@@ -56,6 +60,21 @@ services:
       start_period: 30s
     networks:
       - public
+      - private
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    expose:
+      - "6379"
+    networks:
       - private
 
 volumes:

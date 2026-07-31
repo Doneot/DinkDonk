@@ -9,7 +9,9 @@ import { logger } from "../../../../shared/logger/logger.js";
 
 import { anyString } from "../../../helpers/matchers.js";
 
-type HttpResponse = { data: { data?: unknown[] } };
+type HttpResponse = {
+  data: { data?: unknown[]; pagination?: { cursor?: string } };
+};
 
 function createHttpMock() {
   const request = vi
@@ -76,6 +78,62 @@ describe("TwitchClient", () => {
       request.mockResolvedValue({ data: {} });
 
       await expect(client.getEventSubSubscriptions()).resolves.toEqual([]);
+    });
+
+    it("follows Twitch's pagination cursor across every page of a GET list endpoint", async () => {
+      const { client, request } = createClient();
+
+      request
+        .mockResolvedValueOnce({
+          data: {
+            data: [{ id: "sub-1" }],
+            pagination: { cursor: "cursor-1" },
+          },
+        })
+        .mockResolvedValueOnce({
+          data: {
+            data: [{ id: "sub-2" }],
+            pagination: { cursor: "cursor-2" },
+          },
+        })
+        .mockResolvedValueOnce({
+          data: { data: [{ id: "sub-3" }], pagination: {} },
+        });
+
+      await expect(client.getEventSubSubscriptions()).resolves.toEqual([
+        { id: "sub-1" },
+        { id: "sub-2" },
+        { id: "sub-3" },
+      ]);
+
+      expect(request).toHaveBeenCalledTimes(3);
+
+      // getEventSubSubscriptions() calls request() with no params of its
+      // own, so the "after" cursor is carried as a plain object rather than
+      // a URLSearchParams instance here.
+      expect(request.mock.calls[1]?.[0]?.params).toMatchObject({
+        after: "cursor-1",
+      });
+      expect(request.mock.calls[2]?.[0]?.params).toMatchObject({
+        after: "cursor-2",
+      });
+    });
+
+    it("does not follow a pagination cursor for a non-GET request", async () => {
+      const { client, request } = createClient();
+
+      request.mockResolvedValue({
+        data: {
+          data: [{ id: "sub-1" }],
+          pagination: { cursor: "should-be-ignored" },
+        },
+      });
+
+      await client.subscribeToEvent("stream.online", {
+        broadcaster_user_id: "streamer-1",
+      });
+
+      expect(request).toHaveBeenCalledTimes(1);
     });
 
     it("omits the Authorization header until an access token is set", async () => {
@@ -263,6 +321,33 @@ describe("TwitchClient", () => {
       await client.fetchStreamers("streamer-1");
 
       expect(request.mock.calls[0]?.[0]?.params).toEqual({ id: "streamer-1" });
+    });
+
+    it("splits more than 100 ids into multiple requests and merges the results", async () => {
+      const { client, request } = createClient();
+
+      const ids = Array.from({ length: 150 }, (_, i) => `streamer-${i}`);
+
+      request
+        .mockResolvedValueOnce({
+          data: { data: ids.slice(0, 100).map((id) => ({ id })) },
+        })
+        .mockResolvedValueOnce({
+          data: { data: ids.slice(100).map((id) => ({ id })) },
+        });
+
+      const streamers = await client.fetchStreamers(ids);
+
+      expect(request).toHaveBeenCalledTimes(2);
+      expect(streamers).toHaveLength(150);
+
+      const firstBatch = request.mock.calls[0]?.[0]
+        ?.params as URLSearchParams;
+      const secondBatch = request.mock.calls[1]?.[0]
+        ?.params as URLSearchParams;
+
+      expect(firstBatch.getAll("id")).toHaveLength(100);
+      expect(secondBatch.getAll("id")).toHaveLength(50);
     });
   });
 

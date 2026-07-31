@@ -3,7 +3,6 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CommandContext } from "../../../../modules/discord/domain/CommandContext.js";
-import type { TwitchStreamer } from "../../../../modules/twitch/domain/Twitch.js";
 import { logger } from "../../../../shared/logger/logger.js";
 
 type Command = {
@@ -23,6 +22,10 @@ class MockOptionBuilder {
   }
 
   setRequired(): this {
+    return this;
+  }
+
+  setMaxLength(): this {
     return this;
   }
 }
@@ -101,12 +104,6 @@ const { DiscordBot } =
   await import("../../../../modules/discord/infrastructure/DiscordBot.js");
 
 const COMMAND_DIRECTORY = path.join(process.cwd(), "src", "commands");
-
-const streamer: TwitchStreamer = {
-  id: "streamer-1",
-  login: "streamer",
-  display_name: "Streamer",
-};
 
 function setup({
   onDmCapabilityChanged,
@@ -405,71 +402,4 @@ describe("DiscordBot", () => {
     });
   });
 
-  describe("notifyStreamerLive", () => {
-    it("sends the default live message with the stream link", async () => {
-      const { bot, client } = setup();
-
-      await bot.notifyStreamerLive("user-1", streamer);
-
-      expect(client.send).toHaveBeenCalledWith(
-        "Streamer is live!\nhttps://www.twitch.tv/streamer",
-      );
-    });
-
-    it.each([
-      ["a custom template", "%s just went live — %s!"],
-      ["an empty template", ""],
-    ])("substitutes %s", async (_label, template) => {
-      const { bot, client } = setup();
-
-      await bot.notifyStreamerLive("user-1", streamer, template);
-
-      expect(client.send).toHaveBeenCalledWith(
-        template
-          ? "Streamer just went live — Streamer!\nhttps://www.twitch.tv/streamer"
-          : "Streamer is live!\nhttps://www.twitch.tv/streamer",
-      );
-    });
-
-    it("reports a blocked DM channel through the callback", async () => {
-      const onDmCapabilityChanged = vi.fn().mockResolvedValue(undefined);
-      const error = vi.spyOn(logger, "error").mockReturnValue();
-      const { bot, client } = setup({ onDmCapabilityChanged });
-
-      client.send.mockRejectedValue(discordError(50007));
-
-      await bot.notifyStreamerLive("user-1", streamer);
-
-      expect(onDmCapabilityChanged.mock.calls).toEqual([["user-1", false]]);
-      expect(error).not.toHaveBeenCalled();
-    });
-
-    it("logs a blocked DM channel when no callback is configured", async () => {
-      const error = vi.spyOn(logger, "error").mockReturnValue();
-      const { bot, client } = setup();
-
-      client.send.mockRejectedValue(discordError(50007));
-
-      await bot.notifyStreamerLive("user-1", streamer);
-
-      expect(error).toHaveBeenCalledOnce();
-    });
-
-    it("logs any other delivery failure", async () => {
-      const onDmCapabilityChanged = vi.fn();
-      const error = vi.spyOn(logger, "error").mockReturnValue();
-      const { bot, client } = setup({ onDmCapabilityChanged });
-
-      client.send.mockRejectedValue(discordError(50013, "Missing permissions"));
-
-      await bot.notifyStreamerLive("user-1", streamer);
-
-      expect(onDmCapabilityChanged).not.toHaveBeenCalled();
-      expect(error.mock.calls[0]?.[0]).toMatchObject({
-        userId: "user-1",
-        streamer: "Streamer",
-        message: "Missing permissions",
-      });
-    });
-  });
 });

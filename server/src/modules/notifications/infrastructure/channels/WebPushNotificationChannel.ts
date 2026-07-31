@@ -57,6 +57,8 @@ export class WebPushNotificationChannel {
 
     skipped?: boolean;
 
+    expired?: boolean;
+
     reason?: string;
   }> {
     if (!this.enabled) {
@@ -161,11 +163,28 @@ export class WebPushNotificationChannel {
       }),
     );
 
+    const sent = results.some(
+      (result): result is PromiseFulfilledResult<NotificationResult> =>
+        result.status === "fulfilled" && result.value.sent,
+    );
+
+    // Every subscription attempted (the map above always resolves rather
+    // than rejecting, so "fulfilled" covers all of them) came back expired
+    // and none were actually sent: this is routine cleanup - the stale
+    // subscriptions were already deleted above - not a delivery failure, so
+    // flag it as `expired` rather than letting NotificationManager's metrics
+    // fall through to labeling it "failed".
+    const allExpired =
+      !sent &&
+      results.length > 0 &&
+      results.every(
+        (result) => result.status === "fulfilled" && result.value.expired,
+      );
+
     return {
-      sent: results.some(
-        (result): result is PromiseFulfilledResult<NotificationResult> =>
-          result.status === "fulfilled" && result.value.sent,
-      ),
+      sent,
+
+      ...(allExpired ? { expired: true } : {}),
 
       results,
     };

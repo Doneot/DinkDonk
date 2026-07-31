@@ -59,6 +59,7 @@ afterEach(() => {
   env.prometheus.enabled = false;
   env.prometheus.metricsToken = undefined;
   env.requestLogging.enabled = false;
+  env.isProduction = false;
   vi.restoreAllMocks();
 });
 
@@ -125,12 +126,20 @@ describe("createApp", () => {
       await request(app).get("/health/ready").expect(200);
     });
 
-    it("serves the OpenAPI documentation", async () => {
+    it("serves the OpenAPI documentation outside production", async () => {
       const { app } = setup();
 
       const response = await request(app).get("/docs/").expect(200);
 
       expect(response.text).toContain("swagger");
+    });
+
+    it("does not expose the OpenAPI documentation in production", async () => {
+      env.isProduction = true;
+
+      const { app } = setup();
+
+      await request(app).get("/docs/").expect(404);
     });
 
     it("redirects a failed login back to the client", async () => {

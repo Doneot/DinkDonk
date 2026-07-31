@@ -6,17 +6,27 @@ services:
     restart: unless-stopped
     user: root
     working_dir: /app
+    depends_on:
+      - redis
     env_file:
       - ../server/.env.development
     environment:
       NODE_ENV: development
       PORT: 3000
+      REDIS_URL: redis://redis:6379
     volumes:
       - ../server:/app
       - node_modules:/app/node_modules
     ports:
       - "3000:3000"
     stop_grace_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
 
   prometheus:
     image: prom/prometheus:latest

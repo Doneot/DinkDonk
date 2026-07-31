@@ -4,6 +4,7 @@ import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
 import { execute } from "../../../../../commands/set-message.js";
 import type { CommandContext } from "../../../../../modules/discord/domain/CommandContext.js";
 import { buildUser } from "../../../../builders/user.js";
+import { buildIdentity } from "../../../../builders/auth.js";
 import { TEST_USER_ID } from "../../../../constants.js";
 
 function createInteraction(options: Record<string, string | null> = {}) {
@@ -26,6 +27,11 @@ function createContext(overrides: Partial<CommandContext> = {}): CommandContext 
     twitch: { getStreamer: vi.fn().mockResolvedValue(null) },
     userRepository: {
       getUser: vi.fn().mockResolvedValue(buildUser({ canReceiveDM: true })),
+    },
+    identityRepository: {
+      getIdentityByDiscordUid: vi
+        .fn()
+        .mockResolvedValue(buildIdentity({ uid: TEST_USER_ID })),
     },
     subscriptionRepository: {
       updateSubscription: vi.fn(),

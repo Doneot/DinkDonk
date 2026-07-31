@@ -11,17 +11,58 @@ const BaseEnvSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
 
-  PORT: numberFromEnv(3000),
+  // Deliberately has no default (unlike most other numeric env vars): env.ts
+  // needs to be able to tell "PORT was never set" apart from "PORT was set
+  // to some value" so it can fall back to BACKEND_PORT before finally
+  // defaulting to 3000. Bounds match BACKEND_PORT's below.
+  PORT: z.coerce.number().int().positive().optional(),
 
   BACKEND_PORT: z.coerce.number().int().positive().optional(),
 
   SERVER_URL: z.url().min(1),
 
+  // Backs the rate limiters and the EventSub replay store so both work
+  // correctly across a restart and across multiple backend instances - see
+  // infrastructure/redis/redisClient.ts. Confined to the private,
+  // internal-only Docker network in every compose file, so (like Prometheus
+  // in the same network) it isn't password-protected.
+  REDIS_URL: z.url().min(1),
+
   CLIENT_ORIGIN: z.string().optional(),
 
-  SESSION_SECRET: secretFromEnv("session_secret").pipe(
-    z.string().min(16, "SESSION_SECRET must be at least 16 characters"),
-  ),
+  // Accepts a comma-separated list, mirroring ENCRYPTION_KEY below, so the
+  // session secret can be rotated too: express-session's `secret` option
+  // natively accepts an array, signing new session cookies with the first
+  // entry while still accepting cookies signed by any later entry. A single
+  // value (the common case) parses to a one-element array.
+  SESSION_SECRET: secretFromEnv("session_secret")
+    .pipe(z.string().min(1))
+    .transform((value, ctx) => {
+      const secrets = value
+        .split(",")
+        .map((secret) => secret.trim())
+        .filter((secret) => secret.length > 0);
+
+      if (secrets.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "SESSION_SECRET must not be empty",
+        });
+        return z.NEVER;
+      }
+
+      const tooShort = secrets.find((secret) => secret.length < 16);
+
+      if (tooShort) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Each SESSION_SECRET must be at least 16 characters",
+        });
+        return z.NEVER;
+      }
+
+      return secrets;
+    }),
 
   // Used to encrypt OAuth access/refresh tokens at rest in Firestore. Accepts
   // a comma-separated list to support key rotation: the first key is used
@@ -97,11 +138,7 @@ const BaseEnvSchema = z.object({
 
   FIREBASE_CLIENT_EMAIL: z.string().optional(),
 
-  FIREBASE_PRIVATE_KEY_ID: z.string().optional(),
-
   FIREBASE_PRIVATE_KEY: z.string().optional(),
-
-  FIREBASE_CLIENT_ID: z.string().optional(),
 
   WEB_PUSH_PUBLIC_KEY: z.string().min(1),
 
@@ -126,6 +163,10 @@ const BaseEnvSchema = z.object({
   SSH_TUNNEL_URL: z.string().optional(),
 
   TUNNEL_PROVIDER: z.enum(["ngrok", "ssh"]).optional(),
+
+  LOG_LEVEL: z
+    .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+    .default("info"),
 });
 
 export const EnvSchema = BaseEnvSchema.superRefine((env, ctx) => {
@@ -139,24 +180,10 @@ export const EnvSchema = BaseEnvSchema.superRefine((env, ctx) => {
       });
     }
 
-    if (!env.FIREBASE_CLIENT_ID) {
-      ctx.addIssue({
-        code: "custom",
-        message: "FIREBASE_CLIENT_ID is required",
-      });
-    }
-
     if (!env.FIREBASE_CLIENT_EMAIL) {
       ctx.addIssue({
         code: "custom",
         message: "FIREBASE_CLIENT_EMAIL is required",
-      });
-    }
-
-    if (!env.FIREBASE_PRIVATE_KEY_ID) {
-      ctx.addIssue({
-        code: "custom",
-        message: "FIREBASE_PRIVATE_KEY_ID is required",
       });
     }
 
@@ -176,4 +203,10 @@ export const EnvSchema = BaseEnvSchema.superRefine((env, ctx) => {
     });
   }
 
+  if (env.PROMETHEUS_ENABLED && !env.METRICS_TOKEN) {
+    ctx.addIssue({
+      code: "custom",
+      message: "METRICS_TOKEN is required when PROMETHEUS_ENABLED is true",
+    });
+  }
 });

@@ -13,6 +13,8 @@ export class SubscriptionCleanupScheduler {
 
   private timer: NodeJS.Timeout | null = null;
 
+  private running = false;
+
   constructor({
     intervalMs,
     garbageCollectSubscriptions,
@@ -27,17 +29,32 @@ export class SubscriptionCleanupScheduler {
       return;
     }
 
-    this.timer = setInterval(async () => {
-      try {
-        await this.garbageCollectSubscriptions();
-      } catch (error) {
-        logger.error(
-          {
-            error,
-          },
-          "Failed to execute subscription garbage collection",
+    this.timer = setInterval(() => {
+      // setInterval doesn't wait for a previous async invocation to settle
+      // before firing again; guard against overlapping runs if a pass ever
+      // takes longer than intervalMs.
+      if (this.running) {
+        logger.warn(
+          "Subscription garbage collection still running from the previous tick; skipping this one",
         );
+
+        return;
       }
+
+      this.running = true;
+
+      this.garbageCollectSubscriptions()
+        .catch((error: unknown) => {
+          logger.error(
+            {
+              error,
+            },
+            "Failed to execute subscription garbage collection",
+          );
+        })
+        .finally(() => {
+          this.running = false;
+        });
     }, this.intervalMs);
   }
 

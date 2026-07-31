@@ -16,6 +16,17 @@ type DiscordNotificationChannelOptions = {
   userRepository: UserRepository;
 };
 
+// Discord error codes that mean this user can never be DM'd again until they
+// take some corrective action on their end (re-add the bot, re-open DMs,
+// re-create their account) - as opposed to a transient failure worth
+// retrying on the next notification. Without treating these as permanent,
+// every future live notification re-attempts the same doomed call forever.
+const PERMANENT_DM_FAILURE_CODES = new Set([
+  50007, // Cannot send messages to this user (DMs closed)
+  10013, // Unknown User (account deleted)
+  50001, // Missing Access (bot no longer shares a server with this user)
+]);
+
 export class DiscordNotificationChannel {
   readonly name = "discord";
 
@@ -60,7 +71,7 @@ export class DiscordNotificationChannel {
         message?: string;
       };
 
-      if (err.code === 50007) {
+      if (err.code !== undefined && PERMANENT_DM_FAILURE_CODES.has(err.code)) {
         await this.userRepository.updateUser(user.id, {
           canReceiveDM: false,
         });

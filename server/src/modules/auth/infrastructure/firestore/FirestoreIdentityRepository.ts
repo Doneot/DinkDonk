@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import type {
   Firestore,
   CollectionReference,
+  DocumentReference,
   DocumentData,
 } from "firebase-admin/firestore";
 
@@ -16,6 +17,7 @@ import {
   DiscordCredentialSchema,
   IdentityRecordSchema,
 } from "./records/IdentityRecord.js";
+import type { IdentityRecord } from "./records/IdentityRecord.js";
 
 import { isNonEmptyString } from "../../../../shared/utils/validators.js";
 import { encryptSecret } from "../../../../shared/utils/crypto.js";
@@ -38,6 +40,17 @@ function twitchLinkId(twitchId: string): string {
 function emailLinkId(email: string): string {
   return `email:${email.toLowerCase()}`;
 }
+
+// Validates only accessToken/refreshToken, but against the PLAINTEXT value -
+// callers must run this before encryptSecret() touches either field.
+// encryptSecret("") still produces a non-empty ciphertext string, so a blank
+// token can only ever be caught here; validating the already-encrypted
+// record (as IdentityRecordSchema.parse does further down) can never catch
+// it.
+const PlaintextDiscordTokenPatchSchema = DiscordCredentialSchema.pick({
+  accessToken: true,
+  refreshToken: true,
+}).partial();
 
 export class FirestoreIdentityRepository implements IdentityRepository {
   private readonly identities: CollectionReference<DocumentData>;
@@ -62,37 +75,73 @@ export class FirestoreIdentityRepository implements IdentityRepository {
     return toIdentity(uid, IdentityRecordSchema.parse(doc.data()));
   }
 
-  async upsertDiscordIdentity(
-    profile: DiscordCredential,
-    email: string | null,
-    emailVerified: boolean,
-  ): Promise<Identity> {
-    const discordLinkRef = this.identityLinks.doc(discordLinkId(profile.id));
-    const emailLinkRef =
-      email && emailVerified ? this.identityLinks.doc(emailLinkId(email)) : null;
+  async getIdentityByDiscordUid(discordUid: string): Promise<Identity | null> {
+    if (!isNonEmptyString(discordUid)) {
+      return null;
+    }
+
+    // Follows the exact identityLinks/discord:{id} pattern used everywhere
+    // else in this file to resolve a provider id to this app's canonical
+    // uid, then defers to getIdentity for the actual record fetch/parse.
+    const linkDoc = await getExistingDoc(
+      this.identityLinks,
+      discordLinkId(discordUid),
+    );
+
+    if (!linkDoc) {
+      return null;
+    }
+
+    const { uid } = linkDoc.data() as { uid: string };
+
+    return this.getIdentity(uid);
+  }
+
+  /**
+   * Shared transaction structure behind upsertDiscordIdentity /
+   * upsertGoogleIdentity / upsertTwitchIdentity: resolve the target uid via
+   * the direct provider link (falling back to a verified-email match, then
+   * finally minting a new uid), read-modify-write the identity record, and
+   * maintain both index docs. Each provider-specific field (encryption,
+   * which nested key to set, etc.) is supplied by the caller via
+   * `buildProviderFields`; everything else about the merge is identical
+   * across providers.
+   */
+  private async upsertIdentity(params: {
+    linkRef: DocumentReference<DocumentData>;
+    emailLinkRef: DocumentReference<DocumentData> | null;
+    email: string | null;
+    emailVerified: boolean;
+    mintUid: () => string;
+    buildProviderFields: () => Partial<IdentityRecord>;
+  }): Promise<Identity> {
+    const { linkRef, emailLinkRef, email, emailVerified, mintUid, buildProviderFields } =
+      params;
 
     return this.db.runTransaction(async (tx) => {
-      const discordLinkDoc = await tx.get(discordLinkRef);
+      const linkDoc = await tx.get(linkRef);
 
-      // Only consult the email index when there's no direct Discord link yet
-      // (first time this Discord account has ever signed in here).
-      const emailLinkDoc =
-        !discordLinkDoc.exists && emailLinkRef ? await tx.get(emailLinkRef) : null;
+      // Always read the email index doc (when there is one to read) - even
+      // on a repeat sign-in where it won't be used to resolve the uid below.
+      // Firestore transactions only guard a tx.set/tx.update against
+      // concurrent writes if a tx.get on that same doc happened first in
+      // this transaction; skipping this read on the repeat-sign-in path
+      // used to mean the tx.set(emailLinkRef, ...) further down ran with NO
+      // read-before-write, i.e. zero optimistic-concurrency protection, and
+      // (via the `!emailLinkDoc?.exists` check below evaluating true for a
+      // skipped/null read) could blindly reassign an email index doc
+      // already claimed by a different account onto this one.
+      const emailLinkDoc = emailLinkRef ? await tx.get(emailLinkRef) : null;
 
-      // Three cases, in priority order: (1) this Discord account already has
-      // a uid - use it; (2) no direct link, but another provider already
+      // Three cases, in priority order: (1) this provider account already
+      // has a uid - use it; (2) no direct link, but another provider already
       // claimed this verified email - link onto that existing account; (3)
-      // brand new - mint a uid equal to the Discord id itself. Case 3 is also
-      // what makes pre-migration accounts (which were keyed by their Discord
-      // id under the old `auth/{id}` collection) work transparently: the
-      // first login after migration finds no link doc, falls through to
-      // "uid = discordId", and that happens to be the id their existing
-      // `users/{id}` document already uses - no backfill script needed.
-      const uid = discordLinkDoc.exists
-        ? (discordLinkDoc.data() as { uid: string }).uid
+      // brand new - mint a uid via the caller's strategy.
+      const uid = linkDoc.exists
+        ? (linkDoc.data() as { uid: string }).uid
         : emailLinkDoc?.exists
           ? (emailLinkDoc.data() as { uid: string }).uid
-          : profile.id;
+          : mintUid();
 
       const identityRef = this.identities.doc(uid);
       const existingDoc = await tx.get(identityRef);
@@ -100,28 +149,41 @@ export class FirestoreIdentityRepository implements IdentityRepository {
         ? IdentityRecordSchema.parse(existingDoc.data())
         : undefined;
 
+      // The new email/emailVerified only get to replace what's already
+      // stored when THIS sign-in's email is itself verified - an unverified
+      // email must never be allowed to either (a) claim someone else's
+      // identityLinks/email:* slot (handled above) or (b) demote/replace an
+      // account's already-verified email while inheriting its
+      // emailVerified=true, which is what a plain `||` merge against the OLD
+      // verified state used to allow. When unverified, the previously
+      // stored email/verified pair is kept as-is (falling back to the new
+      // email only if the account doesn't have one yet at all).
+      const emailIsVerified = emailVerified === true;
+      const mergedEmail = emailIsVerified
+        ? (email ?? existing?.email ?? null)
+        : (existing?.email ?? email ?? null);
+      const mergedEmailVerified = emailIsVerified
+        ? true
+        : (existing?.emailVerified ?? false);
+
       // Validates the FULL record this write results in, not just the new
-      // Discord credential - a corrupt merge fails loudly here rather than
+      // provider credential - a corrupt merge fails loudly here rather than
       // persisting a document that only breaks the next time it's read.
-      // Spreads ...existing first so a previously-linked provider (e.g.
-      // google) isn't dropped from the returned Identity - {merge: true}
-      // would've kept it in Firestore regardless, but the return value is
-      // built from this same object and must reflect the full picture.
+      // Spreads ...existing first so a previously-linked provider isn't
+      // dropped from the returned Identity - {merge: true} would've kept it
+      // in Firestore regardless, but the return value is built from this
+      // same object and must reflect the full picture.
       const merged = IdentityRecordSchema.parse({
         ...existing,
-        email: email ?? existing?.email ?? null,
-        emailVerified: emailVerified || existing?.emailVerified || false,
-        discord: {
-          ...profile,
-          accessToken: encryptSecret(profile.accessToken),
-          refreshToken: encryptSecret(profile.refreshToken),
-        },
+        email: mergedEmail,
+        emailVerified: mergedEmailVerified,
+        ...buildProviderFields(),
       });
 
       tx.set(identityRef, merged, { merge: true });
 
-      if (!discordLinkDoc.exists) {
-        tx.set(discordLinkRef, { uid });
+      if (!linkDoc.exists) {
+        tx.set(linkRef, { uid });
       }
 
       if (emailLinkRef && !emailLinkDoc?.exists) {
@@ -132,12 +194,52 @@ export class FirestoreIdentityRepository implements IdentityRepository {
     });
   }
 
+  async upsertDiscordIdentity(
+    profile: DiscordCredential,
+    email: string | null,
+    emailVerified: boolean,
+  ): Promise<Identity> {
+    // Validates the RAW plaintext credential before accessToken/refreshToken
+    // are encrypted below - see PlaintextDiscordTokenPatchSchema's comment.
+    DiscordCredentialSchema.parse(profile);
+
+    const discordLinkRef = this.identityLinks.doc(discordLinkId(profile.id));
+    const emailLinkRef =
+      email && emailVerified ? this.identityLinks.doc(emailLinkId(email)) : null;
+
+    // Case 3 (brand new) mints a uid equal to the Discord id itself, unlike
+    // Google/Twitch below - this is also what makes pre-migration accounts
+    // (which were keyed by their Discord id under the old `auth/{id}`
+    // collection) work transparently: the first login after migration finds
+    // no link doc, falls through to "uid = discordId", and that happens to
+    // be the id their existing `users/{id}` document already uses - no
+    // backfill script needed.
+    return this.upsertIdentity({
+      linkRef: discordLinkRef,
+      emailLinkRef,
+      email,
+      emailVerified,
+      mintUid: () => profile.id,
+      buildProviderFields: () => ({
+        discord: {
+          ...profile,
+          accessToken: encryptSecret(profile.accessToken),
+          refreshToken: encryptSecret(profile.refreshToken),
+        },
+      }),
+    });
+  }
+
   async linkDiscordIdentity(
     uid: string,
     profile: DiscordCredential,
     email: string | null,
     emailVerified: boolean,
   ): Promise<Identity> {
+    // Validates the RAW plaintext credential before accessToken/refreshToken
+    // are encrypted below - see PlaintextDiscordTokenPatchSchema's comment.
+    DiscordCredentialSchema.parse(profile);
+
     const discordLinkRef = this.identityLinks.doc(discordLinkId(profile.id));
 
     return this.db.runTransaction(async (tx) => {
@@ -199,6 +301,10 @@ export class FirestoreIdentityRepository implements IdentityRepository {
       throw new Error("Invalid user id");
     }
 
+    // Validates the RAW plaintext patch before accessToken/refreshToken are
+    // encrypted below - see PlaintextDiscordTokenPatchSchema's comment.
+    PlaintextDiscordTokenPatchSchema.parse(patch);
+
     const identityRef = this.identities.doc(uid);
 
     await this.db.runTransaction(async (tx) => {
@@ -249,45 +355,16 @@ export class FirestoreIdentityRepository implements IdentityRepository {
     const emailLinkRef =
       email && emailVerified ? this.identityLinks.doc(emailLinkId(email)) : null;
 
-    return this.db.runTransaction(async (tx) => {
-      const googleLinkDoc = await tx.get(googleLinkRef);
-
-      const emailLinkDoc =
-        !googleLinkDoc.exists && emailLinkRef ? await tx.get(emailLinkRef) : null;
-
-      // Same priority order as upsertDiscordIdentity, but with no Discord-era
-      // legacy data to stay compatible with: a brand new Google signup always
-      // mints a fresh random uid rather than reusing profile.id.
-      const uid = googleLinkDoc.exists
-        ? (googleLinkDoc.data() as { uid: string }).uid
-        : emailLinkDoc?.exists
-          ? (emailLinkDoc.data() as { uid: string }).uid
-          : randomUUID();
-
-      const identityRef = this.identities.doc(uid);
-      const existingDoc = await tx.get(identityRef);
-      const existing = existingDoc.exists
-        ? IdentityRecordSchema.parse(existingDoc.data())
-        : undefined;
-
-      const merged = IdentityRecordSchema.parse({
-        ...existing,
-        email: email ?? existing?.email ?? null,
-        emailVerified: emailVerified || existing?.emailVerified || false,
-        google: profile,
-      });
-
-      tx.set(identityRef, merged, { merge: true });
-
-      if (!googleLinkDoc.exists) {
-        tx.set(googleLinkRef, { uid });
-      }
-
-      if (emailLinkRef && !emailLinkDoc?.exists) {
-        tx.set(emailLinkRef, { uid });
-      }
-
-      return toIdentity(uid, merged);
+    // Same priority order as upsertDiscordIdentity, but with no Discord-era
+    // legacy data to stay compatible with: a brand new Google signup always
+    // mints a fresh random uid rather than reusing profile.id.
+    return this.upsertIdentity({
+      linkRef: googleLinkRef,
+      emailLinkRef,
+      email,
+      emailVerified,
+      mintUid: () => randomUUID(),
+      buildProviderFields: () => ({ google: profile }),
     });
   }
 
@@ -300,45 +377,16 @@ export class FirestoreIdentityRepository implements IdentityRepository {
     const emailLinkRef =
       email && emailVerified ? this.identityLinks.doc(emailLinkId(email)) : null;
 
-    return this.db.runTransaction(async (tx) => {
-      const twitchLinkDoc = await tx.get(twitchLinkRef);
-
-      const emailLinkDoc =
-        !twitchLinkDoc.exists && emailLinkRef ? await tx.get(emailLinkRef) : null;
-
-      // Same priority order as upsertGoogleIdentity: no Twitch-era legacy
-      // data to stay compatible with, so a brand new Twitch signup always
-      // mints a fresh random uid rather than reusing profile.id.
-      const uid = twitchLinkDoc.exists
-        ? (twitchLinkDoc.data() as { uid: string }).uid
-        : emailLinkDoc?.exists
-          ? (emailLinkDoc.data() as { uid: string }).uid
-          : randomUUID();
-
-      const identityRef = this.identities.doc(uid);
-      const existingDoc = await tx.get(identityRef);
-      const existing = existingDoc.exists
-        ? IdentityRecordSchema.parse(existingDoc.data())
-        : undefined;
-
-      const merged = IdentityRecordSchema.parse({
-        ...existing,
-        email: email ?? existing?.email ?? null,
-        emailVerified: emailVerified || existing?.emailVerified || false,
-        twitch: profile,
-      });
-
-      tx.set(identityRef, merged, { merge: true });
-
-      if (!twitchLinkDoc.exists) {
-        tx.set(twitchLinkRef, { uid });
-      }
-
-      if (emailLinkRef && !emailLinkDoc?.exists) {
-        tx.set(emailLinkRef, { uid });
-      }
-
-      return toIdentity(uid, merged);
+    // Same priority order as upsertGoogleIdentity: no Twitch-era legacy
+    // data to stay compatible with, so a brand new Twitch signup always
+    // mints a fresh random uid rather than reusing profile.id.
+    return this.upsertIdentity({
+      linkRef: twitchLinkRef,
+      emailLinkRef,
+      email,
+      emailVerified,
+      mintUid: () => randomUUID(),
+      buildProviderFields: () => ({ twitch: profile }),
     });
   }
 }

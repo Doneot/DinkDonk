@@ -149,6 +149,57 @@ export function subscriptionRepositoryBehavior(
       });
     });
 
+    it("returns not_subscribed when unsubscribing from a streamer the user was never subscribed to", async () => {
+      const repository = createRepository();
+
+      // The user exists (has at least one subscription), just not to this
+      // streamer - distinct from "user_not_found" above.
+      await repository.subscribe("user-1", "streamer-other");
+
+      await expect(
+        repository.unsubscribe("user-1", "streamer-1"),
+      ).resolves.toEqual({
+        success: false,
+        reason: "not_subscribed",
+      });
+    });
+
+    it("rejects subscribing with a notification message over the schema's length limit", async () => {
+      const repository = createRepository();
+
+      await expect(
+        repository.subscribe("user-1", "streamer-1", "x".repeat(501)),
+      ).rejects.toThrow();
+
+      // The rejected write must not have partially persisted.
+      await expect(
+        repository.getSubscription("user-1", "streamer-1"),
+      ).resolves.toBeNull();
+    });
+
+    it("rejects updating a subscription with a notification message over the schema's length limit", async () => {
+      const repository = createRepository();
+
+      repository.seed(
+        "user-1",
+        buildSubscription({ id: "streamer-1", notification_message: "ok" }),
+      );
+
+      await expect(
+        repository.updateSubscription("user-1", "streamer-1", {
+          notification_message: "x".repeat(501),
+        }),
+      ).rejects.toThrow();
+
+      // The prior valid value must survive the rejected write.
+      await expect(
+        repository.getSubscription("user-1", "streamer-1"),
+      ).resolves.toEqual({
+        id: "streamer-1",
+        notification_message: "ok",
+      });
+    });
+
     it("emits streamerAdded", async () => {
       const repository = createRepository();
 

@@ -14,7 +14,19 @@ import { logger } from "../../../shared/logger/logger.js";
 // and notification-channel calls in one burst.
 const NOTIFY_BATCH_SIZE = 25;
 
+// Twitch can send distinct stream.online notifications in quick succession
+// for the same broadcast (e.g. a brief drop/reconnect "flapping"), which
+// InMemoryReplayStore's message-id dedup can't catch since each delivery has
+// a genuinely different message id. Track the most recent started_at we've
+// already notified subscribers for, per streamer, and skip re-notifying for
+// the same (or a near-identical) stream session. In-memory and best-effort -
+// this guards a UX nicety against a rare edge case, not a correctness
+// guarantee.
+const FLAP_DEDUP_WINDOW_MS = 10 * 60 * 1000;
+
 export class StreamNotificationService {
+  private readonly lastNotifiedStartedAt = new Map<string, string>();
+
   constructor(
     private readonly twitch: TwitchStreamerProvider,
     private readonly users: UserRepository,
@@ -32,6 +44,17 @@ export class StreamNotificationService {
     if (!streamer) {
       return;
     }
+
+    if (this.isDuplicateStreamSession(streamer.id, event.started_at)) {
+      logger.info(
+        { streamerId: streamer.id, startedAt: event.started_at },
+        "Skipping duplicate stream.online notification for the same stream session",
+      );
+
+      return;
+    }
+
+    this.lastNotifiedStartedAt.set(streamer.id, event.started_at);
 
     const userIds = await this.streamers.getSubscriberIds(streamer.id);
 
@@ -53,6 +76,26 @@ export class StreamNotificationService {
         }
       }
     }
+  }
+
+  private isDuplicateStreamSession(
+    streamerId: string,
+    startedAt: string,
+  ): boolean {
+    const lastStartedAt = this.lastNotifiedStartedAt.get(streamerId);
+
+    if (!lastStartedAt) {
+      return false;
+    }
+
+    const lastMs = Date.parse(lastStartedAt);
+    const currentMs = Date.parse(startedAt);
+
+    if (!Number.isFinite(lastMs) || !Number.isFinite(currentMs)) {
+      return false;
+    }
+
+    return Math.abs(currentMs - lastMs) < FLAP_DEDUP_WINDOW_MS;
   }
 
   private async notifyUserForStreamer(

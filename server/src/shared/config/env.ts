@@ -19,9 +19,13 @@ export const env = {
 
   isProduction: parsedEnv.NODE_ENV === "production",
 
-  port: parsedEnv.PORT || parsedEnv.BACKEND_PORT || 3000,
+  logLevel: parsedEnv.LOG_LEVEL,
+
+  port: parsedEnv.PORT ?? parsedEnv.BACKEND_PORT ?? 3000,
 
   serverUrl: parsedEnv.SERVER_URL,
+
+  redisUrl: parsedEnv.REDIS_URL,
 
   clientOrigin: parsedEnv.CLIENT_ORIGIN || parsedEnv.SERVER_URL,
 
@@ -52,10 +56,8 @@ export const env = {
   firebase: {
     serviceAccountPath: parsedEnv.GOOGLE_APPLICATION_CREDENTIALS,
     projectId: parsedEnv.FIREBASE_PROJECT_ID,
-    privateKeyId: parsedEnv.FIREBASE_PRIVATE_KEY_ID,
     privateKey: parsedEnv.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
     clientEmail: parsedEnv.FIREBASE_CLIENT_EMAIL,
-    clientId: parsedEnv.FIREBASE_CLIENT_ID,
   },
   webPush: {
     publicKey: parsedEnv.WEB_PUSH_PUBLIC_KEY,

@@ -5,7 +5,7 @@ import {
 import { z } from "zod";
 
 import {
-  deletePushSubscriptionSchema,
+  deletePushSubscriptionQuerySchema,
   savePushSubscriptionSchema,
 } from "../http/schemas/notifications.js";
 import {
@@ -247,7 +247,14 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     },
     responses: {
       201: jsonResponse("Save result", savePushResponseSchema),
-      400: validationErrorResponse,
+      // Either a Zod validation failure (malformed request) or this route's
+      // own typed domain-rejection shape (a structurally valid request the
+      // handler still declined) - the two are genuinely different response
+      // bodies that both arrive under a 400, see validate.ts/errorHandler.ts.
+      400: jsonResponse(
+        "Validation error or save failure",
+        z.union([errorResponseSchema, savePushResponseSchema.options[1]]),
+      ),
       401: unauthorizedResponse,
     },
   });
@@ -258,11 +265,14 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     summary: "Delete Web Push subscription",
     security: authSecurity,
     request: {
-      body: jsonBody(deletePushSubscriptionSchema),
+      query: deletePushSubscriptionQuerySchema,
     },
     responses: {
       200: jsonResponse("Delete result", deletePushResponseSchema),
-      400: validationErrorResponse,
+      400: jsonResponse(
+        "Validation error or delete failure",
+        z.union([errorResponseSchema, deletePushResponseSchema.options[1]]),
+      ),
       401: unauthorizedResponse,
     },
   });
@@ -337,7 +347,10 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     },
     responses: {
       201: jsonResponse("Subscribe result", subscribeResponseSchema),
-      400: validationErrorResponse,
+      400: jsonResponse(
+        "Validation error or subscribe failure",
+        z.union([errorResponseSchema, subscribeResponseSchema.options[1]]),
+      ),
       401: unauthorizedResponse,
     },
   });
@@ -348,11 +361,14 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     summary: "Unsubscribe from a streamer",
     security: authSecurity,
     request: {
-      body: jsonBody(subscribeSchema),
+      query: subscribeSchema,
     },
     responses: {
       200: jsonResponse("Unsubscribe result", unsubscribeResponseSchema),
-      400: validationErrorResponse,
+      400: jsonResponse(
+        "Validation error or unsubscribe failure",
+        z.union([errorResponseSchema, unsubscribeResponseSchema.options[1]]),
+      ),
       401: unauthorizedResponse,
     },
   });
@@ -370,7 +386,13 @@ export function registerPaths(registry: OpenAPIRegistry): void {
         "Update subscription result",
         updateSubscriptionResponseSchema,
       ),
-      400: validationErrorResponse,
+      400: jsonResponse(
+        "Validation error or update failure",
+        z.union([
+          errorResponseSchema,
+          updateSubscriptionResponseSchema.options[1],
+        ]),
+      ),
       401: unauthorizedResponse,
     },
   });

@@ -37,7 +37,11 @@ export function createEventSubRouter({
 
   router.post(
     "/",
-    express.raw({ type: "application/json" }),
+    // Explicit (rather than relying on express.raw's 100kb default) so the
+    // bound on this public, pre-auth endpoint is self-documenting and a
+    // little tighter: real EventSub notification payloads are small JSON
+    // bodies, well under this.
+    express.raw({ type: "application/json", limit: "64kb" }),
     async (req, res): Promise<void> => {
       const raw = (req.body as Buffer).toString();
 

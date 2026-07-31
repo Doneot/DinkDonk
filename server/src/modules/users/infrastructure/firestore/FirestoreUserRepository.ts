@@ -14,6 +14,12 @@ import { isNonEmptyString } from "../../../../shared/utils/validators.js";
 import { getExistingDoc } from "../../../../shared/utils/firestore.js";
 
 export class FirestoreUserRepository implements UserRepository {
+  // Zero production callers today (confirmed by audit) - getUsers' default
+  // cap still applies even when no limit is passed, so it can never
+  // accidentally become a truly unbounded collection read once it does get
+  // a caller.
+  private static readonly DEFAULT_USERS_LIMIT = 500;
+
   private readonly users: CollectionReference<DocumentData>;
 
   constructor(db: Firestore) {
@@ -30,8 +36,10 @@ export class FirestoreUserRepository implements UserRepository {
     return toUser(doc.id, UserRecordSchema.parse(doc.data()));
   }
 
-  async getUsers(): Promise<User[]> {
-    const snapshot = await this.users.get();
+  async getUsers(
+    limit: number = FirestoreUserRepository.DEFAULT_USERS_LIMIT,
+  ): Promise<User[]> {
+    const snapshot = await this.users.limit(limit).get();
 
     return snapshot.docs.map((doc) => {
       const record = UserRecordSchema.parse(doc.data());

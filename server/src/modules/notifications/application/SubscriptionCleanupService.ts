@@ -12,6 +12,13 @@ const CLEANUP_BATCH_SIZE = 25;
 export class SubscriptionCleanupService {
   private gcRunning = false;
 
+  // Both garbageCollectSubscriptions (the periodic sweep) and
+  // garbageCollectStreamer (triggered directly by the "streamerEmpty" event)
+  // funnel into collectStreamer for the same streamer id when they overlap;
+  // the Twitch DELETE call is idempotent either way, but without this the
+  // "deleted" metric double-counts under that race.
+  private readonly streamersBeingCollected = new Set<string>();
+
   constructor(
     private readonly twitch: TwitchSubscriptionProvider,
     private readonly streamers: StreamerRepository,
@@ -90,20 +97,30 @@ export class SubscriptionCleanupService {
     streamerId: string,
     streamOnlineSubscriptions: TwitchEventSubSubscription[],
   ): Promise<void> {
-    const matching = streamOnlineSubscriptions.filter(
-      (sub) => sub.condition?.broadcaster_user_id === streamerId,
-    );
+    if (this.streamersBeingCollected.has(streamerId)) {
+      return;
+    }
 
-    await Promise.all(
-      matching.map((sub) => {
-        eventSubSubscriptionsDeletedTotal.inc();
-        return this.twitch.unsubscribeFromEvent(sub.id);
-      }),
-    );
+    this.streamersBeingCollected.add(streamerId);
 
-    // Atomic: only deletes if the streamer is still subscriber-less at
-    // commit time, so a subscribe() racing with this sweep can't be
-    // silently wiped out by it.
-    await this.streamers.deleteStreamerIfEmpty(streamerId);
+    try {
+      const matching = streamOnlineSubscriptions.filter(
+        (sub) => sub.condition?.broadcaster_user_id === streamerId,
+      );
+
+      await Promise.all(
+        matching.map((sub) => {
+          eventSubSubscriptionsDeletedTotal.inc();
+          return this.twitch.unsubscribeFromEvent(sub.id);
+        }),
+      );
+
+      // Atomic: only deletes if the streamer is still subscriber-less at
+      // commit time, so a subscribe() racing with this sweep can't be
+      // silently wiped out by it.
+      await this.streamers.deleteStreamerIfEmpty(streamerId);
+    } finally {
+      this.streamersBeingCollected.delete(streamerId);
+    }
   }
 }

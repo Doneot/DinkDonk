@@ -113,7 +113,12 @@ export class TwitchClient
     return Boolean(this.accessToken);
   }
 
-  async request<T>(
+  /**
+   * Performs a single Helix request (with retry/backoff), returning both the
+   * page's data and Twitch's pagination cursor (if any) so callers that need
+   * every page - not just the first up-to-100 items - can keep requesting.
+   */
+  private async requestPage<T>(
     endpoint: string,
     {
       method = "GET",
@@ -122,13 +127,14 @@ export class TwitchClient
       retries = 3,
       headers,
     }: TwitchRequestOptions = {},
-  ): Promise<T[]> {
+  ): Promise<{ data: T[]; cursor: string | undefined }> {
     const url = `https://api.twitch.tv/helix/${endpoint}`;
 
     for (let attempt = 1; attempt <= retries; attempt += 1) {
       try {
         const response = await this.http.request<{
           data?: T[];
+          pagination?: { cursor?: string };
         }>({
           method,
 
@@ -153,7 +159,10 @@ export class TwitchClient
           data,
         });
 
-        return response.data?.data || [];
+        return {
+          data: response.data?.data || [],
+          cursor: response.data?.pagination?.cursor,
+        };
       } catch (error) {
         const err = error as AxiosError;
 
@@ -176,7 +185,7 @@ export class TwitchClient
         const notFoundDelete = status === 404 && method === "DELETE";
 
         if (notFoundDelete) {
-          return [];
+          return { data: [], cursor: undefined };
         }
 
         if (!retryable || attempt === retries) {
@@ -206,20 +215,75 @@ export class TwitchClient
       }
     }
 
-    return [];
+    return { data: [], cursor: undefined };
   }
+
+  /**
+   * Follows Twitch's pagination.cursor across every page of a GET list
+   * endpoint, accumulating results - Helix caps list responses at 100 items
+   * per page (e.g. eventsub/subscriptions), so a single request() call
+   * silently truncated anything past the first page. Only meaningful for GET
+   * requests; POST/DELETE calls return at most one item and never carry a
+   * cursor worth following.
+   */
+  async request<T>(
+    endpoint: string,
+    options: TwitchRequestOptions = {},
+  ): Promise<T[]> {
+    const { method = "GET", params } = options;
+
+    const results: T[] = [];
+
+    let after: string | undefined;
+
+    do {
+      const pageParams =
+        after === undefined
+          ? params
+          : params instanceof URLSearchParams
+            ? new URLSearchParams([...params.entries(), ["after", after]])
+            : { ...params, after };
+
+      const page = await this.requestPage<T>(endpoint, {
+        ...options,
+        ...(pageParams === undefined ? {} : { params: pageParams }),
+      });
+
+      results.push(...page.data);
+
+      after = method === "GET" ? page.cursor : undefined;
+    } while (after);
+
+    return results;
+  }
+
+  // Twitch's users endpoint hard-caps at 100 ids per request (a 400, not a
+  // truncation) - anything beyond that must be split into multiple calls.
+  private static readonly MAX_USER_IDS_PER_REQUEST = 100;
 
   async fetchStreamers(ids: string | string[]): Promise<TwitchStreamer[]> {
     if (Array.isArray(ids)) {
-      const params = new URLSearchParams();
+      const results: TwitchStreamer[] = [];
 
-      ids.forEach((id) => {
-        params.append("id", id);
-      });
+      for (
+        let i = 0;
+        i < ids.length;
+        i += TwitchClient.MAX_USER_IDS_PER_REQUEST
+      ) {
+        const chunk = ids.slice(i, i + TwitchClient.MAX_USER_IDS_PER_REQUEST);
 
-      return this.request<TwitchStreamer>("users", {
-        params,
-      });
+        const params = new URLSearchParams();
+
+        chunk.forEach((id) => {
+          params.append("id", id);
+        });
+
+        results.push(
+          ...(await this.request<TwitchStreamer>("users", { params })),
+        );
+      }
+
+      return results;
     }
 
     return this.request<TwitchStreamer>("users", {

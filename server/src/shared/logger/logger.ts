@@ -6,13 +6,26 @@ import { env } from "../config/env.js";
 // segment at a time, so nested occurrences need an explicit entry per
 // depth. Two levels covers every shape actually logged in this codebase
 // (e.g. `{ user: { accessToken } }`); add another level here if a future
-// log call nests these fields deeper.
+// log call nests these fields deeper. fast-redact paths are also
+// case-sensitive with no case-insensitive mode, so both the camelCase form
+// used in code and any all-lowercase variant that might show up in a raw
+// header/body blob are listed explicitly.
 const SENSITIVE_FIELDS = [
   "accessToken",
   "refreshToken",
   "token",
   "authorization",
   "cookie",
+  "password",
+  "clientSecret",
+  "client_secret",
+  "webhookSecret",
+  "sessionSecret",
+  "session_secret",
+  "encryptionKey",
+  "encryption_key",
+  "privateKey",
+  "private_key",
 ];
 
 export const redact = {
@@ -27,6 +40,7 @@ export const redact = {
 export const logger = pino(
   !env.isProduction
     ? {
+        level: env.logLevel,
         redact,
         transport: {
           target: "pino-pretty",
@@ -36,6 +50,7 @@ export const logger = pino(
         },
       }
     : {
+        level: env.logLevel,
         redact,
       },
 );

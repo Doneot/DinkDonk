@@ -42,6 +42,15 @@ type CreateAuthRouterOptions = {
   discord: DiscordService;
 
   ensureFreshToken: express.RequestHandler;
+
+  /**
+   * Forcibly drops any live Socket.IO connections for a user (see
+   * realtime/socketServer.ts's SocketServer#disconnectUser). Optional so a
+   * composition root that hasn't wired the socket server through yet still
+   * compiles; without it, /logout still destroys the Firestore session doc,
+   * it just can't reach into already-established realtime connections.
+   */
+  disconnectUser?: (userId: string) => void;
 };
 
 function loginRedirect(): string {
@@ -55,6 +64,7 @@ export function createAuthRouter({
   identities,
   discord,
   ensureFreshToken,
+  disconnectUser,
 }: CreateAuthRouterOptions): Router {
   const router = express.Router();
 
@@ -188,9 +198,18 @@ export function createAuthRouter({
   router.post(
     "/logout",
 
+    // Explicit and self-documenting, independent of ensureFreshToken's
+    // internals (it happens to call requireUser(req) itself, which was the
+    // only thing guarding this route before): a 401 here shouldn't depend on
+    // an unrelated middleware's implementation detail.
+    requireAuthenticated,
+
     ensureFreshToken,
 
     (req, res, next) => {
+      // Captured before req.logout() clears req.user below.
+      const userId = requireUser(req).id;
+
       req.logout((error) => {
         if (error) {
           next(error);
@@ -200,6 +219,11 @@ export function createAuthRouter({
 
         req.session.destroy(() => {
           res.clearCookie("connect.sid");
+
+          // Drop any already-established realtime connections for this
+          // user: destroying the Firestore session doc above doesn't by
+          // itself touch a socket that authenticated before logout.
+          disconnectUser?.(userId);
 
           res.json({ ok: true });
         });

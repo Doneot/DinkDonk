@@ -2,10 +2,17 @@ import type express from "express";
 import refresh from "passport-oauth2-refresh";
 import { logger } from "../../shared/logger/logger.js";
 import type { IdentityRepository } from "../../modules/auth/ports/IdentityRepository.js";
+import type { Redis } from "../../infrastructure/redis/redisClient.js";
 
 import { UnauthorizedError } from "../errors/UnauthorizedError.js";
 
 const MAX_TOKEN_AGE_MS = 6 * 24 * 60 * 60 * 1000;
+
+// Safety-net TTL on the distributed refresh lock: comfortably longer than a
+// Discord token exchange should ever take, so a crashed instance can't hold
+// the lock indefinitely and block refreshes for that user on every other
+// instance.
+const REFRESH_LOCK_TTL_MS = 30_000;
 
 type TokenRefreshResult = {
   accessToken: string;
@@ -41,14 +48,24 @@ export function requireAuthenticated(
  * failure is logged and the request proceeds rather than forcing a logout,
  * and a session with no linked Discord credential (a Google- or Twitch-only
  * sign-in) skips this entirely.
+ *
+ * `redis`, when supplied, backs a distributed lock alongside the in-process
+ * one below: without it, two backend instances could both decide the same
+ * user's token is stale and race Discord's refresh-token rotation, with the
+ * loser's exchange failing. Optional so callers that don't wire up Redis
+ * (tests) still work, falling back to single-instance-only locking.
  */
 export function createFreshTokenMiddleware(
   repository: IdentityRepository,
+  redis?: Redis,
 ): (
   req: express.Request,
   res: express.Response,
   next: express.NextFunction,
 ) => Promise<void> {
+  // Dedupes concurrent requests for the same user within this instance
+  // without a Redis round trip; the distributed lock below is only needed
+  // to coordinate across separate instances.
   const locks = new Map<string, Promise<void>>();
 
   return async function ensureFreshDiscordToken(
@@ -86,15 +103,35 @@ export function createFreshTokenMiddleware(
         locks.set(
           uid,
 
-          refreshDiscordToken(discord.refreshToken)
-            .then((tokens) =>
-              repository.updateDiscordCredential(uid, {
+          (async () => {
+            const lockKey = `lock:discord-token-refresh:${uid}`;
+
+            // Without Redis (tests, or a deployment that hasn't wired it
+            // up), there's no cross-instance coordination possible anyway,
+            // so this instance always proceeds - matching the previous
+            // single-instance-only behavior exactly.
+            const acquiredLock = redis
+              ? (await redis.set(lockKey, "1", "PX", REFRESH_LOCK_TTL_MS, "NX")) ===
+                "OK"
+              : true;
+
+            if (!acquiredLock) {
+              // Another instance is already refreshing this user's token;
+              // skip rather than racing Discord's refresh-token rotation.
+              // Nothing depends on this request seeing a freshened token
+              // (see the doc comment above), so there's nothing to wait for.
+              return;
+            }
+
+            try {
+              const tokens = await refreshDiscordToken(discord.refreshToken);
+
+              await repository.updateDiscordCredential(uid, {
                 ...tokens,
 
                 fetchTime: Date.now(),
-              }),
-            )
-            .catch((error: unknown) => {
+              });
+            } catch (error: unknown) {
               logger.warn(
                 {
                   requestId: req.requestId,
@@ -105,10 +142,19 @@ export function createFreshTokenMiddleware(
                 },
                 "Discord token refresh failed; continuing without it",
               );
-            })
-            .finally(() => {
-              locks.delete(uid);
-            }),
+            } finally {
+              if (redis) {
+                await redis.del(lockKey).catch((error: unknown) => {
+                  logger.warn(
+                    { userId: uid, error },
+                    "Failed to release Discord token refresh lock",
+                  );
+                });
+              }
+            }
+          })().finally(() => {
+            locks.delete(uid);
+          }),
         );
       }
 

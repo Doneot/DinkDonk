@@ -1,5 +1,6 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder } from "discord.js";
+import { replyEphemeral } from "./shared/commandReplies.js";
 
 export const data = new SlashCommandBuilder()
   .setName("help")
@@ -17,5 +18,5 @@ export async function execute(
 • \`/dashboard\` — Access your dashboard.
 • \`/help\` — Show this help message.
   `;
-  await interaction.reply(helpText);
+  await replyEphemeral(interaction, helpText);
 }

@@ -27,6 +27,9 @@ services:
       context: ../server
       dockerfile: Dockerfile.prod
     restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
     env_file:
       - .env.production
     secrets:
@@ -42,6 +45,11 @@ services:
       NODE_ENV: production
       PORT: 3000
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase_service_account
+      # Backs the rate limiters and EventSub replay store so both survive a
+      # restart and stay correct if this ever runs as more than one replica.
+      # No auth: redis is only reachable over the private, internal-only
+      # network below (same trust boundary as prometheus, further down).
+      REDIS_URL: redis://redis:6379
     expose:
       - "3000"
     healthcheck:
@@ -54,8 +62,32 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    # The app's graceful-shutdown sequence (runtime disposal, then
+    # sockets/Discord/Twitch teardown concurrently, then Firestore) can take
+    # up to ~10s in its worst case; Compose's default 10s grace period would
+    # SIGKILL it mid-teardown, so give it comfortable headroom.
+    stop_grace_period: 20s
     networks:
       - public
+      - private
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Rate-limit counters and EventSub replay dedup are both short-lived
+    # (TTL-bound) and non-critical if lost - an appendonly volume would add
+    # persistence for data that's explicitly designed not to need it, at the
+    # cost of extra disk I/O on every write.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    expose:
+      - "6379"
+    networks:
       - private
 
   prometheus:

@@ -45,14 +45,16 @@ export async function bootstrap() {
     cleanupScheduler,
   );
 
-  const [twitchStart, discordStart] = await Promise.allSettled([
+  const [twitchStart, discordStart, redisStart] = await Promise.allSettled([
     container.twitch.start(),
     container.discord.start(),
+    container.redis.connect(),
   ]);
 
   for (const [name, result] of [
     ["Twitch", twitchStart],
     ["Discord", discordStart],
+    ["Redis", redisStart],
   ] as const) {
     if (result.status === "rejected") {
       const error = new Error(`Failed to start ${name} client`, {
@@ -74,6 +76,20 @@ export async function bootstrap() {
       return;
     }
   }
+
+  // Node's default behavior for an unhandled 'error' event on a stream is to
+  // throw, crashing the process with a raw stack trace that bypasses both
+  // structured logging and the graceful shutdown() path - leaking the
+  // tunnel/Twitch/Discord clients that already started. Log and tear down
+  // deliberately instead.
+  server.httpServer.on("error", (error: NodeJS.ErrnoException) => {
+    logger.error(
+      { message: error.message, code: error.code, stack: error.stack },
+      "HTTP server error; tearing down",
+    );
+
+    void shutdown("startup_failure");
+  });
 
   server.httpServer.listen(env.port, "0.0.0.0", () => {
     logger.info(`HTTP and Socket.IO server listening on ${env.port}`);

@@ -19,6 +19,7 @@ import type { Repositories } from "../app/container/repositories.js";
 
 import type { TwitchStreamerProvider } from "../modules/twitch/ports/TwitchGateway.js";
 import type { DiscordService } from "../modules/discord/ports/DiscordService.js";
+import type { Redis } from "../infrastructure/redis/redisClient.js";
 
 import { createHealthRouter } from "./routes/healthRoutes.js";
 import { createMetricsAuth } from "./middleware/metricsAuth.js";
@@ -31,6 +32,18 @@ type ConfigureRoutesOptions = {
   twitch: TwitchStreamerProvider & { isReady?: boolean };
 
   discord: DiscordService;
+
+  /**
+   * Forwarded to the auth router so /logout can drop a user's live
+   * Socket.IO connections (see realtime/socketServer.ts's
+   * SocketServer#disconnectUser) once their session is destroyed. Optional
+   * so a caller that hasn't wired the socket server through yet still
+   * compiles.
+   */
+  disconnectUser?: (userId: string) => void;
+
+  /** See middleware/auth.ts's createFreshTokenMiddleware. */
+  redis?: Redis;
 };
 
 export function configureRoutes({
@@ -38,8 +51,13 @@ export function configureRoutes({
   repositories,
   twitch,
   discord,
+  disconnectUser,
+  redis,
 }: ConfigureRoutesOptions): void {
-  const ensureFreshToken = createFreshTokenMiddleware(repositories.identities);
+  const ensureFreshToken = createFreshTokenMiddleware(
+    repositories.identities,
+    redis,
+  );
 
   app.use(
     "/health",
@@ -58,7 +76,12 @@ export function configureRoutes({
     app.use("/metrics", ...metricsGuards, createMetricsRouter());
   }
 
-  app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
+  // Never served in production: the OpenAPI document/Swagger UI has no
+  // authentication of its own, and shouldn't be a public, unauthenticated
+  // way to enumerate every route this deployment exposes.
+  if (!env.isProduction) {
+    app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
+  }
 
   const authRouter = createAuthRouter({
     repository: repositories.users,
@@ -68,6 +91,8 @@ export function configureRoutes({
     discord,
 
     ensureFreshToken,
+
+    ...(disconnectUser ? { disconnectUser } : {}),
   });
 
   const apiRouter = createApiRouter({

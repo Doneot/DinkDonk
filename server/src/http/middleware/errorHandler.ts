@@ -11,6 +11,7 @@ import type {
 
 import { AppError } from "../errors/AppError.js";
 import { env } from "../../shared/config/env.js";
+import { TokenDecryptionError } from "../../shared/utils/crypto.js";
 
 function errorLogContext(error: Error, req: Request): Record<string, unknown> {
   return {
@@ -71,14 +72,32 @@ export const errorHandler: ErrorRequestHandler = (
     return res.status(error.statusCode).json(payload);
   }
 
+  // Same intent as passport.ts's deserializeUser: a rotated or corrupted
+  // encryption key means this session's stored tokens can no longer be
+  // trusted, so log it out gracefully (401) instead of leaking the decrypt
+  // failure to the client as a generic 500.
+  if (error instanceof TokenDecryptionError) {
+    logger.warn(errorLogContext(error, req), "Handled token decryption error");
+
+    return res.status(401).json({
+      error: "unauthorized",
+      message: "Unauthorized",
+    });
+  }
+
   const frameworkStatusCode = frameworkClientErrorStatus(error);
 
   if (frameworkStatusCode !== undefined) {
     logger.warn(errorLogContext(error, req), "Handled framework request error");
 
+    // error.message here is whatever the framework/underlying parser put on
+    // the exception (e.g. body-parser's raw JSON parse error text) - unlike
+    // the AppError branch above, it isn't a message this codebase authored
+    // for client consumption, so it's not sent as-is. The real message is
+    // still captured in errorLogContext above for debugging.
     return res.status(frameworkStatusCode).json({
       error: toErrorCode(frameworkStatusCode),
-      message: error.message,
+      message: STATUS_CODES[frameworkStatusCode] ?? "Request Error",
     });
   }
 

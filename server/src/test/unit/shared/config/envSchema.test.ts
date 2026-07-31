@@ -4,15 +4,14 @@ import { EnvSchema } from "../../../../shared/config/envSchema.js";
 
 const REQUIRED_FIREBASE_KEYS = [
   "FIREBASE_PROJECT_ID",
-  "FIREBASE_CLIENT_ID",
   "FIREBASE_CLIENT_EMAIL",
-  "FIREBASE_PRIVATE_KEY_ID",
   "FIREBASE_PRIVATE_KEY",
 ] as const;
 
 function baseEnv(overrides: Record<string, string | undefined> = {}) {
   return {
     SERVER_URL: "http://localhost:3000",
+    REDIS_URL: "redis://localhost:6379",
     SESSION_SECRET: "session-secret-16-bytes-long!!!!",
     ENCRYPTION_KEY: "encryption-key-32-bytes-long!!!!",
     DISCORD_CLIENT_ID: "discord-client-id",
@@ -25,9 +24,7 @@ function baseEnv(overrides: Record<string, string | undefined> = {}) {
     WEB_PUSH_PRIVATE_KEY: "web-push-private-key",
     WEB_PUSH_SUBJECT: "mailto:test@example.com",
     FIREBASE_PROJECT_ID: "project",
-    FIREBASE_CLIENT_ID: "client",
     FIREBASE_CLIENT_EMAIL: "firebase@example.com",
-    FIREBASE_PRIVATE_KEY_ID: "key-id",
     FIREBASE_PRIVATE_KEY: "private-key",
     ...overrides,
   };
@@ -49,12 +46,37 @@ describe("EnvSchema", () => {
 
     expect(parsed).toMatchObject({
       NODE_ENV: "development",
-      PORT: 3000,
       UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN: false,
       EVENTSUB_GC_INTERVAL_MS: 6 * 60 * 60 * 1000,
       PROMETHEUS_ENABLED: false,
       REQUEST_LOGGING_ENABLED: false,
+      LOG_LEVEL: "info",
     });
+  });
+
+  // Unlike most numeric env vars, PORT has no schema-level default: it must
+  // be able to come back genuinely undefined so env.ts can fall back to
+  // BACKEND_PORT before finally defaulting to 3000 itself.
+  it("leaves PORT undefined when unset", () => {
+    const parsed = EnvSchema.parse(baseEnv());
+
+    expect(parsed.PORT).toBeUndefined();
+  });
+
+  it("rejects a non-numeric PORT", () => {
+    expect(messagesFor(baseEnv({ PORT: "not-a-number" }))).not.toHaveLength(
+      0,
+    );
+  });
+
+  it("rejects a PORT of zero", () => {
+    expect(messagesFor(baseEnv({ PORT: "0" }))).not.toHaveLength(0);
+  });
+
+  it("coerces a numeric PORT", () => {
+    const parsed = EnvSchema.parse(baseEnv({ PORT: "8080" }));
+
+    expect(parsed.PORT).toBe(8080);
   });
 
   it("reads explicit runtime settings", () => {
@@ -65,6 +87,7 @@ describe("EnvSchema", () => {
         UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN: "true",
         EVENTSUB_GC_INTERVAL_MS: "1000",
         PROMETHEUS_ENABLED: "1",
+        METRICS_TOKEN: "a-real-metrics-token-1234567890",
         REQUEST_LOGGING_ENABLED: "1",
         TUNNEL_PROVIDER: "ssh",
       }),
@@ -142,6 +165,38 @@ describe("EnvSchema", () => {
     ).not.toHaveLength(0);
   });
 
+  it("keeps a single SESSION_SECRET as a one-element list", () => {
+    const parsed = EnvSchema.parse(baseEnv());
+
+    expect(parsed.SESSION_SECRET).toEqual([
+      "session-secret-16-bytes-long!!!!",
+    ]);
+  });
+
+  it("splits a comma-separated SESSION_SECRET for rotation", () => {
+    const parsed = EnvSchema.parse(
+      baseEnv({
+        SESSION_SECRET:
+          "new-secret-16-bytes-long!!, old-secret-16-bytes-long!!",
+      }),
+    );
+
+    expect(parsed.SESSION_SECRET).toEqual([
+      "new-secret-16-bytes-long!!",
+      "old-secret-16-bytes-long!!",
+    ]);
+  });
+
+  it("rejects a comma-separated SESSION_SECRET with a too-short entry", () => {
+    expect(
+      messagesFor(
+        baseEnv({
+          SESSION_SECRET: "session-secret-16-bytes-long!!!!,short",
+        }),
+      ),
+    ).not.toHaveLength(0);
+  });
+
   it("leaves GOOGLE_CLIENT_ID/SECRET undefined when both unset", () => {
     const parsed = EnvSchema.parse(baseEnv());
 
@@ -206,6 +261,24 @@ describe("EnvSchema", () => {
     ).not.toHaveLength(0);
   });
 
+  it("requires METRICS_TOKEN when PROMETHEUS_ENABLED is true", () => {
+    expect(
+      messagesFor(baseEnv({ PROMETHEUS_ENABLED: "true" })),
+    ).toContain("METRICS_TOKEN is required when PROMETHEUS_ENABLED is true");
+  });
+
+  it("accepts PROMETHEUS_ENABLED with a METRICS_TOKEN set", () => {
+    const parsed = EnvSchema.parse(
+      baseEnv({
+        PROMETHEUS_ENABLED: "true",
+        METRICS_TOKEN: "a-real-metrics-token-1234567890",
+      }),
+    );
+
+    expect(parsed.PROMETHEUS_ENABLED).toBe(true);
+    expect(parsed.METRICS_TOKEN).toBe("a-real-metrics-token-1234567890");
+  });
+
   it("rejects a non-numeric BACKEND_PORT", () => {
     expect(
       messagesFor(baseEnv({ BACKEND_PORT: "not-a-number" })),
@@ -221,6 +294,24 @@ describe("EnvSchema", () => {
   it("rejects an unknown tunnel provider", () => {
     expect(
       messagesFor(baseEnv({ TUNNEL_PROVIDER: "cloudflare" })),
+    ).not.toHaveLength(0);
+  });
+
+  it("defaults LOG_LEVEL to info", () => {
+    const parsed = EnvSchema.parse(baseEnv());
+
+    expect(parsed.LOG_LEVEL).toBe("info");
+  });
+
+  it("reads an explicit LOG_LEVEL", () => {
+    const parsed = EnvSchema.parse(baseEnv({ LOG_LEVEL: "debug" }));
+
+    expect(parsed.LOG_LEVEL).toBe("debug");
+  });
+
+  it("rejects an unknown LOG_LEVEL", () => {
+    expect(
+      messagesFor(baseEnv({ LOG_LEVEL: "verbose" })),
     ).not.toHaveLength(0);
   });
 });

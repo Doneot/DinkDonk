@@ -24,6 +24,7 @@ export default defineConfig({
         "src/app/container/**",
         "src/shared/config/firebase.ts",
         "src/docs/**",
+        "src/deploy-commands.ts",
       ],
     },
   },

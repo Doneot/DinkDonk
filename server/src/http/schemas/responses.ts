@@ -85,7 +85,7 @@ export const unsubscribeResponseSchema = z.union([
   }),
   z.object({
     success: z.literal(false),
-    reason: z.enum(["invalid_input", "user_not_found"]),
+    reason: z.enum(["invalid_input", "user_not_found", "not_subscribed"]),
   }),
 ]);
 

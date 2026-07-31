@@ -11,13 +11,25 @@ export function configureEventSubscriptions({
   // bus (see createRepositories), so registering here catches a streamer
   // created through either one.
   repositories.subscriptions.events.on("streamerAdded", (event) => {
-    return services.eventSubSync.handleStreamerAdded(event.streamerId);
+    return services.eventSubSync
+      .handleStreamerAdded(event.streamerId)
+      .catch((error: unknown) => {
+        logger.error(
+          { error, streamerId: event.streamerId },
+          'Failed to handle "streamerAdded" event',
+        );
+      });
   });
 
   repositories.subscriptions.events.on("streamerEmpty", (event) => {
-    return services.subscriptionCleanup.garbageCollectStreamer(
-      event.streamerId,
-    );
+    return services.subscriptionCleanup
+      .garbageCollectStreamer(event.streamerId)
+      .catch((error: unknown) => {
+        logger.error(
+          { error, streamerId: event.streamerId },
+          'Failed to handle "streamerEmpty" event',
+        );
+      });
   });
 
   twitch.on("ready", () =>

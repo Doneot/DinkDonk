@@ -28,6 +28,17 @@ jobs:
       - run: npm run coverage
       - run: npm run build
 
+      # Non-blocking: firebase-admin's dependency chain currently carries a
+      # known, tracked transitive vulnerability with no fix available yet.
+      # This still surfaces new high-severity issues in the job log without
+      # turning CI red for the one that's already known.
+      - name: npm audit (non-blocking)
+        run: npm audit --omit=dev --audit-level=high || true
+
+      - name: Docker build smoke test
+        working-directory: .
+        run: docker build -f server/Dockerfile.prod server
+
   client:
     runs-on: ubuntu-latest
 

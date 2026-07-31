@@ -11,13 +11,15 @@ export async function execute(
   interaction: ChatInputCommandInteraction,
   context: CommandContext,
 ): Promise<void> {
-  const { userRepository, twitch } = context;
+  const { twitch } = context;
 
-  const user = await requireDMCapableUser(interaction, userRepository);
+  const resolved = await requireDMCapableUser(interaction, context);
 
-  if (!user) {
+  if (!resolved) {
     return;
   }
+
+  const { user } = resolved;
 
   if (!user.subscriptions.length) {
     await replyEphemeral(interaction, "📭 You have no subscriptions yet.");

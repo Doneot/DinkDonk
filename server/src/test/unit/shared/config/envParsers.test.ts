@@ -1,15 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const existsSync = vi.fn<(path: string) => boolean>();
 const readFileSync = vi.fn<(path: string, encoding: string) => string>();
 
 vi.mock("fs", () => ({
   default: {
-    existsSync: (path: string) => existsSync(path),
     readFileSync: (path: string, encoding: string) =>
       readFileSync(path, encoding),
   },
 }));
+
+function enoent(path: string) {
+  return Object.assign(
+    new Error(`ENOENT: no such file or directory, open '${path}'`),
+    { code: "ENOENT" },
+  );
+}
 
 // envSchema.js (pulled in transitively by setupEnv.ts's logger import) already
 // imported the real, unmocked "fs" before this file's mock was registered;
@@ -62,21 +67,25 @@ describe("secretFromEnv", () => {
     expect(secretFromEnv("session_secret").parse("session-secret")).toBe(
       "session-secret",
     );
-    expect(existsSync).not.toHaveBeenCalled();
+    expect(readFileSync).not.toHaveBeenCalled();
   });
 
   it("falls back to the named docker secret file when the value is missing", () => {
-    existsSync.mockReturnValue(true);
     readFileSync.mockReturnValue("from-secret\n");
 
     expect(secretFromEnv("session_secret").parse(undefined)).toBe(
       "from-secret",
     );
-    expect(existsSync).toHaveBeenCalledWith("/run/secrets/session_secret");
+    expect(readFileSync).toHaveBeenCalledWith(
+      "/run/secrets/session_secret",
+      "utf8",
+    );
   });
 
   it("rejects when neither the value nor the secret file is present", () => {
-    existsSync.mockReturnValue(false);
+    readFileSync.mockImplementation(() => {
+      throw enoent("/run/secrets/session_secret");
+    });
 
     expect(() => secretFromEnv("session_secret").parse(undefined)).toThrow();
   });
@@ -94,17 +103,21 @@ describe("optionalSecretFromEnv", () => {
   });
 
   it("falls back to the named docker secret file when the value is missing", () => {
-    existsSync.mockReturnValue(true);
     readFileSync.mockReturnValue("from-secret\n");
 
     expect(optionalSecretFromEnv("metrics_token").parse(undefined)).toBe(
       "from-secret",
     );
-    expect(existsSync).toHaveBeenCalledWith("/run/secrets/metrics_token");
+    expect(readFileSync).toHaveBeenCalledWith(
+      "/run/secrets/metrics_token",
+      "utf8",
+    );
   });
 
   it("resolves to undefined, not an error, when neither is present", () => {
-    existsSync.mockReturnValue(false);
+    readFileSync.mockImplementation(() => {
+      throw enoent("/run/secrets/metrics_token");
+    });
 
     expect(
       optionalSecretFromEnv("metrics_token").parse(undefined),

@@ -101,7 +101,7 @@ const SubscriptionsManager = ({ canReceiveDM }) => {
   const handleUnsubscribe = useCallback(
     (id) => {
       api
-        .delete("/subscriptions", { data: { streamerId: id } })
+        .delete("/subscriptions", { params: { streamerId: id } })
         .then(() => {
           setUser((prev) => ({
             ...prev,

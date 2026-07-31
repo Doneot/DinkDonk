@@ -74,7 +74,7 @@ export type ShutdownHandle = {
 
 export function registerShutdownHooks(
   runtime: Runtime,
-  { twitch, discord }: Container,
+  { twitch, discord, firestore, redis }: Container,
   { httpServer, sockets }: Server,
   userChangeBroadCaster: UserChangeBroadcaster,
   cleanScheduler: SubscriptionCleanupScheduler,
@@ -89,10 +89,6 @@ export function registerShutdownHooks(
     shuttingDown = true;
 
     logger.info(`Shutting down gracefully (${reason})`);
-
-    userChangeBroadCaster.stop();
-
-    cleanScheduler.stop();
 
     let hadFailure = false;
 
@@ -109,26 +105,50 @@ export function registerShutdownHooks(
     };
 
     try {
+      // Wrapped in the same try/catch as every other step below (rather than
+      // called bare beforehand) so a synchronous throw from either .stop()
+      // can't bypass the rest of teardown and the process.exit() call.
+      userChangeBroadCaster.stop();
+
+      cleanScheduler.stop();
+
       await track(runtime.dispose(), "runtime.dispose");
 
-      // sockets.close() (io.close()) disconnects every live WebSocket client
-      // and, because the Socket.IO server was attached to this http.Server,
-      // also closes that http.Server once its clients are gone - there is no
-      // separate http.Server.close() call to make here, since http.Server
-      // rejects a second close() on an already-closed server. Bound the whole
-      // thing with a timeout and force-close anything still open as a last
-      // resort, since http.Server.close()'s callback only fires once every
-      // open connection has ended.
-      await track(sockets.close(), "sockets.close", () => {
-        httpServer.closeAllConnections();
-      });
+      // sockets/discord/twitch are independent external connections with no
+      // ordering dependency on one another - running them concurrently keeps
+      // the worst-case teardown time to roughly one step's timeout instead of
+      // three, which matters because Docker's default stop_grace_period
+      // (10s) is shorter than three sequential 5s step timeouts.
+      await Promise.all([
+        // sockets.close() (io.close()) disconnects every live WebSocket
+        // client and, because the Socket.IO server was attached to this
+        // http.Server, also closes that http.Server once its clients are
+        // gone - there is no separate http.Server.close() call to make here,
+        // since http.Server rejects a second close() on an already-closed
+        // server. Bound the whole thing with a timeout and force-close
+        // anything still open as a last resort, since http.Server.close()'s
+        // callback only fires once every open connection has ended.
+        track(sockets.close(), "sockets.close", () => {
+          httpServer.closeAllConnections();
+        }),
 
-      await track(discord.stop(), "discord.stop");
+        track(discord.stop(), "discord.stop"),
 
-      await track(
-        twitch.stop({ unsubscribeEventSub: env.unsubscribeEventSubOnShutdown }),
-        "twitch.stop",
-      );
+        track(
+          twitch.stop({
+            unsubscribeEventSub: env.unsubscribeEventSubOnShutdown,
+          }),
+          "twitch.stop",
+        ),
+      ]);
+
+      await Promise.all([
+        track(firestore.terminate(), "firestore.terminate"),
+
+        // quit() sends a graceful QUIT and waits for pending replies, unlike
+        // disconnect() which drops the connection immediately.
+        track(redis.quit(), "redis.quit"),
+      ]);
 
       logger.info("Shutdown complete");
 

@@ -1,10 +1,58 @@
 import { describe, expect, it } from "vitest";
 
 import { FirestorePushSubscriptionRepository } from "../../../modules/notifications/infrastructure/firestore/FirestorePushSubscriptionRepository.js";
+import type { PushSubscription } from "../../../modules/notifications/domain/PushSubscription.js";
 
+import { pushSubscriptionRepositoryBehavior } from "../contracts/PushSubscriptionRepository.behavior.js";
 import { FakeFirestore } from "../../helpers/fakeFirestore.js";
 
 import { anyValue } from "../../helpers/matchers.js";
+
+pushSubscriptionRepositoryBehavior("FirestorePushSubscriptionRepository", () => {
+  const firestore = new FakeFirestore();
+  const repository = new FirestorePushSubscriptionRepository(
+    firestore.asFirestore(),
+  );
+
+  // Subscriptions live in a users/{userId}/pushSubscriptions/{id}
+  // subcollection, which firestore.paths() can't list recursively - track
+  // every user id this test instance has touched so clear() can sweep each
+  // one's subcollection explicitly.
+  const touchedUserIds = new Set<string>();
+
+  const originalSave = repository.savePushSubscription.bind(repository);
+
+  repository.savePushSubscription = (userId, ...rest) => {
+    touchedUserIds.add(userId);
+
+    return originalSave(userId, ...rest);
+  };
+
+  return Object.assign(repository, {
+    seed(userId: string, subscription: PushSubscription): void {
+      touchedUserIds.add(userId);
+
+      const id = Buffer.from(subscription.subscription.endpoint).toString(
+        "base64url",
+      );
+
+      firestore.write(`users/${userId}/pushSubscriptions/${id}`, {
+        subscription: subscription.subscription,
+        userAgent: subscription.userAgent,
+      });
+    },
+
+    clear(): void {
+      for (const userId of touchedUserIds) {
+        for (const path of firestore.paths(
+          `users/${userId}/pushSubscriptions`,
+        )) {
+          firestore.remove(path);
+        }
+      }
+    },
+  });
+});
 
 const SUBSCRIPTION = {
   endpoint: "https://push.example.com/subscription-1",

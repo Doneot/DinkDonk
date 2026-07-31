@@ -134,4 +134,40 @@ describe("createDomainEventBus", () => {
 
     expect(lateHandler).not.toHaveBeenCalled();
   });
+
+  it("stops calling a handler once it has been off()'d", async () => {
+    const bus = createDomainEventBus(createFakeLogger());
+    const handler = vi.fn().mockResolvedValue(undefined);
+
+    bus.on("streamerAdded", handler);
+    bus.off("streamerAdded", handler);
+    bus.emit({ type: "streamerAdded", streamerId: "streamer-1" });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("off() only removes the matching handler, leaving others registered for the same type", async () => {
+    const bus = createDomainEventBus(createFakeLogger());
+    const first = vi.fn().mockResolvedValue(undefined);
+    const second = vi.fn().mockResolvedValue(undefined);
+
+    bus.on("streamerAdded", first);
+    bus.on("streamerAdded", second);
+    bus.off("streamerAdded", first);
+    bus.emit({ type: "streamerAdded", streamerId: "streamer-1" });
+
+    await vi.waitFor(() => {
+      expect(second).toHaveBeenCalledOnce();
+    });
+    expect(first).not.toHaveBeenCalled();
+  });
+
+  it("off() is a no-op for a handler that was never registered", () => {
+    const bus = createDomainEventBus(createFakeLogger());
+    const handler = vi.fn().mockResolvedValue(undefined);
+
+    expect(() => bus.off("streamerAdded", handler)).not.toThrow();
+  });
 });

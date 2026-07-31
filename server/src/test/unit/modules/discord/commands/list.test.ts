@@ -4,6 +4,7 @@ import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
 import { execute } from "../../../../../commands/list.js";
 import type { CommandContext } from "../../../../../modules/discord/domain/CommandContext.js";
 import { buildUser } from "../../../../builders/user.js";
+import { buildIdentity } from "../../../../builders/auth.js";
 import { TEST_USER_ID } from "../../../../constants.js";
 
 function createInteraction() {
@@ -18,6 +19,14 @@ function createInteraction() {
   };
 }
 
+function identityRepository() {
+  return {
+    getIdentityByDiscordUid: vi
+      .fn()
+      .mockResolvedValue(buildIdentity({ uid: TEST_USER_ID })),
+  };
+}
+
 describe("list command", () => {
   it("tells the user when it cannot DM them", async () => {
     const { interaction, reply } = createInteraction();
@@ -25,6 +34,7 @@ describe("list command", () => {
       userRepository: {
         getUser: vi.fn().mockResolvedValue(buildUser({ canReceiveDM: false })),
       },
+      identityRepository: identityRepository(),
     } as unknown as CommandContext;
 
     await execute(interaction, context);
@@ -43,6 +53,7 @@ describe("list command", () => {
           buildUser({ canReceiveDM: true, subscriptions: [] }),
         ),
       },
+      identityRepository: identityRepository(),
     } as unknown as CommandContext;
 
     await execute(interaction, context);
@@ -67,6 +78,7 @@ describe("list command", () => {
           }),
         ),
       },
+      identityRepository: identityRepository(),
       twitch: {
         fetchStreamers: vi.fn().mockResolvedValue([
           { id: "streamer-1", login: "one", display_name: "One" },

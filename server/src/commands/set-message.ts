@@ -16,6 +16,7 @@ export const data = new SlashCommandBuilder()
     option
       .setName("message")
       .setDescription("Use placeholder like `%s` for streamer name")
+      .setMaxLength(500)
       .setRequired(true),
   );
 
@@ -26,7 +27,7 @@ export async function execute(
   const username = interaction.options.getString("username", true);
   const notificationMessage = interaction.options.getString("message", true);
 
-  const { userRepository, subscriptionRepository, twitch } = context;
+  const { subscriptionRepository, twitch } = context;
 
   const streamer = await twitch.getStreamer(username);
 
@@ -35,14 +36,14 @@ export async function execute(
     return;
   }
 
-  const user = await requireDMCapableUser(interaction, userRepository);
+  const resolved = await requireDMCapableUser(interaction, context);
 
-  if (!user) {
+  if (!resolved) {
     return;
   }
 
   const res = await subscriptionRepository.updateSubscription(
-    interaction.user.id,
+    resolved.uid,
     streamer.id,
     { notification_message: notificationMessage },
   );

@@ -241,6 +241,63 @@ describe("WebPushNotificationChannel", () => {
     });
   });
 
+  it("reports expired (not failed) when every subscription had already expired", async () => {
+    const expiredOne = buildPushSubscription({
+      subscription: {
+        endpoint: "https://example.com/push/one",
+        keys: { p256dh: "p256dh", auth: "auth" },
+      },
+    });
+    const expiredTwo = buildPushSubscription({
+      subscription: {
+        endpoint: "https://example.com/push/two",
+        keys: { p256dh: "p256dh", auth: "auth" },
+      },
+    });
+
+    const { channel } = setup({ subscriptions: [expiredOne, expiredTwo] });
+
+    sendNotification.mockRejectedValue(pushError(410));
+
+    const result = await channel.send(user, notification);
+
+    expect(result.sent).toBe(false);
+    expect(result.expired).toBe(true);
+  });
+
+  it("does not report expired when at least one subscription genuinely failed", async () => {
+    const expired = buildPushSubscription({
+      subscription: {
+        endpoint: "https://example.com/push/expired",
+        keys: { p256dh: "p256dh", auth: "auth" },
+      },
+    });
+    const failing = buildPushSubscription({
+      subscription: {
+        endpoint: "https://example.com/push/failing",
+        keys: { p256dh: "p256dh", auth: "auth" },
+      },
+    });
+
+    expired.id = "expired";
+    failing.id = "failing";
+
+    vi.spyOn(logger, "error").mockReturnValue();
+
+    const { channel } = setup({ subscriptions: [expired, failing] });
+
+    sendNotification.mockImplementation((target) =>
+      (target as { endpoint: string }).endpoint.endsWith("expired")
+        ? Promise.reject(pushError(410))
+        : Promise.reject(pushError(500, "service unavailable")),
+    );
+
+    const result = await channel.send(user, notification);
+
+    expect(result.sent).toBe(false);
+    expect(result.expired).toBeUndefined();
+  });
+
   it("reports success when at least one subscription accepts the push", async () => {
     const healthy = buildPushSubscription({
       subscription: {

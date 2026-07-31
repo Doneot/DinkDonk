@@ -1,5 +1,6 @@
 process.env.NODE_ENV = "test";
 process.env.SERVER_URL = "http://localhost:3000";
+process.env.REDIS_URL = "redis://localhost:6379";
 process.env.CLIENT_ORIGIN = "http://localhost:5000";
 process.env.SESSION_SECRET = "test-session-secret";
 process.env.ENCRYPTION_KEY = "test-encryption-key-32-bytes-long!!";

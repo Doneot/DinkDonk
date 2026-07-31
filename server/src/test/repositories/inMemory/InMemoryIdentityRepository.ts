@@ -29,6 +29,20 @@ export class InMemoryIdentityRepository implements IdentityRepository {
     return Promise.resolve(structuredClone(this.identities.get(uid) ?? null));
   }
 
+  getIdentityByDiscordUid(discordUid: string): Promise<Identity | null> {
+    if (!isNonEmptyString(discordUid)) {
+      return Promise.resolve(null);
+    }
+
+    const uid = this.links.get(`discord:${discordUid}`);
+
+    if (uid === undefined) {
+      return Promise.resolve(null);
+    }
+
+    return this.getIdentity(uid);
+  }
+
   upsertDiscordIdentity(
     profile: DiscordCredential,
     email: string | null,

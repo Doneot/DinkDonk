@@ -18,6 +18,7 @@ import type { DomainEventBus } from "../../../../shared/events/DomainEventBus.js
 import { isNonEmptyString } from "../../../../shared/utils/validators.js";
 import { UserRecordSchema } from "../../../users/infrastructure/firestore/records/UserRecord.js";
 import { toUser } from "../../../users/infrastructure/firestore/mappers/userMapper.js";
+import { SubscriptionSchema } from "../../schemas/SubscriptionSchema.js";
 
 // Reuses FirestoreUserRepository's validated schema/mapper rather than an
 // unchecked cast, so a malformed user document surfaces as a Zod error
@@ -83,18 +84,28 @@ export class FirestoreSubscriptionRepository implements SubscriptionRepository {
         } as const;
       }
 
+      // Validated against SubscriptionSchema BEFORE it's written, so an
+      // invalid entry (e.g. a too-long notification_message) throws a clear
+      // Zod error right here instead of silently corrupting the user's
+      // document - previously the only validation was retroactive, on the
+      // next read via UserRecordSchema.parse, by which point the document
+      // was already "bricked".
+      const newSubscription = SubscriptionSchema.parse({
+        id: streamerId,
+        notification_message: notificationMessage,
+      });
+
+      // A plain tx.update (as unsubscribe/updateSubscription use) isn't safe
+      // here the way it is for them: they've both already confirmed
+      // userDoc.exists before reaching this point, but a user's very first
+      // subscribe has no prior document to update - Firestore's update()
+      // rejects when the target doc doesn't exist. {merge: true} creates it
+      // on demand while still writing only the touched field, rather than
+      // the previous ...user spread that also wrote a redundant `id` into
+      // the document (the doc's own key already is the user id).
       tx.set(
         userRef,
-        {
-          ...user,
-          subscriptions: [
-            ...currentSubscriptions,
-            {
-              id: streamerId,
-              notification_message: notificationMessage,
-            },
-          ],
-        },
+        { subscriptions: [...currentSubscriptions, newSubscription] },
         { merge: true },
       );
 
@@ -145,6 +156,19 @@ export class FirestoreSubscriptionRepository implements SubscriptionRepository {
       }
 
       const user = normalizeUserRecord(userId, userDoc.data());
+      const wasSubscribed = user.subscriptions.some((s) => s.id === streamerId);
+
+      if (!wasSubscribed) {
+        // Distinguishes "there was nothing to unsubscribe from" from an
+        // actual unsubscribe - without this, calling unsubscribe on a
+        // streamer the user was never subscribed to fell through to a
+        // no-op delete/filter and still reported {success: true}.
+        return {
+          success: false,
+          reason: "not_subscribed",
+        } as const;
+      }
+
       const nextSubscriptions = user.subscriptions.filter(
         (s) => s.id !== streamerId,
       );
@@ -189,9 +213,16 @@ export class FirestoreSubscriptionRepository implements SubscriptionRepository {
   async updateSubscription(
     userId: string,
     streamerId: string,
-    data: Partial<Subscription>,
+    data: Partial<Omit<Subscription, "id">>,
   ): Promise<UpdateSubscriptionResult> {
     const userRef = this.users.doc(userId);
+
+    // Defense-in-depth alongside the Partial<Omit<Subscription, "id">> patch
+    // type: even if a caller's `data` were cast/widened to smuggle an `id`
+    // through, it's stripped here so it can never override the entry being
+    // updated and desynchronize it from the `subscribers` subcollection doc
+    // (which stays keyed by the original id).
+    const { id: _ignoredId, ...patch } = data as Partial<Subscription>;
 
     return userRef.firestore.runTransaction(async (tx) => {
       const doc = await tx.get(userRef);
@@ -214,8 +245,13 @@ export class FirestoreSubscriptionRepository implements SubscriptionRepository {
         } as const;
       }
 
+      // Validated against SubscriptionSchema BEFORE it's written - see the
+      // matching comment in subscribe() for why this can't be left to the
+      // next read's retroactive UserRecordSchema.parse.
       const nextSubscriptions = user.subscriptions.map((s) =>
-        s.id === streamerId ? { ...s, ...data } : s,
+        s.id === streamerId
+          ? SubscriptionSchema.parse({ ...s, ...patch })
+          : s,
       );
 
       tx.update(userRef, { subscriptions: nextSubscriptions });

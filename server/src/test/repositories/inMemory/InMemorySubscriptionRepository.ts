@@ -5,6 +5,7 @@ import type {
   UnsubscribeResult,
   UpdateSubscriptionResult,
 } from "../../../modules/subscriptions/types/SubscribeResult.js";
+import { SubscriptionSchema } from "../../../modules/subscriptions/schemas/SubscriptionSchema.js";
 import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
@@ -36,7 +37,10 @@ export class InMemorySubscriptionRepository implements SubscriptionRepository {
     );
   }
 
-  subscribe(
+  // async so a synchronous SubscriptionSchema.parse() throw below becomes a
+  // rejected promise (matching FirestoreSubscriptionRepository's behavior)
+  // rather than throwing out of this call synchronously.
+  async subscribe(
     userId: string,
     streamerId: string,
     notificationMessage = "",
@@ -57,10 +61,13 @@ export class InMemorySubscriptionRepository implements SubscriptionRepository {
       });
     }
 
-    subscriptions.set(streamerId, {
-      id: streamerId,
-      notification_message: notificationMessage,
-    });
+    subscriptions.set(
+      streamerId,
+      SubscriptionSchema.parse({
+        id: streamerId,
+        notification_message: notificationMessage,
+      }),
+    );
 
     const createdStreamer = !this.streamerUsers.has(streamerId);
 
@@ -93,6 +100,13 @@ export class InMemorySubscriptionRepository implements SubscriptionRepository {
       });
     }
 
+    if (!subscriptions.has(streamerId)) {
+      return Promise.resolve({
+        success: false,
+        reason: "not_subscribed",
+      });
+    }
+
     subscriptions.delete(streamerId);
 
     let usersLeft = 0;
@@ -115,10 +129,11 @@ export class InMemorySubscriptionRepository implements SubscriptionRepository {
     });
   }
 
-  updateSubscription(
+  // async for the same reason as subscribe() above.
+  async updateSubscription(
     userId: string,
     streamerId: string,
-    data: Partial<Subscription>,
+    data: Partial<Omit<Subscription, "id">>,
   ): Promise<UpdateSubscriptionResult> {
     const subscriptions = this.userSubscriptions.get(userId);
 
@@ -138,10 +153,13 @@ export class InMemorySubscriptionRepository implements SubscriptionRepository {
       });
     }
 
-    subscriptions.set(streamerId, {
-      ...existing,
-      ...data,
-    });
+    subscriptions.set(
+      streamerId,
+      SubscriptionSchema.parse({
+        ...existing,
+        ...data,
+      }),
+    );
 
     return Promise.resolve({
       success: true,

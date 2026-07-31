@@ -6,6 +6,7 @@ import { NotFoundError } from "../../../../http/errors/NotFoundError.js";
 import { UnauthorizedError } from "../../../../http/errors/UnauthorizedError.js";
 import { env } from "../../../../shared/config/env.js";
 import { logger } from "../../../../shared/logger/logger.js";
+import { TokenDecryptionError } from "../../../../shared/utils/crypto.js";
 
 import {
   createMockRequest,
@@ -84,6 +85,19 @@ describe("errorHandler", () => {
     expect(warn.mock.calls[0]?.[0]).toMatchObject({ details: undefined });
   });
 
+  it("logs a user out gracefully with a 401 when stored tokens can't be decrypted", () => {
+    const warn = vi.spyOn(logger, "warn").mockReturnValue();
+
+    const res = handle(new TokenDecryptionError(new Error("bad auth tag")));
+
+    expect(res.statusCode).toBe(401);
+    expect(res.jsonBody).toEqual({
+      error: "unauthorized",
+      message: "Unauthorized",
+    });
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
   it("passes through a framework error's own 4xx status instead of flattening it to 500", () => {
     const warn = vi.spyOn(logger, "warn").mockReturnValue();
 
@@ -97,11 +111,17 @@ describe("errorHandler", () => {
     const res = handle(error);
 
     expect(res.statusCode).toBe(400);
+    // The raw framework message ("Unexpected token h in JSON") isn't sent to
+    // the client - only a generic, controlled message is - but it's still
+    // captured in the log context (asserted separately below).
     expect(res.jsonBody).toEqual({
       error: "bad_request",
-      message: "Unexpected token h in JSON",
+      message: "Bad Request",
     });
     expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]?.[0]).toMatchObject({
+      message: "Unexpected token h in JSON",
+    });
   });
 
   it("reads a framework error's status from statusCode when status is absent", () => {

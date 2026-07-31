@@ -11,6 +11,17 @@ export interface IdentityRepository {
   getIdentity(uid: string): Promise<Identity | null>;
 
   /**
+   * Resolves a raw Discord snowflake to the Identity (and thus the
+   * canonical `uid`) it's linked to, via the identityLinks/discord:{id}
+   * index - as opposed to getIdentity, which already requires the canonical
+   * uid. Needed anywhere a Discord id is the only thing on hand (e.g. a
+   * slash command interaction), since the Discord id is NOT the uid for any
+   * account that linked Discord as a secondary provider. Returns null when
+   * no account has this Discord id linked.
+   */
+  getIdentityByDiscordUid(discordUid: string): Promise<Identity | null>;
+
+  /**
    * Resolves a Discord profile to this app's uid and persists the given
    * credential, creating a new identity (or linking onto an existing one
    * found by verified email) if none exists yet. Returns the resulting

@@ -28,37 +28,43 @@ Frontend clients and notification channels remain decoupled from Twitch integrat
 
 # Backend architecture
 
-The backend entrypoint is:
+The backend is written in TypeScript and entered via:
 
 ```txt
-server/src/index.js
+server/src/app/index.ts
 ```
 
-The backend is organized into bounded modules.
+`npm run build` compiles `src/` to `dist/` (see `tsconfig.build.json`); `npm run dev` runs the TypeScript source directly through `tsx`.
+
+The backend is organized as a small composition root (`app/`) wiring together an HTTP layer (`http/`), a set of bounded modules (`modules/*`), and cross-cutting shared code (`shared/`). Each bounded module is internally layered (domain / ports / infrastructure / application), loosely following a hexagonal/ports-and-adapters style: domain types and business rules don't depend on Firestore, Express, or any other framework detail.
 
 ---
 
-## config/
+## app/
 
-Application configuration and runtime setup.
+The composition root and process lifecycle.
 
 Responsibilities:
-- environment loading
-- Docker secret loading
-- Firebase initialization
-- runtime configuration validation
+- process entrypoint and startup sequencing
+- dependency injection ("container") wiring every module's repositories, providers, and services together
+- runtime setup (tunneling, working-directory resolution)
+- graceful shutdown on `SIGINT`/`SIGTERM`
+- the recurring subscription garbage-collection scheduler
 
 Important files:
 
 ```txt
-server/src/config/env.js
-server/src/config/firebase.js
+server/src/app/index.ts               entrypoint - awaits bootstrap(), exits non-zero on failure
+server/src/app/bootstrap.ts           starts the runtime, container, HTTP server, Twitch/Discord clients
+server/src/app/shutdown.ts            registers signal handlers, tears everything down with per-step timeouts
+server/src/app/server.ts              builds the http.Server + Socket.IO server
+server/src/app/configureEventSubscriptions.ts   wires DomainEventBus events to application services
+server/src/app/SubscriptionCleanupScheduler.ts  periodic EventSub subscription garbage collection
+server/src/app/container/            dependency injection: repositories.ts, providers.ts, services.ts, notifications.ts, index.ts
+server/src/app/runtime/              tunnel/runtime lifecycle (ngrok/ssh), independent of any one module
 ```
 
-Configuration should support:
-- local `.env` files for development
-- Docker secrets for production and staging
-- service account JSON for Firebase in deployed environments
+This layer should only wire things together - business logic belongs in `modules/*`, and request handling belongs in `http/`.
 
 ---
 
@@ -67,102 +73,106 @@ Configuration should support:
 Express application layer.
 
 Responsibilities:
-- Express initialization
-- middleware registration
-- session handling
-- Passport authentication
-- HTTP routes
-- OAuth callbacks
+- Express app/middleware initialization (`createApp.ts`, `configureMiddleware.ts`)
+- session handling (Firestore-backed session store, cookie config)
+- Passport authentication strategies and OAuth callback routes
+- request validation (Zod schemas per route)
+- HTTP routes: API routes, auth routes, the Twitch EventSub webhook, health and metrics endpoints
 
-Expected responsibilities:
-- expose API routes
-- expose auth routes
-- expose EventSub callback routes
-- never contain low-level Twitch/Discord persistence logic
+Important files:
+
+```txt
+server/src/http/createApp.ts
+server/src/http/configureMiddleware.ts
+server/src/http/configureRoutes.ts
+server/src/http/passport.ts
+server/src/http/routes/            apiRoutes.ts, authRoutes.ts, eventSubRoutes.ts, healthRoutes.ts, metricsRoutes.ts
+server/src/http/middleware/        requestId, requestLogger, httpMetrics, auth, errorHandler, validate
+server/src/http/schemas/           Zod request/response schemas, also reused to generate the OpenAPI spec
+server/src/http/errors/            typed HTTP error classes (BadRequestError, NotFoundError, ...)
+```
+
+This layer should expose routes and translate HTTP <-> application calls, but should never contain low-level Twitch/Discord/Firestore persistence logic directly.
 
 ---
 
-## integrations/
+## modules/
 
-Third-party service clients.
+Bounded modules, one per domain concept: `auth`, `discord`, `notifications`, `streamers`, `subscriptions`, `twitch`, `users`. Each module is organized the same way (not every module has every layer, but the layering is consistent where it appears):
 
-Responsibilities:
-- Twitch API access
-- Discord bot lifecycle
-- external API abstractions
+```txt
+modules/<name>/domain/            entities, value objects, plain business types (no framework deps)
+modules/<name>/ports/             interfaces the application layer depends on (repositories, services)
+modules/<name>/infrastructure/    concrete adapters implementing those ports (Firestore repositories,
+                                   the Twitch/Discord clients, notification channels)
+modules/<name>/application/       orchestration services that implement use cases against ports
+modules/<name>/schemas/           Zod schemas for the module's persisted/public shapes
+modules/<name>/types/             small module-local result/DTO types
+```
 
 Examples:
 
 ```txt
-server/src/integrations/TwitchClient.js
-server/src/integrations/DiscordBot.js
+server/src/modules/notifications/domain/Notification.ts
+server/src/modules/notifications/ports/PushSubscriptionRepository.ts
+server/src/modules/notifications/infrastructure/firestore/FirestorePushSubscriptionRepository.ts
+server/src/modules/notifications/infrastructure/channels/DiscordNotificationChannel.ts
+server/src/modules/notifications/infrastructure/channels/WebPushNotificationChannel.ts
+server/src/modules/notifications/application/NotificationManager.ts
+server/src/modules/notifications/application/EventSubSyncService.ts
+server/src/modules/subscriptions/infrastructure/firestore/FirestoreSubscriptionRepository.ts
+server/src/modules/twitch/infrastructure/TwitchClient.ts
+server/src/modules/discord/infrastructure/DiscordBot.ts
 ```
-
-This layer should know how to speak to external APIs, but should not own high-level business workflows.
-
----
-
-## services/
-
-Application orchestration layer.
-
-Responsibilities:
-- EventSub workflows
-- notification delivery
-- subscription synchronization
-- business logic coordination
-
-This layer should remain independent from transport-specific implementations.
 
 Current notification flow:
 
 ```txt
 Twitch live event
-    -> notification service
-        -> Discord delivery
-        -> Socket.IO delivery
+    -> NotificationManager
+        -> DiscordNotificationChannel
+        -> WebPushNotificationChannel
+        -> Socket.IO delivery (via realtime/, driven by domain events)
 ```
 
-Future notification architecture:
+The `application/` layer should remain independent from transport-specific implementations (Express, Discord.js, Firestore) - it depends on `ports/` interfaces, and `infrastructure/` supplies the concrete adapters. This is what lets e.g. `NotificationManager` add a new delivery channel without any module needing to know about Express or Firestore.
 
-```txt
-NotificationService
-  -> DiscordNotificationChannel
-  -> WebPushNotificationChannel
-  -> future MobilePushNotificationChannel
-  -> future NativeDesktopNotificationChannel
-```
-
-The goal is to avoid hard-coupling Twitch events to Discord delivery.
-
----
-
-## stores/
-
-Persistence adapters.
-
-Responsibilities:
-- Firestore repositories
-- persistence abstraction
-- user storage
-- streamer storage
-- session storage
-- subscription storage
-
-Important files:
-
-```txt
-server/src/stores/FirestoreRepository.js
-server/src/stores/FirestoreSessionStore.js
-```
-
-Repository methods should preserve existing user data unless intentionally replacing it.
-
-Important rule:
+Repository methods should preserve existing user/streamer data unless intentionally replacing it. Important rule that still holds:
 
 ```txt
 Partial user updates must not reset streamer subscriptions.
 ```
+
+---
+
+## shared/
+
+Cross-cutting code with no ownership by a single module.
+
+Responsibilities:
+- environment loading and validation (`shared/config/env.ts`, `envSchema.ts`, `envParsers.ts`)
+- Docker secret loading (`shared/utils/secrets.ts`)
+- Firebase/Firestore initialization (`shared/config/firebase.ts`)
+- structured logging with field redaction (`shared/logger/logger.ts`)
+- the in-process domain event bus used to decouple repositories from application services (`shared/events/DomainEventBus.ts`)
+- small reusable helpers: token encryption at rest, assertions, Firestore query helpers, validators (`shared/utils/`)
+
+Important files:
+
+```txt
+server/src/shared/config/env.ts
+server/src/shared/config/envSchema.ts
+server/src/shared/config/firebase.ts
+server/src/shared/logger/logger.ts
+server/src/shared/events/DomainEventBus.ts
+server/src/shared/utils/crypto.ts
+server/src/shared/utils/secrets.ts
+```
+
+Configuration should support:
+- local `.env`/`.env.development` files for development
+- Docker secrets (`/run/secrets/<name>`) for production and staging, with env vars taking precedence when both are present
+- service account JSON (`GOOGLE_APPLICATION_CREDENTIALS`) or discrete `FIREBASE_*` env vars for Firebase, depending on deployment
 
 ---
 
@@ -179,15 +189,42 @@ Socket.IO should be treated as a realtime UI channel, not the primary persistenc
 
 ---
 
-## utils/
+## infrastructure/
 
-Small reusable helpers.
+Cross-cutting operational concerns that aren't tied to a single bounded module.
 
 Responsibilities:
-- logging
-- validation
-- secret helpers
-- utility abstractions
+- Prometheus metrics registry and collectors (`infrastructure/metrics/prometheus.ts`)
+- development/staging tunnel providers - ngrok and SSH - used to expose a stable EventSub callback URL (`infrastructure/tunneling/`)
+
+---
+
+## docs/
+
+OpenAPI spec generation, built from the same Zod schemas used to validate requests (`http/schemas/`, plus each module's `schemas/`) via `@asteasolutions/zod-to-openapi`. Served through `swagger-ui-express`.
+
+---
+
+## commands/
+
+Discord slash command handlers (`/subscribe`, `/unsubscribe`, `/list`, `/dashboard`, `/set-message`, `/get-subscriptions`, `/help`), registered by `server/src/deploy-commands.ts` and dispatched by `modules/discord/infrastructure/DiscordBot.ts`.
+
+---
+
+## test/
+
+Test suites and shared test infrastructure, mirroring `src/`'s layout:
+
+```txt
+server/src/test/unit/           unit tests, one subtree per top-level src/ directory
+server/src/test/integration/    supertest-driven HTTP integration tests
+server/src/test/builders/       test data builders
+server/src/test/fixtures/       static test fixtures
+server/src/test/helpers/        shared test app/setup helpers
+server/src/test/repositories/   in-memory port implementations used in tests, plus shared
+                                 repository contract tests run against both the in-memory and
+                                 Firestore implementations
+```
 
 ---
 

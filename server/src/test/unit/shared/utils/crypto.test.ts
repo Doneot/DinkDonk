@@ -54,10 +54,10 @@ describe("encryptSecret / decryptSecret", () => {
     );
   });
 
-  it("returns the original value unchanged if it looks tampered/malformed", () => {
+  it("throws a TokenDecryptionError for a prefixed value with missing ciphertext segments", () => {
     const malformed = "enc:v1:not-enough-parts";
 
-    expect(decryptSecret(malformed)).toBe(malformed);
+    expect(() => decryptSecret(malformed)).toThrow(TokenDecryptionError);
   });
 
   it("supports key rotation: a value encrypted under an old key still decrypts once a new key is prepended", async () => {

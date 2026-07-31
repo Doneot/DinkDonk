@@ -317,4 +317,35 @@ describe("POST /api/auth/logout", () => {
       error: "internal_server_error",
     });
   });
+
+  it("rejects an anonymous request", async () => {
+    const { app } = await createAuthTestApp({ authenticated: false });
+
+    const response = await request(app).post("/api/auth/logout").expect(401);
+
+    expect(errorResponseSchema.parse(response.body)).toMatchObject({
+      error: "unauthorized",
+    });
+  });
+
+  it("disconnects the user's live sockets once the session is destroyed", async () => {
+    const disconnectUser = vi.fn();
+    const { app } = await createAuthTestApp({ disconnectUser });
+
+    await request(app).post("/api/auth/logout").expect(200);
+
+    expect(disconnectUser).toHaveBeenCalledWith(AUTH_TEST_USER.id);
+  });
+
+  it("does not disconnect any sockets when passport fails to log the user out", async () => {
+    const disconnectUser = vi.fn();
+    const { app } = await createAuthTestApp({
+      disconnectUser,
+      logoutError: new Error("logout failed"),
+    });
+
+    await request(app).post("/api/auth/logout").expect(500);
+
+    expect(disconnectUser).not.toHaveBeenCalled();
+  });
 });

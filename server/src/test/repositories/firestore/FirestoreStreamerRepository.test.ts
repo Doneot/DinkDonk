@@ -3,8 +3,38 @@ import { describe, expect, it, vi } from "vitest";
 import { FirestoreStreamerRepository } from "../../../modules/streamers/infrastructure/firestore/FirestoreStreamerRepository.js";
 import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
+import type { Streamer } from "../../../modules/streamers/domain/Streamer.js";
 
+import { streamerRepositoryBehavior } from "../contracts/StreamerRepository.behavior.js";
 import { FakeFirestore } from "../../helpers/fakeFirestore.js";
+
+streamerRepositoryBehavior("FirestoreStreamerRepository", () => {
+  const firestore = new FakeFirestore();
+  const repository = new FirestoreStreamerRepository(
+    firestore.asFirestore(),
+    createDomainEventBus(logger),
+  );
+
+  return Object.assign(repository, {
+    seed(streamer: Streamer & { users?: string[] }): void {
+      const { users, ...rest } = streamer;
+
+      firestore.write(`streamers/${rest.id}`, rest);
+
+      for (const userId of users ?? []) {
+        firestore.write(`streamers/${rest.id}/subscribers/${userId}`, {
+          subscribedAt: Date.now(),
+        });
+      }
+    },
+
+    clear(): void {
+      for (const path of firestore.paths("streamers")) {
+        firestore.remove(path);
+      }
+    },
+  });
+});
 
 function setup() {
   const firestore = new FakeFirestore();

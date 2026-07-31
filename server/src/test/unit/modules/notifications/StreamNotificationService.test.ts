@@ -235,4 +235,68 @@ describe("StreamNotificationService", () => {
       "Failed to notify subscriber of stream going live",
     );
   });
+
+  describe("flapping stream dedup", () => {
+    it("skips a second stream.online event for the same stream session", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const { service, notify } = setup({
+        streamers: [buildStreamer({ id: "streamer-1", users: ["user-1"] })],
+        users: [buildUser({ id: "user-1" })],
+      });
+
+      await service.handleStreamOnline(event);
+      await service.handleStreamOnline({
+        ...event,
+        // A redelivery/flap a few seconds later, well within the dedup
+        // window, but with a distinct Twitch message id (not modeled here -
+        // replay-store dedup is by message id, this is by stream session).
+        started_at: "2026-06-29T00:00:07Z",
+      });
+
+      expect(notify).toHaveBeenCalledOnce();
+    });
+
+    it("notifies again for a genuinely new stream session outside the dedup window", async () => {
+      const { service, notify } = setup({
+        streamers: [buildStreamer({ id: "streamer-1", users: ["user-1"] })],
+        users: [buildUser({ id: "user-1" })],
+      });
+
+      await service.handleStreamOnline(event);
+      await service.handleStreamOnline({
+        ...event,
+        started_at: "2026-06-29T01:00:00Z",
+      });
+
+      expect(notify).toHaveBeenCalledTimes(2);
+    });
+
+    it("tracks dedup state independently per streamer", async () => {
+      const otherStreamer: TwitchStreamer = {
+        id: "streamer-2",
+        login: "other",
+        display_name: "Other",
+        profile_image_url: "https://example.com/avatar2.png",
+      };
+
+      const { service, notify } = setup({
+        knownStreamers: [twitchStreamer, otherStreamer],
+        streamers: [
+          buildStreamer({ id: "streamer-1", users: ["user-1"] }),
+          buildStreamer({ id: "streamer-2", users: ["user-1"] }),
+        ],
+        users: [buildUser({ id: "user-1" })],
+      });
+
+      await service.handleStreamOnline(event);
+      await service.handleStreamOnline({
+        ...event,
+        broadcaster_user_id: "streamer-2",
+        broadcaster_user_login: "other",
+      });
+
+      expect(notify).toHaveBeenCalledTimes(2);
+    });
+  });
 });

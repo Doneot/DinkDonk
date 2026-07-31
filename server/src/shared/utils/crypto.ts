@@ -33,6 +33,13 @@ let cachedKeys: Buffer[] | undefined;
 // is a candidate when decrypting, to support rotating in a new key without
 // breaking ciphertext written under the previous one.
 function getKeys(): Buffer[] {
+  // The salt is intentionally fixed rather than random/per-value: key
+  // derivation needs to be deterministic so the same ENCRYPTION_KEY always
+  // derives the same AES key across process restarts and across every
+  // instance in a multi-instance deployment, without persisting a salt
+  // anywhere. Security here rests on ENCRYPTION_KEY itself being
+  // high-entropy (envSchema enforces a minimum length), not on salt
+  // diversity - a fixed salt is a standard tradeoff for this use case.
   cachedKeys ??= env.encryptionKey.map((key) =>
     scryptSync(key, "dinkdonk-token-encryption", 32),
   );
@@ -74,8 +81,15 @@ export function decryptSecret(value: string): string {
 
   const [ivPart, tagPart, dataPart] = value.slice(PREFIX.length).split(":");
 
+  // Unlike the no-prefix case above, this value was written by
+  // `encryptSecret` (or claims to be), so a missing segment means the
+  // ciphertext itself is corrupt rather than pre-dating encryption -
+  // returning it unchanged would silently hand back garbage as if it were
+  // the real secret.
   if (!ivPart || !tagPart || !dataPart) {
-    return value;
+    throw new TokenDecryptionError(
+      new Error("Malformed ciphertext: expected iv:authTag:data segments"),
+    );
   }
 
   const iv = Buffer.from(ivPart, "base64");

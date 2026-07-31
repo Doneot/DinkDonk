@@ -120,6 +120,72 @@ describe("EventSubSyncService", () => {
         "twitch unavailable",
       );
     });
+
+    it("recreates a subscription that is revoked or otherwise dead, instead of treating it as still active", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const { service, twitch } = setup({
+        subscriptions: [
+          buildEventSubSubscription({
+            id: "sub-1",
+            condition: { broadcaster_user_id: "streamer-1" },
+            status: "authorization_revoked",
+          }),
+        ],
+        streamers: [buildStreamer({ id: "streamer-1" })],
+      });
+
+      await service.syncEventSubSubscriptions();
+
+      const streamOnline = twitch.subscriptions.filter(
+        (subscription) =>
+          subscription.type === "stream.online" &&
+          subscription.condition.broadcaster_user_id === "streamer-1",
+      );
+
+      // The dead subscription is still in the list (Twitch doesn't remove it
+      // automatically), plus a freshly created replacement.
+      expect(streamOnline).toHaveLength(2);
+      expect(
+        streamOnline.some((subscription) => subscription.status === "enabled"),
+      ).toBe(true);
+    });
+
+    it("continues syncing remaining streamers when one streamer's subscription attempt fails", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+      const errorSpy = vi.spyOn(logger, "error").mockReturnValue();
+
+      const { service, twitch } = setup({
+        subscriptions: [],
+        streamers: [
+          buildStreamer({ id: "streamer-1" }),
+          buildStreamer({ id: "streamer-2" }),
+        ],
+      });
+
+      vi.spyOn(twitch, "subscribeToEvent").mockImplementation(
+        (type, condition) => {
+          if (condition.broadcaster_user_id === "streamer-1") {
+            return Promise.reject(new Error("twitch rejected streamer-1"));
+          }
+
+          return FakeTwitchSubscriptions.prototype.subscribeToEvent.call(
+            twitch,
+            type,
+            condition,
+          );
+        },
+      );
+
+      await service.syncEventSubSubscriptions();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ streamerId: "streamer-1" }),
+        expect.any(String),
+      );
+
+      expect(twitch.broadcasterIds()).toEqual(["streamer-2"]);
+    });
   });
 
   describe("handleStreamerAdded", () => {

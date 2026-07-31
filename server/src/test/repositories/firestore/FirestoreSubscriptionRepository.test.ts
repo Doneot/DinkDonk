@@ -3,8 +3,63 @@ import { describe, expect, it, vi } from "vitest";
 import { FirestoreSubscriptionRepository } from "../../../modules/subscriptions/infrastructure/firestore/FirestoreSubscriptionRepository.js";
 import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
+import type { Subscription } from "../../../modules/subscriptions/domain/Subscription.js";
 
-import { FakeFirestore } from "../../helpers/fakeFirestore.js";
+import { subscriptionRepositoryBehavior } from "../contracts/SubscriptionRepository.behavior.js";
+import {
+  FakeFirestore,
+  FakeDocumentReference,
+} from "../../helpers/fakeFirestore.js";
+
+subscriptionRepositoryBehavior("FirestoreSubscriptionRepository", () => {
+  const firestore = new FakeFirestore();
+  const repository = new FirestoreSubscriptionRepository(
+    firestore.asFirestore(),
+    createDomainEventBus(logger),
+  );
+
+  return Object.assign(repository, {
+    seed(userId: string, subscription: Subscription): void {
+      const existing = firestore.read(`users/${userId}`) as
+        | { subscriptions?: Subscription[] }
+        | undefined;
+
+      // A blank id is the contract's way of seeding "this user exists but
+      // isn't meaningfully subscribed to anything" (see
+      // SubscriptionRepository.behavior.ts's subscription_not_found case) -
+      // writing it literally would violate SubscriptionSchema's id.min(1)
+      // once it's read back, which InMemorySubscriptionRepository doesn't
+      // validate against but Firestore now does. Ensure the user document
+      // exists without adding an invalid entry.
+      if (subscription.id.trim() === "") {
+        firestore.write(`users/${userId}`, {
+          subscriptions: existing?.subscriptions ?? [],
+        });
+
+        return;
+      }
+
+      firestore.write(`users/${userId}`, {
+        subscriptions: [...(existing?.subscriptions ?? []), subscription],
+      });
+
+      firestore.write(`streamers/${subscription.id}`, { id: subscription.id });
+      firestore.write(
+        `streamers/${subscription.id}/subscribers/${userId}`,
+        { subscribedAt: Date.now() },
+      );
+    },
+
+    clear(): void {
+      for (const path of [
+        ...firestore.paths("users"),
+        ...firestore.paths("streamers"),
+      ]) {
+        firestore.remove(path);
+      }
+    },
+  });
+});
 
 const BLANK_IDS = ["", "   "] as const;
 
@@ -337,6 +392,67 @@ describe("FirestoreSubscriptionRepository", () => {
       await expect(
         repository.updateSubscription("user-1", "streamer-1", {}),
       ).resolves.toEqual({ success: false, reason: "subscription_not_found" });
+    });
+  });
+
+  // Real Firestore transactions retry automatically when two concurrent
+  // transactions touch the same document - but only if every mutation
+  // genuinely reads the document *inside* the transaction (tx.get), not
+  // before it starts. A read taken before runTransaction() is called would
+  // capture stale data no retry can fix, silently reintroducing a
+  // lost-update bug under concurrent subscribe/unsubscribe/updateSubscription
+  // calls for the same user. FakeFirestore has no real concurrency to test
+  // this against directly (see its own doc comment), so this instead proves
+  // the structural property that makes Firestore's own retry mechanism able
+  // to do its job: the user document read is always the very first thing to
+  // happen after runTransaction() is invoked, never before it.
+  describe("concurrency safety: reads happen inside the transaction", () => {
+    it.each([
+      [
+        "subscribe",
+        (repository: FirestoreSubscriptionRepository) =>
+          repository.subscribe("user-1", "streamer-1"),
+      ],
+      [
+        "unsubscribe",
+        (repository: FirestoreSubscriptionRepository) =>
+          repository.unsubscribe("user-1", "streamer-1"),
+      ],
+      [
+        "updateSubscription",
+        (repository: FirestoreSubscriptionRepository) =>
+          repository.updateSubscription("user-1", "streamer-1", {}),
+      ],
+    ])("%s reads the user document via the transaction, not before it", async (
+      _name,
+      invoke,
+    ) => {
+      const { firestore, repository } = setup();
+
+      seedSubscription(firestore);
+
+      const runTransaction = vi.spyOn(
+        FakeFirestore.prototype,
+        "runTransaction",
+      );
+      const get = vi.spyOn(FakeDocumentReference.prototype, "get");
+
+      await invoke(repository);
+
+      expect(runTransaction).toHaveBeenCalled();
+      expect(get).toHaveBeenCalled();
+
+      const runTransactionOrder = runTransaction.mock.invocationCallOrder[0];
+      const firstGetOrder = get.mock.invocationCallOrder[0];
+
+      expect(runTransactionOrder).toBeDefined();
+      expect(firstGetOrder).toBeDefined();
+
+      // The first document read must happen after runTransaction() was
+      // invoked (i.e. from inside its callback) - a read that happened
+      // first would mean the code captured data before the transaction
+      // boundary, defeating Firestore's automatic conflict retry.
+      expect(firstGetOrder).toBeGreaterThan(runTransactionOrder!);
     });
   });
 });

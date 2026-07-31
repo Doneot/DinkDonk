@@ -85,4 +85,12 @@ describe.each([
       expect(req.validated[key]).toEqual({});
     }
   });
+
+  it(`throws if read before ${source === "body" ? "validateBody" : "validateQuery"} ran`, () => {
+    const req = createMockRequest();
+
+    expect(() => read(req)).toThrow(
+      /never ran for this request/,
+    );
+  });
 });

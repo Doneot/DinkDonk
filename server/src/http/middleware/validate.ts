@@ -3,9 +3,18 @@ import { z } from "zod";
 import type { ZodTypeAny } from "zod";
 import { BadRequestError } from "../errors/BadRequestError.js";
 
+type ValidatedSource = "body" | "query";
+
+// Tracks which of req.validated.{body,query} were actually populated by
+// validateBody/validateQuery running on this request, as opposed to still
+// holding initializeValidatedRequest's empty-object default. Keyed on the
+// request object itself so it doesn't need a new field on Express's Request
+// type and is automatically garbage-collected with the request.
+const validatedSources = new WeakMap<Request, Set<ValidatedSource>>();
+
 function validate<TSchema extends ZodTypeAny>(
   schema: TSchema,
-  source: "body" | "query",
+  source: ValidatedSource,
 ): RequestHandler {
   return (req, _res, next) => {
     const result = schema.safeParse(req[source]);
@@ -15,6 +24,15 @@ function validate<TSchema extends ZodTypeAny>(
     }
 
     req.validated[source] = result.data;
+
+    let sources = validatedSources.get(req);
+
+    if (!sources) {
+      sources = new Set();
+      validatedSources.set(req, sources);
+    }
+
+    sources.add(source);
 
     next();
   };
@@ -32,16 +50,27 @@ export function validateQuery<TSchema extends ZodTypeAny>(
   return validate(schema, "query");
 }
 
-function validated<T>(value: unknown): T {
-  return value as T;
+function validated<T>(req: Request, source: ValidatedSource): T {
+  if (!validatedSources.get(req)?.has(source)) {
+    // A route handler calling validatedBody/validatedQuery without the
+    // corresponding validateBody/validateQuery middleware in front of it is
+    // a programming error, not a client error: without this check it would
+    // silently return {} cast as T instead of failing loudly.
+    throw new Error(
+      `validated${source === "body" ? "Body" : "Query"}() called but ` +
+        `validate${source === "body" ? "Body" : "Query"}() never ran for this request`,
+    );
+  }
+
+  return req.validated[source] as T;
 }
 
 export function validatedBody<T>(req: Request): T {
-  return validated(req.validated.body);
+  return validated(req, "body");
 }
 
 export function validatedQuery<T>(req: Request): T {
-  return validated(req.validated.query);
+  return validated(req, "query");
 }
 
 export const initializeValidatedRequest: RequestHandler = (req, _res, next) => {
@@ -49,6 +78,8 @@ export const initializeValidatedRequest: RequestHandler = (req, _res, next) => {
     body: {},
     query: {},
   };
+
+  validatedSources.delete(req);
 
   next();
 };

@@ -11,10 +11,12 @@ vi.mock("../../../app/runtime/createRuntime.js", () => ({
 
 const twitchStart = vi.fn().mockResolvedValue(undefined);
 const discordStart = vi.fn().mockResolvedValue(undefined);
+const redisConnect = vi.fn().mockResolvedValue(undefined);
 const garbageCollectSubscriptions = vi.fn().mockResolvedValue(undefined);
 
 const fakeContainer = {
   firestore: {},
+  redis: { connect: redisConnect, quit: vi.fn().mockResolvedValue(undefined) },
   twitch: { start: twitchStart, stop: vi.fn().mockResolvedValue(undefined) },
   discord: { start: discordStart, stop: vi.fn().mockResolvedValue(undefined) },
   services: {
@@ -75,6 +77,7 @@ afterEach(() => {
   vi.clearAllMocks();
   twitchStart.mockResolvedValue(undefined);
   discordStart.mockResolvedValue(undefined);
+  redisConnect.mockResolvedValue(undefined);
   httpServerListen.mockImplementation(
     (_port: number, _host: string, callback: () => void) => callback(),
   );

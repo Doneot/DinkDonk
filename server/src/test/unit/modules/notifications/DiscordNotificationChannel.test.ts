@@ -90,36 +90,43 @@ describe("DiscordNotificationChannel", () => {
     expect(notifyUser).not.toHaveBeenCalled();
   });
 
-  it("disables DMs for the user when Discord reports a closed DM channel", async () => {
-    const { channel, notifyUser, user, userRepository } = setup();
+  it.each([
+    [50007, "DMs closed"],
+    [10013, "Unknown User"],
+    [50001, "Missing Access"],
+  ])(
+    "disables DMs for the user when Discord reports a permanent failure (%i - %s)",
+    async (code) => {
+      const { channel, notifyUser, user, userRepository } = setup();
 
-    notifyUser.mockRejectedValue(discordError(50007));
+      notifyUser.mockRejectedValue(discordError(code));
 
-    await expect(channel.send(user, notification)).resolves.toEqual({
-      sent: false,
-      expired: true,
-      reason: "discord_dm_blocked",
-    });
+      await expect(channel.send(user, notification)).resolves.toEqual({
+        sent: false,
+        expired: true,
+        reason: "discord_dm_blocked",
+      });
 
-    await expect(userRepository.getUser(user.id)).resolves.toMatchObject({
-      canReceiveDM: false,
-    });
-  });
+      await expect(userRepository.getUser(user.id)).resolves.toMatchObject({
+        canReceiveDM: false,
+      });
+    },
+  );
 
   it("reports an unexpected Discord failure without changing the user", async () => {
     const error = vi.spyOn(logger, "error").mockReturnValue();
     const { channel, notifyUser, user, userRepository } = setup();
 
-    notifyUser.mockRejectedValue(discordError(50001, "Missing access"));
+    notifyUser.mockRejectedValue(discordError(500, "Internal Server Error"));
 
     await expect(channel.send(user, notification)).resolves.toEqual({
       sent: false,
-      reason: "Missing access",
+      reason: "Internal Server Error",
     });
 
     expect(error.mock.calls[0]?.[0]).toMatchObject({
       userId: user.id,
-      message: "Missing access",
+      message: "Internal Server Error",
     });
     await expect(userRepository.getUser(user.id)).resolves.toMatchObject({
       canReceiveDM: true,

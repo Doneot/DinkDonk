@@ -42,10 +42,14 @@ function setup() {
   } as unknown as SocketServer;
   const discordStop = vi.fn(record("discord"));
   const twitchStop = vi.fn(record("twitch"));
+  const firestoreTerminate = vi.fn(record("firestore"));
+  const redisQuit = vi.fn(record("redis"));
 
   const container = {
     twitch: { stop: twitchStop },
     discord: { stop: discordStop },
+    firestore: { terminate: firestoreTerminate },
+    redis: { quit: redisQuit },
   } as unknown as Container;
 
   const broadcaster = { stop: vi.fn(record("broadcaster")) };
@@ -67,6 +71,8 @@ function setup() {
     scheduler,
     twitchStop,
     discordStop,
+    firestoreTerminate,
+    redisQuit,
   };
 }
 
@@ -142,6 +148,8 @@ describe("registerShutdownHooks", () => {
       "sockets",
       "discord",
       "twitch",
+      "firestore",
+      "redis",
     ]);
     expect(exit).toHaveBeenCalledWith(0);
   });
@@ -208,6 +216,8 @@ describe("registerShutdownHooks", () => {
       const container = {
         twitch: { stop: vi.fn().mockResolvedValue(undefined) },
         discord: { stop: vi.fn().mockResolvedValue(undefined) },
+        firestore: { terminate: vi.fn().mockResolvedValue(undefined) },
+        redis: { quit: vi.fn().mockResolvedValue(undefined) },
       } as unknown as Container;
 
       const runtime = {

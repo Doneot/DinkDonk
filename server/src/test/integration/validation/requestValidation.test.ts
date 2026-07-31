@@ -101,17 +101,24 @@ describe("malformed request bodies", () => {
 });
 
 describe("subscription payload validation", () => {
-  it.each([
-    ["POST", "/api/subscriptions"],
-    ["DELETE", "/api/subscriptions"],
-  ] as const)("%s %s rejects a missing streamer id", async (method, path) => {
+  it("POST /api/subscriptions rejects a missing streamer id", async () => {
     const { ctx, client } = await createClient();
 
     const subscribe = vi.spyOn(ctx.repositories.subscriptions, "subscribe");
 
-    const response = await (
-      method === "POST" ? client.post(path) : client.delete(path)
-    ).send({});
+    const response = await client.post("/api/subscriptions").send({});
+
+    expect(response.status).toBe(400);
+    expect(subscribe).not.toHaveBeenCalled();
+    expectValidationError(response.body);
+  });
+
+  it("DELETE /api/subscriptions rejects a missing streamer id", async () => {
+    const { ctx, client } = await createClient();
+
+    const subscribe = vi.spyOn(ctx.repositories.subscriptions, "subscribe");
+
+    const response = await client.delete("/api/subscriptions").query({});
 
     expect(response.status).toBe(400);
     expect(subscribe).not.toHaveBeenCalled();
@@ -194,15 +201,15 @@ describe("web push payload validation", () => {
   });
 
   it.each([
-    ["an empty body", {}],
+    ["an empty query", {}],
     ["a blank subscription id", { subscriptionId: "   " }],
-    ["an unusable subscription payload", { subscription: { endpoint: "" } }],
-  ])("DELETE rejects %s", async (_label, body) => {
+    ["a blank endpoint", { endpoint: "" }],
+  ])("DELETE rejects %s", async (_label, query) => {
     const { client } = await createClient();
 
     const response = await client
       .delete("/api/notifications/web-push/subscriptions")
-      .send(body);
+      .query(query);
 
     expect(response.status).toBe(400);
     expectValidationError(response.body);

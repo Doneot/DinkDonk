@@ -183,7 +183,7 @@ describe("DELETE /api/notifications/web-push/subscriptions", () => {
 
     const response = await client
       .delete("/api/notifications/web-push/subscriptions")
-      .send({ subscriptionId: SUBSCRIPTION_ID })
+      .query({ subscriptionId: SUBSCRIPTION_ID })
       .expect(200);
 
     expect(deletePushResponseSchema.parse(response.body)).toEqual({
@@ -194,7 +194,7 @@ describe("DELETE /api/notifications/web-push/subscriptions", () => {
     ).resolves.toEqual([]);
   });
 
-  it("deletes a subscription referenced by its full payload", async () => {
+  it("deletes a subscription referenced by its endpoint", async () => {
     const { ctx, client } = await createClient();
 
     await client
@@ -204,7 +204,7 @@ describe("DELETE /api/notifications/web-push/subscriptions", () => {
 
     await client
       .delete("/api/notifications/web-push/subscriptions")
-      .send({ subscription: SUBSCRIPTION })
+      .query({ endpoint: SUBSCRIPTION.endpoint })
       .expect(200);
 
     await expect(
@@ -217,7 +217,7 @@ describe("DELETE /api/notifications/web-push/subscriptions", () => {
 
     await client
       .delete("/api/notifications/web-push/subscriptions")
-      .send({ subscriptionId: "unknown-id" })
+      .query({ subscriptionId: "unknown-id" })
       .expect(200);
   });
 
@@ -231,7 +231,7 @@ describe("DELETE /api/notifications/web-push/subscriptions", () => {
 
     const response = await client
       .delete("/api/notifications/web-push/subscriptions")
-      .send({ subscriptionId: SUBSCRIPTION_ID })
+      .query({ subscriptionId: SUBSCRIPTION_ID })
       .expect(400);
 
     expect(deletePushResponseSchema.parse(response.body)).toEqual({
@@ -252,7 +252,7 @@ describe("DELETE /api/notifications/web-push/subscriptions", () => {
 
     await client
       .delete("/api/notifications/web-push/subscriptions")
-      .send({ subscriptionId: SUBSCRIPTION_ID })
+      .query({ subscriptionId: SUBSCRIPTION_ID })
       .expect(200);
 
     await expect(

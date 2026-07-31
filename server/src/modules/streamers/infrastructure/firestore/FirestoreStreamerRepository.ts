@@ -7,6 +7,7 @@ import type {
 import type { StreamerRepository } from "../../ports/StreamerRepository.js";
 import type { Streamer } from "../../domain/Streamer.js";
 import type { DomainEventBus } from "../../../../shared/events/DomainEventBus.js";
+import { StreamerSchema } from "../../schemas/StreamerSchema.js";
 import { isNonEmptyString } from "../../../../shared/utils/validators.js";
 import { getExistingDoc } from "../../../../shared/utils/firestore.js";
 import { logger } from "../../../../shared/logger/logger.js";
@@ -34,6 +35,13 @@ export class FirestoreStreamerRepository implements StreamerRepository {
   }
 
   async createStreamer(id: string): Promise<void> {
+    // Matches every sibling method's guard (isNonEmptyString), plus the id
+    // length cap StreamerSchema enforces on read - so a document that could
+    // never have validly come from a read also can't be written here.
+    if (!isNonEmptyString(id) || !StreamerSchema.shape.id.safeParse(id).success) {
+      return;
+    }
+
     await this.streamers.doc(id).set({ id }, { merge: true });
 
     this.events.emit({ type: "streamerAdded", streamerId: id });
@@ -42,7 +50,26 @@ export class FirestoreStreamerRepository implements StreamerRepository {
   async deleteStreamer(id: string): Promise<void> {
     if (!isNonEmptyString(id)) return;
 
-    await this.streamers.doc(id).delete();
+    // Unlike a bare `.delete()`, this cascades the `subscribers`
+    // subcollection in the same transaction as the streamer doc itself, so
+    // a hard delete here can't leave orphaned subscriber documents behind
+    // (dangling references a future `getSubscriberIds`/re-created streamer
+    // could otherwise pick back up). There are currently no production
+    // callers of this method - deleteStreamerIfEmpty is what's actually
+    // used - but it's kept safe rather than removed since it's still
+    // exercised by tests as a distinct hard-delete capability.
+    const streamerRef = this.streamers.doc(id);
+    const subscribersRef = this.subscribersOf(id);
+
+    await this.streamers.firestore.runTransaction(async (tx) => {
+      const subscribersSnapshot = await tx.get(subscribersRef);
+
+      for (const doc of subscribersSnapshot.docs) {
+        tx.delete(subscribersRef.doc(doc.id));
+      }
+
+      tx.delete(streamerRef);
+    });
 
     logger.info(`Deleted streamer ${id}`);
   }

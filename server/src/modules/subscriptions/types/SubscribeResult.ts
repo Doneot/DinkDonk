@@ -7,7 +7,10 @@ export type SubscribeResult =
 
 export type UnsubscribeResult =
   | { success: true; usersLeft: number }
-  | { success: false; reason: "invalid_input" | "user_not_found" };
+  | {
+      success: false;
+      reason: "invalid_input" | "user_not_found" | "not_subscribed";
+    };
 
 export type UpdateSubscriptionResult =
   | { success: true }

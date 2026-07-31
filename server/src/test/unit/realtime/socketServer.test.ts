@@ -7,6 +7,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSocketServer } from "../../../realtime/socketServer.js";
 import type { SocketServer } from "../../../realtime/socketServer.js";
 import { logger } from "../../../shared/logger/logger.js";
+import { TokenDecryptionError } from "../../../shared/utils/crypto.js";
+import { InMemoryIdentityRepository } from "../../repositories/inMemory/InMemoryIdentityRepository.js";
+import { buildIdentity } from "../../builders/auth.js";
 
 type FakeSocket = {
   request: { session?: { passport?: { user?: { id?: string } } } };
@@ -35,16 +38,23 @@ type Harness = {
   sockets: SocketServer;
   httpServer: http.Server;
   sessionMiddleware: RequestHandler;
-  connect: (socket: FakeSocket) => void;
+  connect: (socket: FakeSocket) => Promise<void>;
 };
 
-function setup(): Harness {
+function setup(
+  options: { identityRepository?: InMemoryIdentityRepository } = {},
+): Harness {
   const httpServer = http.createServer();
   const sessionMiddleware = vi.fn<RequestHandler>((_req, _res, next) => {
     next();
   });
 
-  const sockets = createSocketServer(httpServer, { sessionMiddleware });
+  const sockets = createSocketServer(httpServer, {
+    sessionMiddleware,
+    ...(options.identityRepository
+      ? { identityRepository: options.identityRepository }
+      : {}),
+  });
 
   return {
     sockets,
@@ -52,7 +62,7 @@ function setup(): Harness {
     sessionMiddleware,
     // socket.io registers the handler on its main namespace; invoking it
     // directly keeps the test free of a real websocket client.
-    connect: (socket) => {
+    connect: async (socket) => {
       const listeners = sockets.io.sockets.listeners(
         "connection",
       ) as unknown as Array<(socket: Socket) => void>;
@@ -60,6 +70,12 @@ function setup(): Harness {
       for (const listener of listeners) {
         listener(socket as unknown as Socket);
       }
+
+      // The connection handler resolves the identity asynchronously
+      // (deserializeUser-style) when an identityRepository is configured;
+      // flush the microtask queue so that lookup has settled before
+      // assertions run.
+      await new Promise((resolve) => setImmediate(resolve));
     },
   };
 }
@@ -91,7 +107,7 @@ describe("createSocketServer", () => {
     const harness = setup();
     const socket = createFakeSocket();
 
-    harness.connect(socket);
+    await harness.connect(socket);
 
     expect(socket.disconnect).toHaveBeenCalledWith(true);
     expect(socket.handlers.has("disconnect")).toBe(false);
@@ -105,7 +121,7 @@ describe("createSocketServer", () => {
     const harness = setup();
     const socket = createFakeSocket("user-1");
 
-    harness.connect(socket);
+    await harness.connect(socket);
     harness.sockets.notifyUser("user-1", "user_data_updated", { a: 1 });
 
     expect(socket.emit.mock.calls).toEqual([["user_data_updated", { a: 1 }]]);
@@ -120,8 +136,8 @@ describe("createSocketServer", () => {
     const first = createFakeSocket("user-1");
     const second = createFakeSocket("user-1");
 
-    harness.connect(first);
-    harness.connect(second);
+    await harness.connect(first);
+    await harness.connect(second);
     harness.sockets.notifyUser("user-1", "ping", null);
 
     expect(first.emit).toHaveBeenCalledOnce();
@@ -136,7 +152,7 @@ describe("createSocketServer", () => {
     const harness = setup();
     const socket = createFakeSocket("user-1");
 
-    harness.connect(socket);
+    await harness.connect(socket);
     harness.sockets.notifyUser("user-2", "ping", null);
 
     expect(socket.emit).not.toHaveBeenCalled();
@@ -160,7 +176,7 @@ describe("createSocketServer", () => {
     const harness = setup();
     const socket = createFakeSocket("user-1");
 
-    harness.connect(socket);
+    await harness.connect(socket);
     socket.handlers.get("disconnect")?.();
     harness.sockets.notifyUser("user-1", "ping", null);
 
@@ -176,8 +192,8 @@ describe("createSocketServer", () => {
     const first = createFakeSocket("user-1");
     const second = createFakeSocket("user-1");
 
-    harness.connect(first);
-    harness.connect(second);
+    await harness.connect(first);
+    await harness.connect(second);
     first.handlers.get("disconnect")?.();
     harness.sockets.notifyUser("user-1", "ping", null);
 
@@ -193,7 +209,7 @@ describe("createSocketServer", () => {
     const harness = setup();
     const socket = createFakeSocket("user-1");
 
-    harness.connect(socket);
+    await harness.connect(socket);
 
     const disconnect = socket.handlers.get("disconnect");
 
@@ -210,5 +226,137 @@ describe("createSocketServer", () => {
     await expect(harness.sockets.close()).resolves.toBeUndefined();
 
     harness.httpServer.close();
+  });
+
+  describe("identity verification", () => {
+    it("admits a connection whose session id resolves to a real identity", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const identityRepository = new InMemoryIdentityRepository();
+
+      identityRepository.seed(buildIdentity({ uid: "user-1" }));
+
+      const harness = setup({ identityRepository });
+      const socket = createFakeSocket("user-1");
+
+      await harness.connect(socket);
+
+      expect(socket.disconnect).not.toHaveBeenCalled();
+
+      harness.sockets.notifyUser("user-1", "ping", null);
+      expect(socket.emit).toHaveBeenCalledOnce();
+
+      await teardown(harness);
+    });
+
+    it("disconnects a session whose backing identity no longer exists", async () => {
+      const identityRepository = new InMemoryIdentityRepository();
+      const harness = setup({ identityRepository });
+      const socket = createFakeSocket("deleted-user");
+
+      await harness.connect(socket);
+
+      expect(socket.disconnect).toHaveBeenCalledWith(true);
+      expect(socket.handlers.has("disconnect")).toBe(false);
+
+      await teardown(harness);
+    });
+
+    it("fails closed and disconnects when the identity's stored tokens can't be decrypted", async () => {
+      const warn = vi.spyOn(logger, "warn").mockReturnValue();
+      const identityRepository = new InMemoryIdentityRepository();
+
+      vi.spyOn(identityRepository, "getIdentity").mockRejectedValue(
+        new TokenDecryptionError(new Error("bad auth tag")),
+      );
+
+      const harness = setup({ identityRepository });
+      const socket = createFakeSocket("user-1");
+
+      await harness.connect(socket);
+
+      expect(socket.disconnect).toHaveBeenCalledWith(true);
+      expect(warn).toHaveBeenCalled();
+
+      await teardown(harness);
+    });
+
+    it("disconnects when the identity lookup fails for another reason", async () => {
+      const error = vi.spyOn(logger, "error").mockReturnValue();
+      const identityRepository = new InMemoryIdentityRepository();
+
+      vi.spyOn(identityRepository, "getIdentity").mockRejectedValue(
+        new Error("firestore unavailable"),
+      );
+
+      const harness = setup({ identityRepository });
+      const socket = createFakeSocket("user-1");
+
+      await harness.connect(socket);
+
+      expect(socket.disconnect).toHaveBeenCalledWith(true);
+      expect(error).toHaveBeenCalled();
+
+      await teardown(harness);
+    });
+  });
+
+  describe("disconnectUser", () => {
+    it("forcibly disconnects every live socket for a user", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const harness = setup();
+      const first = createFakeSocket("user-1");
+      const second = createFakeSocket("user-1");
+
+      await harness.connect(first);
+      await harness.connect(second);
+
+      harness.sockets.disconnectUser("user-1");
+
+      expect(first.disconnect).toHaveBeenCalledWith(true);
+      expect(second.disconnect).toHaveBeenCalledWith(true);
+
+      harness.sockets.notifyUser("user-1", "ping", null);
+      expect(first.emit).not.toHaveBeenCalled();
+      expect(second.emit).not.toHaveBeenCalled();
+
+      await teardown(harness);
+    });
+
+    it("does nothing for a user with no live sockets", async () => {
+      const harness = setup();
+
+      expect(() => harness.sockets.disconnectUser("nobody")).not.toThrow();
+
+      await teardown(harness);
+    });
+  });
+
+  describe("per-user socket cap", () => {
+    it("disconnects the oldest socket once a user exceeds the concurrent socket cap", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const harness = setup();
+      const sockets = Array.from({ length: 9 }, () => createFakeSocket("user-1"));
+
+      for (const socket of sockets) {
+        await harness.connect(socket);
+      }
+
+      const [oldest, ...rest] = sockets;
+
+      expect(oldest?.disconnect).toHaveBeenCalledWith(true);
+
+      harness.sockets.notifyUser("user-1", "ping", null);
+
+      expect(oldest?.emit).not.toHaveBeenCalled();
+
+      for (const socket of rest) {
+        expect(socket.emit).toHaveBeenCalledOnce();
+      }
+
+      await teardown(harness);
+    });
   });
 });

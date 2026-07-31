@@ -1,8 +1,29 @@
 import { describe, expect, it } from "vitest";
 
 import { FirestoreUserRepository } from "../../../modules/users/infrastructure/firestore/FirestoreUserRepository.js";
+import type { User } from "../../../modules/users/domain/User.js";
 
+import { userRepositoryBehavior } from "../contracts/UserRepository.behavior.js";
 import { FakeFirestore } from "../../helpers/fakeFirestore.js";
+
+userRepositoryBehavior("FirestoreUserRepository", () => {
+  const firestore = new FakeFirestore();
+  const repository = new FirestoreUserRepository(firestore.asFirestore());
+
+  return Object.assign(repository, {
+    seed(user: User): void {
+      const { id, ...rest } = user;
+
+      firestore.write(`users/${id}`, rest);
+    },
+
+    clear(): void {
+      for (const path of firestore.paths("users")) {
+        firestore.remove(path);
+      }
+    },
+  });
+});
 
 function setup() {
   const firestore = new FakeFirestore();

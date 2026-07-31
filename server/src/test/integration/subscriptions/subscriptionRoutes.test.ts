@@ -120,7 +120,7 @@ describe("DELETE /api/subscriptions", () => {
 
     const response = await client
       .delete("/api/subscriptions")
-      .send({ streamerId: "streamer-1" })
+      .query({ streamerId: "streamer-1" })
       .expect(200);
 
     expect(unsubscribeResponseSchema.parse(response.body)).toEqual({
@@ -145,7 +145,7 @@ describe("DELETE /api/subscriptions", () => {
 
     const response = await client
       .delete("/api/subscriptions")
-      .send({ streamerId: "streamer-1" })
+      .query({ streamerId: "streamer-1" })
       .expect(200);
 
     expect(response.body).toEqual({ success: true, usersLeft: 1 });
@@ -156,7 +156,7 @@ describe("DELETE /api/subscriptions", () => {
 
     const response = await client
       .delete("/api/subscriptions")
-      .send({ streamerId: "streamer-1" })
+      .query({ streamerId: "streamer-1" })
       .expect(400);
 
     expect(unsubscribeResponseSchema.parse(response.body)).toEqual({

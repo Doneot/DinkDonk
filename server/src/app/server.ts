@@ -20,12 +20,16 @@ export function createServer(container: Container): Server {
 
   const sessionMiddleware = createSessionMiddleware(container.firestore);
 
-  const sockets = createSocketServer(httpServer, { sessionMiddleware });
+  const sockets = createSocketServer(httpServer, {
+    sessionMiddleware,
+    identityRepository: container.repositories.identities,
+  });
 
   const app = createApp({
     ...container,
     sessionMiddleware,
     twitch: container.twitch.client,
+    disconnectUser: (userId) => sockets.disconnectUser(userId),
   });
 
   return {

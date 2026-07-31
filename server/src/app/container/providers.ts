@@ -11,6 +11,7 @@ import { TwitchClient } from "../../modules/twitch/infrastructure/TwitchClient.j
 
 import type { Repositories } from "./repositories.js";
 import type { UserRepository } from "../../modules/users/ports/UserRepository.js";
+import type { IdentityRepository } from "../../modules/auth/ports/IdentityRepository.js";
 import type { StreamerRepository } from "../../modules/streamers/ports/StreamerRepository.js";
 import type { SubscriptionRepository } from "../../modules/subscriptions/ports/SubscriptionRepository.js";
 import type { Runtime } from "../runtime/Runtime.js";
@@ -26,11 +27,13 @@ export function createProviders(repositories: Repositories, runtime: Runtime) {
   const context: {
     twitch: TwitchClient;
     userRepository: UserRepository;
+    identityRepository: IdentityRepository;
     streamerRepository: StreamerRepository;
     subscriptionRepository: SubscriptionRepository;
   } = {
     twitch: twitch.client,
     userRepository: repositories.users,
+    identityRepository: repositories.identities,
     streamerRepository: repositories.streamers,
     subscriptionRepository: repositories.subscriptions,
   };

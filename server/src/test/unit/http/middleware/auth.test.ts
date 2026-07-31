@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Redis } from "ioredis";
 
 import type {
   Identity,
@@ -56,7 +57,7 @@ function authenticatedRequest(user: SessionUser) {
   return createMockRequest({ user });
 }
 
-function setup(identity: Identity | null = buildIdentity()) {
+function setup(identity: Identity | null = buildIdentity(), redis?: Redis) {
   const repository = new InMemoryIdentityRepository();
 
   if (identity) {
@@ -65,8 +66,43 @@ function setup(identity: Identity | null = buildIdentity()) {
 
   return {
     repository,
-    middleware: createFreshTokenMiddleware(repository),
+    middleware: createFreshTokenMiddleware(repository, redis),
   };
+}
+
+/**
+ * Backs a distributed refresh lock the same way a real Redis instance would
+ * for SET ... NX/DEL: a plain Map keyed by lock name, with "NX" honored (a
+ * second SET for an already-held key is refused).
+ */
+function fakeRedis() {
+  const held = new Map<string, unknown>();
+
+  const set = vi.fn(
+    (
+      key: string,
+      value: unknown,
+      _px: "PX",
+      _ttlMs: number,
+      nx: "NX",
+    ): Promise<"OK" | null> => {
+      if (nx === "NX" && held.has(key)) {
+        return Promise.resolve(null);
+      }
+
+      held.set(key, value);
+
+      return Promise.resolve("OK");
+    },
+  );
+
+  const del = vi.fn((key: string): Promise<number> => {
+    const existed = held.delete(key);
+
+    return Promise.resolve(existed ? 1 : 0);
+  });
+
+  return { redis: { set, del } as unknown as Redis, set, del };
 }
 
 beforeEach(() => {
@@ -279,6 +315,90 @@ describe("createFreshTokenMiddleware", () => {
     expect(requestNewAccessToken).toHaveBeenCalledOnce();
     expect(firstNext.calls).toEqual([undefined]);
     expect(secondNext.calls).toEqual([undefined]);
+  });
+
+  it("refreshes once across two middleware instances sharing a distributed lock", async () => {
+    // Simulates two backend instances (two separate createFreshTokenMiddleware
+    // closures, each with their own in-process `locks` Map) racing to refresh
+    // the same user's token, coordinated only through the shared Redis lock.
+    const base = buildIdentity();
+    const identity = buildIdentity({
+      discord: { ...base.discord!, fetchTime: STALE_FETCH_TIME },
+    });
+    const repository = new InMemoryIdentityRepository();
+
+    repository.seed(identity);
+
+    const { redis, set, del } = fakeRedis();
+    const middlewareA = createFreshTokenMiddleware(repository, redis);
+    const middlewareB = createFreshTokenMiddleware(repository, redis);
+
+    requestNewAccessToken.mockImplementation((_strategy, _token, done) => {
+      done(null, "new-access-token", "new-refresh-token");
+    });
+
+    const user = authenticatedRequest(sessionUserFor(identity));
+
+    await Promise.all([
+      middlewareA(user, createMockResponse(), createNext()),
+      middlewareB(user, createMockResponse(), createNext()),
+    ]);
+
+    expect(requestNewAccessToken).toHaveBeenCalledOnce();
+    expect(set).toHaveBeenCalledWith(
+      `lock:discord-token-refresh:${identity.uid}`,
+      "1",
+      "PX",
+      30_000,
+      "NX",
+    );
+    expect(del).toHaveBeenCalledWith(
+      `lock:discord-token-refresh:${identity.uid}`,
+    );
+  });
+
+  it("proceeds without refreshing when the distributed lock is already held by another instance", async () => {
+    const base = buildIdentity();
+    const identity = buildIdentity({
+      discord: { ...base.discord!, fetchTime: STALE_FETCH_TIME },
+    });
+    const { redis, set } = fakeRedis();
+
+    // Simulate another instance already holding the lock.
+    await set(
+      `lock:discord-token-refresh:${identity.uid}`,
+      "1",
+      "PX",
+      30_000,
+      "NX",
+    );
+
+    const { middleware } = setup(identity, redis);
+    const user = authenticatedRequest(sessionUserFor(identity));
+    const next = createNext();
+
+    await middleware(user, createMockResponse(), next);
+
+    expect(requestNewAccessToken).not.toHaveBeenCalled();
+    expect(next.calls).toEqual([undefined]);
+  });
+
+  it("proceeds with the refresh when no Redis client is configured", async () => {
+    const base = buildIdentity();
+    const identity = buildIdentity({
+      discord: { ...base.discord!, fetchTime: STALE_FETCH_TIME },
+    });
+    const { middleware } = setup(identity);
+
+    requestNewAccessToken.mockImplementation((_strategy, _token, done) => {
+      done(null, "new-access-token", "new-refresh-token");
+    });
+
+    const user = authenticatedRequest(sessionUserFor(identity));
+
+    await middleware(user, createMockResponse(), createNext());
+
+    expect(requestNewAccessToken).toHaveBeenCalledOnce();
   });
 
   it("does not refresh again once the stored token is fresh", async () => {

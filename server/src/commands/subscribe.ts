@@ -16,6 +16,7 @@ export const data = new SlashCommandBuilder()
     option
       .setName("message")
       .setDescription("Custom notification message")
+      .setMaxLength(500)
       .setRequired(false),
   );
 
@@ -27,7 +28,7 @@ export async function execute(
 
   const notificationMessage = interaction.options.getString("message");
 
-  const { userRepository, subscriptionRepository, twitch } = context;
+  const { subscriptionRepository, twitch } = context;
 
   const streamer = await twitch.getStreamer(username);
 
@@ -37,14 +38,14 @@ export async function execute(
     return;
   }
 
-  const user = await requireDMCapableUser(interaction, userRepository);
+  const resolved = await requireDMCapableUser(interaction, context);
 
-  if (!user) {
+  if (!resolved) {
     return;
   }
 
   const res = await subscriptionRepository.subscribe(
-    interaction.user.id,
+    resolved.uid,
     streamer.id,
     notificationMessage || undefined,
   );

@@ -1,10 +1,12 @@
 import { createFirestore } from "../../shared/config/firebase.js";
+import { createRedisClient } from "../../infrastructure/redis/redisClient.js";
 
 import { createRepositories, type Repositories } from "./repositories.js";
 import { createProviders } from "./providers.js";
 import { createNotificationManager } from "./notifications.js";
 import { createServices } from "./services.js";
 
+import type { Redis } from "../../infrastructure/redis/redisClient.js";
 import type { TwitchProvider } from "../../modules/twitch/application/TwitchProvider.js";
 import type { DiscordBot } from "../../modules/discord/infrastructure/DiscordBot.js";
 import type { NotificationManager } from "../../modules/notifications/application/NotificationManager.js";
@@ -15,6 +17,7 @@ import type { Runtime } from "../runtime/Runtime.js";
 
 export interface Container {
   firestore: FirebaseFirestore.Firestore;
+  redis: Redis;
   twitch: TwitchProvider;
   discord: DiscordBot;
 
@@ -32,6 +35,8 @@ export interface Container {
 export function createContainer(runtime: Runtime): Container {
   const firestore = createFirestore();
 
+  const redis = createRedisClient();
+
   const repositories = createRepositories(firestore);
 
   const { twitch, discord } = createProviders(repositories, runtime);
@@ -42,6 +47,7 @@ export function createContainer(runtime: Runtime): Container {
 
   return {
     firestore,
+    redis,
     twitch,
     discord,
     repositories,

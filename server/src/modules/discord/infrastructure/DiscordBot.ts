@@ -15,7 +15,6 @@ import {
 
 import { logger } from "../../../shared/logger/logger.js";
 
-import type { TwitchStreamer } from "../../twitch/domain/Twitch.js";
 import type { CommandContext } from "../domain/CommandContext.js";
 import type { DiscordService } from "../ports/DiscordService.js";
 
@@ -47,6 +46,12 @@ type DiscordApiError = Error & {
   code?: number;
 };
 
+// canSendDirectMessage sends a real, visible probe DM - caching the result
+// avoids spamming a user with repeat "you can safely ignore this" messages
+// if the HTTP paths that call it (POST /can-receive-dm, OAuth callbacks) are
+// hit repeatedly in quick succession.
+const DM_CAPABILITY_CACHE_TTL_MS = 5 * 60 * 1000;
+
 type DiscordClient = Client & {
   commands: Collection<string, Command>;
 };
@@ -63,6 +68,11 @@ export class DiscordBot implements DiscordService {
     | undefined;
 
   private readonly client: DiscordClient;
+
+  private readonly dmCapabilityCache = new Map<
+    string,
+    { result: boolean; expiresAt: number }
+  >();
 
   constructor({
     token,
@@ -118,9 +128,21 @@ export class DiscordBot implements DiscordService {
 
       const commandModule = (await import(
         pathToFileURL(modulePath).href
-      )) as Command;
+      )) as Partial<Command>;
 
-      this.client.commands.set(commandModule.data.name, commandModule);
+      if (
+        typeof commandModule.data?.name !== "string" ||
+        typeof commandModule.execute !== "function"
+      ) {
+        logger.warn(
+          { file },
+          "Skipping command module: missing data.name or execute export",
+        );
+
+        continue;
+      }
+
+      this.client.commands.set(commandModule.data.name, commandModule as Command);
     }
   }
 
@@ -180,6 +202,23 @@ export class DiscordBot implements DiscordService {
   }
 
   async canSendDirectMessage(userId: string): Promise<boolean> {
+    const cached = this.dmCapabilityCache.get(userId);
+
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.result;
+    }
+
+    const result = await this.probeDirectMessageCapability(userId);
+
+    this.dmCapabilityCache.set(userId, {
+      result,
+      expiresAt: Date.now() + DM_CAPABILITY_CACHE_TTL_MS,
+    });
+
+    return result;
+  }
+
+  private async probeDirectMessageCapability(userId: string): Promise<boolean> {
     try {
       const user = await this.client.users.fetch(userId);
 
@@ -212,44 +251,5 @@ export class DiscordBot implements DiscordService {
     const channel = await user.createDM();
 
     await channel.send(content);
-  }
-
-  async notifyStreamerLive(
-    userId: string,
-    streamer: TwitchStreamer & {
-      login: string;
-    },
-    template?: string,
-  ): Promise<void> {
-    try {
-      const message = (template || "%s is live!").replace(
-        /%s/g,
-        streamer.display_name,
-      );
-
-      await this.notifyUser(
-        userId,
-        `${message}\nhttps://www.twitch.tv/${streamer.login}`,
-      );
-    } catch (error: unknown) {
-      const err = error as DiscordApiError;
-
-      if (err.code === 50007 && this.onDmCapabilityChanged) {
-        await this.onDmCapabilityChanged(userId, false);
-
-        return;
-      }
-
-      logger.error(
-        {
-          userId,
-
-          streamer: streamer.display_name,
-
-          message: err.message,
-        },
-        "Failed to send live notification",
-      );
-    }
   }
 }

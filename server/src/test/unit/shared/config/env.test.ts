@@ -72,22 +72,26 @@ describe("env", () => {
     expect(env.port).toBe(8080);
   });
 
-  it("falls back to BACKEND_PORT when PORT is zero", async () => {
-    const env = await loadEnv({ PORT: "0", BACKEND_PORT: "4100" });
+  it("falls back to BACKEND_PORT when PORT is unset", async () => {
+    const env = await loadEnv({ BACKEND_PORT: "4100" });
 
     expect(env.port).toBe(4100);
   });
 
-  it("falls back to 3000 when neither port is usable", async () => {
-    const env = await loadEnv({ PORT: "0" });
+  it("falls back to 3000 when neither port is set", async () => {
+    const env = await loadEnv();
 
     expect(env.port).toBe(3000);
   });
 
   it("fails fast instead of silently resolving to NaN when BACKEND_PORT isn't numeric", async () => {
     await expect(
-      loadEnv({ PORT: "0", BACKEND_PORT: "not-a-number" }),
+      loadEnv({ BACKEND_PORT: "not-a-number" }),
     ).rejects.toThrow();
+  });
+
+  it("fails fast on a PORT of zero instead of silently falling back", async () => {
+    await expect(loadEnv({ PORT: "0", BACKEND_PORT: "4100" })).rejects.toThrow();
   });
 
   it("defaults the client origin to the server url", async () => {
@@ -118,6 +122,24 @@ describe("env", () => {
     expect(env.firebase.serviceAccountPath).toBe(
       "/run/secrets/firebase_service_account",
     );
+  });
+
+  it("keeps a single SESSION_SECRET as a one-element list", async () => {
+    const env = await loadEnv();
+
+    expect(env.sessionSecret).toEqual(["test-session-secret"]);
+  });
+
+  it("splits a comma-separated SESSION_SECRET for rotation", async () => {
+    const env = await loadEnv({
+      SESSION_SECRET:
+        "new-session-secret-bytes-long!!, old-session-secret-bytes-long!!",
+    });
+
+    expect(env.sessionSecret).toEqual([
+      "new-session-secret-bytes-long!!",
+      "old-session-secret-bytes-long!!",
+    ]);
   });
 
   it("keeps a single ENCRYPTION_KEY as a one-element list", async () => {

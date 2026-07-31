@@ -239,6 +239,12 @@ export function configurePassport(
             : "http://localhost:3000/api/auth/google/callback",
 
           scope: ["email", "profile"],
+
+          // Binds a session-stored nonce into the OAuth redirect/callback
+          // round trip, same as the Discord and Twitch strategies above -
+          // without it, Google logins had no CSRF binding between the
+          // authorization request and its callback.
+          state: true,
         },
 
         (

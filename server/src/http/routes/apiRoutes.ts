@@ -11,10 +11,10 @@ import {
   validateQuery,
 } from "../middleware/validate.js";
 import {
-  deletePushSubscriptionSchema,
+  deletePushSubscriptionQuerySchema,
   savePushSubscriptionSchema,
   type SavePushSubscriptionRequest,
-  type DeletePushSubscriptionRequest,
+  type DeletePushSubscriptionQuery,
 } from "../schemas/notifications.js";
 import {
   searchStreamersQuerySchema,
@@ -66,11 +66,19 @@ export function createApiRouter({
 }: CreateApiRouterOptions): Router {
   const router = express.Router();
 
-  router.use(ensureFreshToken);
   // Applied once for the whole router rather than per-route: express.json()
   // is a no-op for requests without a JSON content-type, so this doesn't
   // affect the GET-only routes below.
   router.use(express.json());
+
+  // ensureFreshToken (see its doc comment in http/middleware/auth.ts) is
+  // purely best-effort housekeeping - nothing in this codebase calls
+  // Discord's API with the user's own OAuth token, so no route's
+  // correctness depends on it. Scoped to just the two routes below that
+  // actually touch the Discord-linked DM capability, rather than applied to
+  // every route under /api (including ones with nothing to do with Discord,
+  // like /streamers/search or /status), to avoid an unnecessary Firestore
+  // read/refresh check on every request.
 
   router.get(
     "/status",
@@ -98,6 +106,8 @@ export function createApiRouter({
 
   router.get(
     "/notifications/channels",
+
+    ensureFreshToken,
 
     async (req, res) => {
       const authUser = requireUser(req);
@@ -138,6 +148,8 @@ export function createApiRouter({
 
   router.post(
     "/can-receive-dm",
+
+    ensureFreshToken,
 
     async (req, res) => {
       const user = requireUser(req);
@@ -250,12 +262,12 @@ export function createApiRouter({
   router.delete(
     "/notifications/web-push/subscriptions",
 
-    validateBody(deletePushSubscriptionSchema),
+    validateQuery(deletePushSubscriptionQuerySchema),
 
     async (req, res) => {
       const user = requireUser(req);
       const { subscriptionId } =
-        validatedBody<DeletePushSubscriptionRequest>(req);
+        validatedQuery<DeletePushSubscriptionQuery>(req);
 
       const result =
         await repositories.pushSubscriptions.deletePushSubscription(
@@ -295,11 +307,11 @@ export function createApiRouter({
   router.delete(
     "/subscriptions",
 
-    validateBody(subscribeSchema),
+    validateQuery(subscribeSchema),
 
     async (req, res) => {
       const user = requireUser(req);
-      const { streamerId } = validatedBody<UnsubscribeRequest>(req);
+      const { streamerId } = validatedQuery<UnsubscribeRequest>(req);
 
       const result = await repositories.subscriptions.unsubscribe(
         user.id,

@@ -12,6 +12,7 @@ Backend container
     -> Twitch API
     -> Discord API
     -> Firestore
+    -> Redis (rate limiting + EventSub replay dedup; private network only)
 ```
 
 Only Caddy exposes public ports.

@@ -33,6 +33,8 @@ export type CreateAuthTestAppOptions = {
    * simulate a session with no corresponding identity record.
    */
   identity?: Identity | null;
+  /** Spied on by tests asserting /logout disconnects live sockets. */
+  disconnectUser?: (userId: string) => void;
 };
 
 export type AuthTestContext = {
@@ -46,6 +48,7 @@ export async function createAuthTestApp({
   state,
   logoutError,
   identity = buildIdentity({ uid: AUTH_TEST_USER.id }),
+  disconnectUser,
 }: CreateAuthTestAppOptions = {}): Promise<AuthTestContext> {
   const container = createTestContainer();
 
@@ -93,6 +96,7 @@ export async function createAuthTestApp({
       identities: container.repositories.identities,
       discord: container.discord,
       ensureFreshToken: (_req, _res, next) => next(),
+      ...(disconnectUser ? { disconnectUser } : {}),
     }),
   );
 
