@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { BadRequestError } from "../../../../../http/errors/BadRequestError.js";
+import { EventSubValidationError } from "../../../../../modules/twitch/eventsub/EventSubValidationError.js";
 import { dispatchEventSubNotification } from "../../../../../modules/twitch/eventsub/EventSubDispatcher.js";
 import { createEventSubHandlerRegistry } from "../../../../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
 
@@ -47,13 +47,13 @@ describe("dispatchEventSubNotification", () => {
 
       await expect(
         dispatch(payload, "webhook_callback_verification"),
-      ).rejects.toThrow(BadRequestError);
+      ).rejects.toThrow(EventSubValidationError);
     });
 
     it("rejects an empty challenge", async () => {
       await expect(
         dispatch(buildWebhookVerification(""), "webhook_callback_verification"),
-      ).rejects.toThrow(BadRequestError);
+      ).rejects.toThrow(EventSubValidationError);
     });
 
     it("never invokes notification handlers", async () => {
@@ -104,7 +104,7 @@ describe("dispatchEventSubNotification", () => {
 
       await expect(
         dispatch(payload, "notification", handlers),
-      ).rejects.toThrow(BadRequestError);
+      ).rejects.toThrow(EventSubValidationError);
       expect(onNotification).not.toHaveBeenCalled();
     });
 
@@ -117,11 +117,11 @@ describe("dispatchEventSubNotification", () => {
         (caught: unknown) => caught,
       );
 
-      expect(error).toBeInstanceOf(BadRequestError);
-      expect((error as BadRequestError).details).toMatchObject({
+      expect(error).toBeInstanceOf(EventSubValidationError);
+      expect((error as EventSubValidationError).details).toMatchObject({
         event: invalidEvent,
       });
-      expect((error as BadRequestError).details?.issues).toBeDefined();
+      expect((error as EventSubValidationError).details?.issues).toBeDefined();
     });
 
     it("propagates a handler failure", async () => {
@@ -159,7 +159,7 @@ describe("dispatchEventSubNotification", () => {
   describe("malformed input", () => {
     it("rejects an envelope without a subscription", async () => {
       await expect(dispatch({ event: {} }, "notification")).rejects.toThrow(
-        BadRequestError,
+        EventSubValidationError,
       );
     });
 
@@ -170,29 +170,29 @@ describe("dispatchEventSubNotification", () => {
         (caught: unknown) => caught,
       );
 
-      expect(error).toBeInstanceOf(BadRequestError);
-      expect((error as BadRequestError).details).toMatchObject({
+      expect(error).toBeInstanceOf(EventSubValidationError);
+      expect((error as EventSubValidationError).details).toMatchObject({
         raw: JSON.stringify(payload),
       });
-      expect((error as BadRequestError).details?.issues).toBeDefined();
+      expect((error as EventSubValidationError).details?.issues).toBeDefined();
     });
 
     it("rejects an envelope whose subscription has no type", async () => {
       await expect(
         dispatch({ subscription: { version: "1" }, event: {} }, "notification"),
-      ).rejects.toThrow(BadRequestError);
+      ).rejects.toThrow(EventSubValidationError);
     });
 
     it("rejects a JSON body that is not an object", async () => {
       await expect(
         dispatchEventSubNotification("[]", "notification", setup().handlers),
-      ).rejects.toThrow(BadRequestError);
+      ).rejects.toThrow(EventSubValidationError);
     });
 
-    it("throws BadRequestError for malformed JSON", async () => {
+    it("throws EventSubValidationError for malformed JSON", async () => {
       await expect(
         dispatchEventSubNotification("{", "notification", setup().handlers),
-      ).rejects.toThrow(BadRequestError);
+      ).rejects.toThrow(EventSubValidationError);
     });
   });
 });

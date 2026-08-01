@@ -39,6 +39,42 @@ export function identityRepositoryBehavior(
       );
     });
 
+    describe("getIdentityByDiscordUid", () => {
+      it("resolves a linked Discord uid to the account's canonical uid", async () => {
+        const repository = createRepository();
+
+        const identity = buildIdentity({
+          uid: "canonical-uid",
+          discord: buildDiscordCredential({ id: "discord-snowflake-1" }),
+        });
+
+        repository.seed(identity);
+
+        await expect(
+          repository.getIdentityByDiscordUid("discord-snowflake-1"),
+        ).resolves.toEqual(identity);
+      });
+
+      it("returns null for a Discord id that isn't linked to any account", async () => {
+        const repository = createRepository();
+
+        await expect(
+          repository.getIdentityByDiscordUid("unknown-discord-id"),
+        ).resolves.toBeNull();
+      });
+
+      it.each(["", "   "])(
+        "returns null for a blank Discord id %j",
+        async (discordUid) => {
+          const repository = createRepository();
+
+          await expect(
+            repository.getIdentityByDiscordUid(discordUid),
+          ).resolves.toBeNull();
+        },
+      );
+    });
+
     it("creates a new identity (uid = discord id) for a first-time Discord sign-in", async () => {
       const repository = createRepository();
 

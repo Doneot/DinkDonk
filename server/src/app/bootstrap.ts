@@ -24,14 +24,16 @@ export async function bootstrap() {
   });
 
   const userChangeBroadcaster = new UserChangeBroadcaster(
-    container.firestore,
+    container.repositories.users,
     server.sockets,
   );
 
   userChangeBroadcaster.start();
 
-  server.httpServer.on("request", server.app);
-
+  // Express is already attached to server.httpServer as of createServer()
+  // (see server.ts) - it has to happen before socket.io's engine.io attach()
+  // runs, not after, so registering it again here would just add Express as
+  // a redundant second "request" listener.
   configureEventSubscriptions(container);
 
   // Registered before the (potentially slow) Twitch/Discord startup calls so a
@@ -92,7 +94,7 @@ export async function bootstrap() {
   });
 
   server.httpServer.listen(env.port, "0.0.0.0", () => {
-    logger.info(`HTTP and Socket.IO server listening on ${env.port}`);
+    logger.info({ port: env.port }, "HTTP and Socket.IO server listening");
   });
 
   cleanupScheduler.start();

@@ -8,7 +8,6 @@ import { InMemoryIdentityRepository } from "../repositories/inMemory/InMemoryIde
 import { InMemoryPushSubscriptionRepository } from "../repositories/inMemory/InMemoryPushSubscriptionRepository.js";
 import { InMemoryStreamerRepository } from "../repositories/inMemory/InMemoryStreamerRepository.js";
 import { InMemorySubscriberStore } from "../repositories/inMemory/InMemorySubscriberStore.js";
-import { InMemorySubscriptionRepository } from "../repositories/inMemory/InMemorySubscriptionRepository.js";
 import { InMemoryUserRepository } from "../repositories/inMemory/InMemoryUserRepository.js";
 
 export type TestContainer = {
@@ -18,19 +17,17 @@ export type TestContainer = {
 };
 
 export function createTestContainer(): TestContainer {
-  // Mirrors production wiring (createRepositories): the streamer and
-  // subscription repositories share one event bus and one view of "who's
-  // subscribed to this streamer", the same way both Firestore repositories
-  // share one event bus and the same `streamers/{id}/subscribers`
-  // subcollection.
+  // Mirrors production wiring (createRepositories): the streamer and user
+  // repositories share one event bus and one view of "who's subscribed to
+  // this streamer", the same way both Firestore repositories share one
+  // event bus and the same `streamers/{id}/subscribers` subcollection.
   const events = createDomainEventBus(logger);
   const subscribers = new InMemorySubscriberStore();
 
   const repositories: Repositories = {
-    users: new InMemoryUserRepository(),
+    users: new InMemoryUserRepository(events, subscribers),
     identities: new InMemoryIdentityRepository(),
     streamers: new InMemoryStreamerRepository(events, subscribers),
-    subscriptions: new InMemorySubscriptionRepository(events, subscribers),
     pushSubscriptions: new InMemoryPushSubscriptionRepository(),
   };
 

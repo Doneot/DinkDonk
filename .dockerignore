@@ -1,0 +1,30 @@
+.git
+.gitignore
+
+node_modules
+**/node_modules
+
+dist
+**/dist
+build
+**/build
+coverage
+**/coverage
+
+*.log
+.DS_Store
+
+.vscode
+.idea
+
+# Real secret material and backend runtime env files - never needed to build
+# the frontend/Caddy image (Dockerfile.caddy only ever COPYs client/ and
+# deploy/Caddyfile), but sat in the build context anyway since this file
+# didn't exist before. client/.env* is deliberately NOT excluded here: Vite
+# reads it at build time for VITE_* values baked into the production bundle
+# (e.g. VITE_INVITE_URL), so removing it would silently break the built app.
+deploy/secrets
+deploy/secrets-staging
+deploy/.env.production
+deploy/.env.staging
+server/.env.development

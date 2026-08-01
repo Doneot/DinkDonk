@@ -6,6 +6,7 @@ import {
   getExistingPushSubscription,
   isWebPushSupported,
 } from "../services/pushNotifications";
+import { notifyActionError } from "../services/errorToast";
 
 const WebPushCard = () => {
   const [supported, setSupported] = useState(true);
@@ -34,11 +35,7 @@ const WebPushCard = () => {
       setEnabled(true);
       toast.success("Browser notifications enabled.");
     } catch (error) {
-      toast.error(
-        error.response?.data?.error ||
-          error.message ||
-          "Failed to enable browser notifications.",
-      );
+      notifyActionError(error, "Failed to enable browser notifications.");
     } finally {
       setLoading(false);
     }
@@ -51,7 +48,7 @@ const WebPushCard = () => {
       setEnabled(false);
       toast.success("Browser notifications disabled on this device.");
     } catch (error) {
-      toast.error(error.message || "Failed to disable browser notifications.");
+      notifyActionError(error, "Failed to disable browser notifications.");
     } finally {
       setLoading(false);
     }

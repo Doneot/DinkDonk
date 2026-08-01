@@ -5,9 +5,14 @@ const StatusCard = () => {
   const [status, setStatus] = useState("loading");
 
   useEffect(() => {
-    api.get("/status").then((res) => {
-      setStatus(res.data.online ? "Online" : "Offline");
-    });
+    api
+      .get("/status")
+      .then((res) => {
+        setStatus(res.data.online ? "Online" : "Offline");
+      })
+      .catch(() => {
+        setStatus("Unknown");
+      });
   }, []);
 
   return (

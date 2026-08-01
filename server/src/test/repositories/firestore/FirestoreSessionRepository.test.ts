@@ -2,8 +2,9 @@ import type { SessionData } from "express-session";
 import { describe, expect, it, vi } from "vitest";
 
 import { FirestoreSessionRepository } from "../../../modules/auth/infrastructure/firestore/FirestoreSessionRepository.js";
+import { logger } from "../../../shared/logger/logger.js";
 
-import { FakeFirestore } from "../../helpers/fakeFirestore.js";
+import { FakeDocumentReference, FakeFirestore } from "../../helpers/fakeFirestore.js";
 
 import { anyNumber } from "../../helpers/matchers.js";
 
@@ -54,6 +55,19 @@ function call(
 
       resolve();
     });
+  });
+}
+
+// touch()'s callback has no error parameter - unlike set/destroy, a touch
+// failure is logged and swallowed rather than surfaced, so this just
+// resolves once the callback fires either way.
+function touch(
+  store: FirestoreSessionRepository,
+  sessionId: string,
+  sessionData: SessionData,
+): Promise<void> {
+  return new Promise((resolve) => {
+    store.touch(sessionId, sessionData, resolve);
   });
 }
 
@@ -190,5 +204,66 @@ describe("FirestoreSessionRepository", () => {
     await call((callback) => store.set("session-1", SESSION, callback));
 
     expect(firestore.read("custom-sessions/session-1")).toBeDefined();
+  });
+
+  describe("touch", () => {
+    it("refreshes updatedAt/expiresAt via merge without disturbing the stored session blob", async () => {
+      const { firestore, store } = setup();
+
+      await call((callback) => store.set("session-1", SESSION, callback));
+
+      const touchedSession: SessionData = {
+        ...SESSION,
+        cookie: {
+          ...SESSION.cookie,
+          expires: new Date(Date.now() + 7_200_000),
+        },
+      };
+
+      await touch(store, "session-1", touchedSession);
+
+      expect(firestore.read("sessions/session-1")).toMatchObject({
+        // The original set() call's serialized blob is untouched - touch()
+        // only refreshes the expiry-related fields, it doesn't re-serialize
+        // the session data (that's what set() is for).
+        session: JSON.stringify(SESSION),
+        updatedAt: anyNumber,
+        expiresAt: touchedSession.cookie.expires!.getTime(),
+      });
+    });
+
+    it("invokes the callback on success", async () => {
+      const { store } = setup();
+
+      await call((callback) => store.set("session-1", SESSION, callback));
+
+      await expect(touch(store, "session-1", SESSION)).resolves.toBeUndefined();
+    });
+
+    it("logs and still invokes the callback when the write fails", async () => {
+      const error = vi.spyOn(logger, "error").mockReturnValue();
+      const { store } = setup();
+
+      // A rejected promise (not a synchronous throw): touch() chains
+      // .then()/.catch() directly onto set()'s return value rather than
+      // wrapping it in try/catch, so this exercises the real Firestore SDK's
+      // actual failure shape (an async rejection) rather than a same-tick
+      // throw that would never reach that .catch() at all.
+      vi.spyOn(FakeDocumentReference.prototype, "set").mockRejectedValueOnce(
+        new Error("firestore unavailable"),
+      );
+
+      await expect(touch(store, "session-1", SESSION)).resolves.toBeUndefined();
+
+      expect(error).toHaveBeenCalledWith(
+        {
+          sessionId: "session-1",
+          error: expect.any(Error) as Error,
+        },
+        "Failed to touch session document",
+      );
+
+      vi.restoreAllMocks();
+    });
   });
 });

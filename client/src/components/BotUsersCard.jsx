@@ -5,9 +5,14 @@ const BotUsersCard = () => {
   const [userCount, setUserCount] = useState(null);
 
   useEffect(() => {
-    api.get("/user-count").then((res) => {
-      setUserCount(res.data.count);
-    });
+    api
+      .get("/user-count")
+      .then((res) => {
+        setUserCount(res.data.count);
+      })
+      .catch(() => {
+        setUserCount("—");
+      });
   }, []);
 
   return (

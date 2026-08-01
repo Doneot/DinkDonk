@@ -20,6 +20,7 @@ import {
   canReceiveDmResponseSchema,
   deletePushResponseSchema,
   errorResponseSchema,
+  logoutResponseSchema,
   notificationChannelsResponseSchema,
   publicKeyResponseSchema,
   savePushResponseSchema,
@@ -177,12 +178,7 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     summary: "Log out authenticated user",
     security: authSecurity,
     responses: {
-      200: jsonResponse(
-        "Logged out",
-        z.object({
-          ok: z.literal(true),
-        }),
-      ),
+      200: jsonResponse("Logged out", logoutResponseSchema),
       401: unauthorizedResponse,
       500: internalErrorResponse,
     },
@@ -247,14 +243,10 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     },
     responses: {
       201: jsonResponse("Save result", savePushResponseSchema),
-      // Either a Zod validation failure (malformed request) or this route's
-      // own typed domain-rejection shape (a structurally valid request the
-      // handler still declined) - the two are genuinely different response
-      // bodies that both arrive under a 400, see validate.ts/errorHandler.ts.
-      400: jsonResponse(
-        "Validation error or save failure",
-        z.union([errorResponseSchema, savePushResponseSchema.options[1]]),
-      ),
+      // Covers both a Zod validation failure and this route's own rejection
+      // of a structurally valid but unusable subscription - both now throw
+      // the same AppError-shaped 400, see errorHandler.ts.
+      400: validationErrorResponse,
       401: unauthorizedResponse,
     },
   });
@@ -269,10 +261,7 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     },
     responses: {
       200: jsonResponse("Delete result", deletePushResponseSchema),
-      400: jsonResponse(
-        "Validation error or delete failure",
-        z.union([errorResponseSchema, deletePushResponseSchema.options[1]]),
-      ),
+      400: validationErrorResponse,
       401: unauthorizedResponse,
     },
   });
@@ -347,11 +336,10 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     },
     responses: {
       201: jsonResponse("Subscribe result", subscribeResponseSchema),
-      400: jsonResponse(
-        "Validation error or subscribe failure",
-        z.union([errorResponseSchema, subscribeResponseSchema.options[1]]),
-      ),
+      400: validationErrorResponse,
       401: unauthorizedResponse,
+      404: notFoundResponse,
+      409: conflictResponse,
     },
   });
 
@@ -365,11 +353,9 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     },
     responses: {
       200: jsonResponse("Unsubscribe result", unsubscribeResponseSchema),
-      400: jsonResponse(
-        "Validation error or unsubscribe failure",
-        z.union([errorResponseSchema, unsubscribeResponseSchema.options[1]]),
-      ),
+      400: validationErrorResponse,
       401: unauthorizedResponse,
+      404: notFoundResponse,
     },
   });
 
@@ -386,14 +372,9 @@ export function registerPaths(registry: OpenAPIRegistry): void {
         "Update subscription result",
         updateSubscriptionResponseSchema,
       ),
-      400: jsonResponse(
-        "Validation error or update failure",
-        z.union([
-          errorResponseSchema,
-          updateSubscriptionResponseSchema.options[1],
-        ]),
-      ),
+      400: validationErrorResponse,
       401: unauthorizedResponse,
+      404: notFoundResponse,
     },
   });
 

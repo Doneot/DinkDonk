@@ -22,8 +22,9 @@ export class FirestoreStreamerRepository implements StreamerRepository {
     this.streamers = db.collection("streamers");
   }
 
-  async getStreamers(): Promise<Streamer[]> {
-    const snapshot = await this.streamers.get();
+  async getStreamers(limit?: number): Promise<Streamer[]> {
+    const query = limit === undefined ? this.streamers : this.streamers.limit(limit);
+    const snapshot = await query.get();
 
     return snapshot.docs.map((doc) => ({ id: doc.id }));
   }
@@ -42,9 +43,30 @@ export class FirestoreStreamerRepository implements StreamerRepository {
       return;
     }
 
-    await this.streamers.doc(id).set({ id }, { merge: true });
+    const streamerRef = this.streamers.doc(id);
 
-    this.events.emit({ type: "streamerAdded", streamerId: id });
+    // Transactional read-before-write (not a separate .get() then .set())
+    // so the "did this create a new streamer" check can't race a concurrent
+    // caller the way two independent calls could - mirrors
+    // FirestoreUserRepository.subscribe()'s createdStreamer guard,
+    // which this previously didn't match: an unconditional emit here meant
+    // calling createStreamer on an already-existing streamer fired a
+    // spurious streamerAdded event.
+    const created = await this.streamers.firestore.runTransaction(
+      async (tx) => {
+        const doc = await tx.get(streamerRef);
+
+        tx.set(streamerRef, { id }, { merge: true });
+
+        return !doc.exists;
+      },
+    );
+
+    // Same known, accepted debt as FirestoreUserRepository.subscribe()'s
+    // identical decision - see ARCHITECTURE.md's modules/ section.
+    if (created) {
+      this.events.emit({ type: "streamerAdded", streamerId: id });
+    }
   }
 
   async deleteStreamer(id: string): Promise<void> {
@@ -71,7 +93,7 @@ export class FirestoreStreamerRepository implements StreamerRepository {
       tx.delete(streamerRef);
     });
 
-    logger.info(`Deleted streamer ${id}`);
+    logger.info({ streamerId: id }, "Deleted streamer");
   }
 
   async getSubscriberIds(id: string): Promise<string[]> {

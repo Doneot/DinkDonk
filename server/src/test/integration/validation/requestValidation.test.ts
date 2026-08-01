@@ -6,7 +6,7 @@ import { createTestApp } from "../../helpers/createTestApp.js";
 import { TestClient } from "../../helpers/TestClient.js";
 
 const VALID_PUSH_SUBSCRIPTION = {
-  endpoint: "https://push.example.com/subscription-1",
+  endpoint: "https://fcm.googleapis.com/fcm/send/subscription-1",
   keys: { p256dh: "p256dh-key", auth: "auth-key" },
 };
 
@@ -104,7 +104,7 @@ describe("subscription payload validation", () => {
   it("POST /api/subscriptions rejects a missing streamer id", async () => {
     const { ctx, client } = await createClient();
 
-    const subscribe = vi.spyOn(ctx.repositories.subscriptions, "subscribe");
+    const subscribe = vi.spyOn(ctx.repositories.users, "subscribe");
 
     const response = await client.post("/api/subscriptions").send({});
 
@@ -116,7 +116,7 @@ describe("subscription payload validation", () => {
   it("DELETE /api/subscriptions rejects a missing streamer id", async () => {
     const { ctx, client } = await createClient();
 
-    const subscribe = vi.spyOn(ctx.repositories.subscriptions, "subscribe");
+    const subscribe = vi.spyOn(ctx.repositories.users, "subscribe");
 
     const response = await client.delete("/api/subscriptions").query({});
 
@@ -129,6 +129,7 @@ describe("subscription payload validation", () => {
     ["a blank streamer id", { streamerId: "   " }],
     ["an over-long streamer id", { streamerId: "a".repeat(65) }],
     ["a non-string streamer id", { streamerId: 42 }],
+    ["a streamer id containing a path separator", { streamerId: "abc/def" }],
   ])("POST /api/subscriptions rejects %s", async (_label, body) => {
     const { client } = await createClient();
 
@@ -160,6 +161,15 @@ describe("web push payload validation", () => {
     [
       "a non-url endpoint",
       { subscription: { ...VALID_PUSH_SUBSCRIPTION, endpoint: "not-a-url" } },
+    ],
+    [
+      "an endpoint on a host that isn't a known push service (SSRF guard)",
+      {
+        subscription: {
+          ...VALID_PUSH_SUBSCRIPTION,
+          endpoint: "http://169.254.169.254/latest/meta-data/",
+        },
+      },
     ],
     [
       "missing keys",
@@ -204,6 +214,10 @@ describe("web push payload validation", () => {
     ["an empty query", {}],
     ["a blank subscription id", { subscriptionId: "   " }],
     ["a blank endpoint", { endpoint: "" }],
+    [
+      "a subscription id containing a path separator",
+      { subscriptionId: "abc/def" },
+    ],
   ])("DELETE rejects %s", async (_label, query) => {
     const { client } = await createClient();
 

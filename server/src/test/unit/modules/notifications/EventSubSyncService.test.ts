@@ -186,6 +186,23 @@ describe("EventSubSyncService", () => {
 
       expect(twitch.broadcasterIds()).toEqual(["streamer-2"]);
     });
+
+    it("syncs every streamer across more than one batch", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      // SYNC_BATCH_SIZE is 25 - 30 streamers spans exactly two batches.
+      const streamers = Array.from({ length: 30 }, (_, i) =>
+        buildStreamer({ id: `streamer-${i}` }),
+      );
+
+      const { service, twitch } = setup({ subscriptions: [], streamers });
+
+      await service.syncEventSubSubscriptions();
+
+      expect(twitch.broadcasterIds().sort()).toEqual(
+        streamers.map((streamer) => streamer.id).sort(),
+      );
+    });
   });
 
   describe("handleStreamerAdded", () => {

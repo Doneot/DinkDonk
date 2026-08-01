@@ -1,7 +1,7 @@
 /**
  * The subscriber-id-set for a streamer, shared between
- * InMemoryStreamerRepository and InMemorySubscriptionRepository so they
- * behave like their Firestore counterparts, which both read/write the same
+ * InMemoryStreamerRepository and InMemoryUserRepository so they behave like
+ * their Firestore counterparts, which both read/write the same
  * `streamers/{id}/subscribers` subcollection. Without this, subscribing
  * through one fake wouldn't be visible through the other - a gap the real
  * repositories don't have.

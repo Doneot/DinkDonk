@@ -87,7 +87,7 @@ describe("EnvSchema", () => {
         UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN: "true",
         EVENTSUB_GC_INTERVAL_MS: "1000",
         PROMETHEUS_ENABLED: "1",
-        METRICS_TOKEN: "a-real-metrics-token-1234567890",
+        METRICS_TOKEN: "a-real-metrics-token-123456789012",
         REQUEST_LOGGING_ENABLED: "1",
         TUNNEL_PROVIDER: "ssh",
       }),
@@ -177,13 +177,13 @@ describe("EnvSchema", () => {
     const parsed = EnvSchema.parse(
       baseEnv({
         SESSION_SECRET:
-          "new-secret-16-bytes-long!!, old-secret-16-bytes-long!!",
+          "new-secret-16-bytes-long!!-padded, old-secret-16-bytes-long!!-padded",
       }),
     );
 
     expect(parsed.SESSION_SECRET).toEqual([
-      "new-secret-16-bytes-long!!",
-      "old-secret-16-bytes-long!!",
+      "new-secret-16-bytes-long!!-padded",
+      "old-secret-16-bytes-long!!-padded",
     ]);
   });
 
@@ -249,10 +249,10 @@ describe("EnvSchema", () => {
 
   it("accepts a METRICS_TOKEN of sufficient length", () => {
     const parsed = EnvSchema.parse(
-      baseEnv({ METRICS_TOKEN: "a-real-metrics-token-1234567890" }),
+      baseEnv({ METRICS_TOKEN: "a-real-metrics-token-123456789012" }),
     );
 
-    expect(parsed.METRICS_TOKEN).toBe("a-real-metrics-token-1234567890");
+    expect(parsed.METRICS_TOKEN).toBe("a-real-metrics-token-123456789012");
   });
 
   it("rejects a METRICS_TOKEN that is too short", () => {
@@ -271,12 +271,12 @@ describe("EnvSchema", () => {
     const parsed = EnvSchema.parse(
       baseEnv({
         PROMETHEUS_ENABLED: "true",
-        METRICS_TOKEN: "a-real-metrics-token-1234567890",
+        METRICS_TOKEN: "a-real-metrics-token-123456789012",
       }),
     );
 
     expect(parsed.PROMETHEUS_ENABLED).toBe(true);
-    expect(parsed.METRICS_TOKEN).toBe("a-real-metrics-token-1234567890");
+    expect(parsed.METRICS_TOKEN).toBe("a-real-metrics-token-123456789012");
   });
 
   it("rejects a non-numeric BACKEND_PORT", () => {

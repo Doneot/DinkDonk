@@ -7,10 +7,10 @@ export function configureEventSubscriptions({
   services,
   twitch,
 }: Container): void {
-  // Both the streamer and subscription repositories share the same event
-  // bus (see createRepositories), so registering here catches a streamer
-  // created through either one.
-  repositories.subscriptions.events.on("streamerAdded", (event) => {
+  // Both the user and streamer repositories share the same event bus (see
+  // createRepositories), so registering here catches a streamer created
+  // through either one.
+  repositories.users.events.on("streamerAdded", (event) => {
     return services.eventSubSync
       .handleStreamerAdded(event.streamerId)
       .catch((error: unknown) => {
@@ -21,7 +21,7 @@ export function configureEventSubscriptions({
       });
   });
 
-  repositories.subscriptions.events.on("streamerEmpty", (event) => {
+  repositories.users.events.on("streamerEmpty", (event) => {
     return services.subscriptionCleanup
       .garbageCollectStreamer(event.streamerId)
       .catch((error: unknown) => {

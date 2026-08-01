@@ -46,58 +46,23 @@ export const subscriptionResponseSchema = z.object({
   notification_message: z.string().optional(),
 });
 
-export const savePushResponseSchema = z.union([
-  z.object({
-    success: z.literal(true),
-    id: z.string().min(1),
-  }),
-  z.object({
-    success: z.literal(false),
-    reason: z.literal("invalid_push_subscription"),
-  }),
-]);
+export const savePushResponseSchema = z.object({
+  id: z.string().min(1),
+});
 
-export const deletePushResponseSchema = z.union([
-  z.object({
-    success: z.literal(true),
-  }),
-  z.object({
-    success: z.literal(false),
-    reason: z.enum(["invalid_user", "invalid_push_subscription"]),
-  }),
-]);
+export const deletePushResponseSchema = z.object({});
 
-export const subscribeResponseSchema = z.union([
-  z.object({
-    success: z.literal(true),
-    createdStreamer: z.boolean(),
-  }),
-  z.object({
-    success: z.literal(false),
-    reason: z.enum(["invalid_input", "already_subscribed"]),
-  }),
-]);
+export const subscribeResponseSchema = z.object({
+  createdStreamer: z.boolean(),
+});
 
-export const unsubscribeResponseSchema = z.union([
-  z.object({
-    success: z.literal(true),
-    usersLeft: z.number().int().nonnegative(),
-  }),
-  z.object({
-    success: z.literal(false),
-    reason: z.enum(["invalid_input", "user_not_found", "not_subscribed"]),
-  }),
-]);
+export const unsubscribeResponseSchema = z.object({
+  usersLeft: z.number().int().nonnegative(),
+});
 
-export const updateSubscriptionResponseSchema = z.union([
-  z.object({
-    success: z.literal(true),
-  }),
-  z.object({
-    success: z.literal(false),
-    reason: z.enum(["user_not_found", "subscription_not_found"]),
-  }),
-]);
+export const updateSubscriptionResponseSchema = z.object({});
+
+export const logoutResponseSchema = z.object({});
 
 const providerSchema = z.enum(["discord", "google", "twitch"]);
 
@@ -118,6 +83,9 @@ export const authProvidersResponseSchema = z.object({
 
 export type StatusResponse = z.infer<typeof statusResponseSchema>;
 export type PublicKeyResponse = z.infer<typeof publicKeyResponseSchema>;
+export type SavePushResponse = z.infer<typeof savePushResponseSchema>;
+export type SubscribeResponse = z.infer<typeof subscribeResponseSchema>;
+export type UnsubscribeResponse = z.infer<typeof unsubscribeResponseSchema>;
 export type NotificationChannelsResponse = z.infer<
   typeof notificationChannelsResponseSchema
 >;

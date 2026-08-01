@@ -9,7 +9,7 @@ import { createTestApp } from "../../helpers/createTestApp.js";
 import { TestClient } from "../../helpers/TestClient.js";
 
 const TWITCH_RESULT = {
-  id: "streamer-1",
+  id: "streamer_1",
   login: "streamer",
   display_name: "Streamer",
   profile_image_url: "https://example.com/avatar.png",
@@ -39,6 +39,9 @@ describe("GET /api/streamers/search", () => {
     expect(search).toHaveBeenCalledWith("streamer");
     expect(streamerSummaryResponseSchema.array().parse(response.body)).toEqual([
       {
+        // From createTestContainer.ts's hardcoded searchStreamers fake, not
+        // subject to streamerIdSchema (search results are outbound Twitch
+        // data, not client-supplied request input).
         id: "streamer-1",
         name: "Streamer",
         avatar: "https://example.com/avatar.png",
@@ -87,14 +90,14 @@ describe("POST /api/streamers/info", () => {
       .mockResolvedValue([TWITCH_RESULT]);
 
     const response = await client.post("/api/streamers/info").send({
-      ids: ["streamer-1"],
+      ids: ["streamer_1"],
     });
 
     expect(response.status).toBe(200);
-    expect(fetchStreamers).toHaveBeenCalledWith(["streamer-1"]);
+    expect(fetchStreamers).toHaveBeenCalledWith(["streamer_1"]);
     expect(streamerSummaryResponseSchema.array().parse(response.body)).toEqual([
       {
-        id: "streamer-1",
+        id: "streamer_1",
         name: "Streamer",
         avatar: "https://example.com/avatar.png",
       },
@@ -111,7 +114,7 @@ describe("POST /api/streamers/info", () => {
     expect(response.status).toBe(404);
     expect(errorResponseSchema.parse(response.body)).toEqual({
       error: "not_found",
-      message: "streamer",
+      message: "We couldn't find that streamer.",
     });
   });
 
@@ -124,7 +127,7 @@ describe("POST /api/streamers/info", () => {
 
     const response = await client
       .post("/api/streamers/info")
-      .send({ ids: ["streamer-1"] });
+      .send({ ids: ["streamer_1"] });
 
     expect(response.status).toBe(500);
   });

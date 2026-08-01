@@ -1,5 +1,6 @@
 import type { TwitchStreamerProvider } from "../../twitch/ports/TwitchGateway.js";
 import type { UserRepository } from "../../users/ports/UserRepository.js";
+import type { User } from "../../users/domain/User.js";
 import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
 import type { NotificationManager } from "./NotificationManager.js";
 import type {
@@ -24,6 +25,12 @@ const NOTIFY_BATCH_SIZE = 25;
 // guarantee.
 const FLAP_DEDUP_WINDOW_MS = 10 * 60 * 1000;
 
+// Without a sweep, every distinct streamer that has ever gone live would
+// leave a permanent entry here for the life of the process (nothing removes
+// one once its dedup window has passed) - unbounded growth on a long-running
+// instance as the streamer catalog churns.
+const DEDUP_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+
 export class StreamNotificationService {
   private readonly lastNotifiedStartedAt = new Map<string, string>();
 
@@ -32,7 +39,24 @@ export class StreamNotificationService {
     private readonly users: UserRepository,
     private readonly streamers: StreamerRepository,
     private readonly notificationManager: NotificationManager,
-  ) {}
+  ) {
+    const sweep: NodeJS.Timeout = setInterval(() => {
+      const now = Date.now();
+
+      for (const [streamerId, startedAt] of this.lastNotifiedStartedAt) {
+        const startedAtMs = Date.parse(startedAt);
+
+        if (
+          !Number.isFinite(startedAtMs) ||
+          now - startedAtMs >= FLAP_DEDUP_WINDOW_MS
+        ) {
+          this.lastNotifiedStartedAt.delete(streamerId);
+        }
+      }
+    }, DEDUP_SWEEP_INTERVAL_MS);
+
+    sweep.unref();
+  }
 
   async handleStreamOnline(
     event: TwitchEventSubStreamOnlineEvent,
@@ -61,10 +85,39 @@ export class StreamNotificationService {
     for (let i = 0; i < userIds.length; i += NOTIFY_BATCH_SIZE) {
       const batch = userIds.slice(i, i + NOTIFY_BATCH_SIZE);
 
-      // allSettled, not all: one subscriber's bad record or a single failed
-      // notification call must not abort every later batch's delivery.
+      // Batched multi-get instead of one getUser() per subscriber: for a
+      // popular streamer this is the difference between ~1 Firestore round
+      // trip per 300 subscribers and 1 per subscriber, which otherwise
+      // dominates fan-out latency for the single most time-sensitive
+      // notification in the product.
+      let users: User[];
+
+      try {
+        users = await this.users.getUsersByIds(batch);
+      } catch (error) {
+        // A whole batch's read failing (e.g. a Firestore outage) shouldn't
+        // abort later batches' delivery, mirroring the per-item isolation
+        // this loop already gives notification sends below.
+        logger.error(
+          { userIds: batch, streamerId: streamer.id, error },
+          "Failed to load a batch of subscribers to notify of stream going live",
+        );
+
+        continue;
+      }
+
+      const usersById = new Map(users.map((user) => [user.id, user]));
+
+      // allSettled, not all: one failed notification call must not abort
+      // the rest of this batch's delivery.
       const results = await Promise.allSettled(
-        batch.map((userId) => this.notifyUserForStreamer(userId, streamer)),
+        batch.map((userId) => {
+          const user = usersById.get(userId);
+
+          return user
+            ? this.notifyUser(user, streamer)
+            : Promise.resolve();
+        }),
       );
 
       for (const [index, result] of results.entries()) {
@@ -98,16 +151,10 @@ export class StreamNotificationService {
     return Math.abs(currentMs - lastMs) < FLAP_DEDUP_WINDOW_MS;
   }
 
-  private async notifyUserForStreamer(
-    userId: string,
+  private async notifyUser(
+    user: User,
     streamer: TwitchStreamer,
   ): Promise<void> {
-    const user = await this.users.getUser(userId);
-
-    if (!user) {
-      return;
-    }
-
     const subscription = user.subscriptions.find((s) => s.id === streamer.id);
     const message = subscription?.notification_message || "";
 

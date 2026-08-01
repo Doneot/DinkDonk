@@ -62,4 +62,22 @@ describe("TwitchAuthenticator", () => {
       "invalid_client",
     );
   });
+
+  describe("default http client", () => {
+    it("reuses connections via the shared keep-alive agent", async () => {
+      const axios = await import("axios");
+      const { keepAliveHttpsAgent } = await import(
+        "../../../../infrastructure/http/httpsAgent.js"
+      );
+      const create = vi.spyOn(axios.default, "create");
+
+      new TwitchAuthenticator();
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ httpsAgent: keepAliveHttpsAgent }),
+      );
+
+      create.mockRestore();
+    });
+  });
 });

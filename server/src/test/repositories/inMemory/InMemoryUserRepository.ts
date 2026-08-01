@@ -1,11 +1,29 @@
 import type { UserRepository } from "../../../modules/users/ports/UserRepository.js";
 import type { User } from "../../../modules/users/domain/User.js";
 import type { UserUpdate } from "../../../modules/users/domain/UserUpdate.js";
+import type { Subscription } from "../../../modules/users/domain/Subscription.js";
+import { MAX_SUBSCRIPTIONS } from "../../../modules/users/domain/Subscription.js";
+import type {
+  SubscribeResult,
+  UnsubscribeResult,
+  UpdateSubscriptionResult,
+} from "../../../modules/users/domain/SubscribeResult.js";
+import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
+import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
+import { logger } from "../../../shared/logger/logger.js";
+import { SubscriptionSchema } from "../../../modules/users/schemas/SubscriptionSchema.js";
 
 import { isNonEmptyString } from "../../../shared/utils/validators.js";
+import { InMemorySubscriberStore } from "./InMemorySubscriberStore.js";
 
 export class InMemoryUserRepository implements UserRepository {
   private readonly users = new Map<string, User>();
+  private readonly watchers = new Set<(user: User) => void>();
+
+  constructor(
+    readonly events: DomainEventBus = createDomainEventBus(logger),
+    private readonly subscribers: InMemorySubscriberStore = new InMemorySubscriberStore(),
+  ) {}
 
   getUser(userId: string): Promise<User | null> {
     return Promise.resolve(structuredClone(this.users.get(userId) ?? null));
@@ -17,22 +35,40 @@ export class InMemoryUserRepository implements UserRepository {
     );
   }
 
+  getUsersByIds(userIds: string[]): Promise<User[]> {
+    return Promise.resolve(
+      userIds
+        .filter(isNonEmptyString)
+        .map((id) => this.users.get(id))
+        .filter((user): user is User => user !== undefined)
+        .map((user) => structuredClone(user)),
+    );
+  }
+
   updateUser(userId: string, data: UserUpdate): Promise<void> {
     if (!isNonEmptyString(userId)) {
       return Promise.reject(new Error("Invalid user id"));
     }
 
-    let existing = this.users.get(userId);
+    const existing = this.users.get(userId);
+    const isModification = existing !== undefined;
 
-    if (!existing) {
-      existing = {
-        id: userId,
-        subscriptions: [],
-        canReceiveDM: false,
-      };
+    const updated: User = {
+      ...(existing ?? { id: userId, subscriptions: [], canReceiveDM: false }),
+      ...data,
+    };
+
+    this.users.set(userId, updated);
+
+    // Mirrors Firestore's "modified" doc-change type: a brand-new document
+    // is a creation, not a change to watch, matching
+    // FirestoreUserRepository.watchUsers()'s change.type === "modified"
+    // filter.
+    if (isModification) {
+      for (const watcher of this.watchers) {
+        watcher(structuredClone(updated));
+      }
     }
-
-    this.users.set(userId, { ...existing, ...data });
 
     return Promise.resolve();
   }
@@ -43,8 +79,172 @@ export class InMemoryUserRepository implements UserRepository {
     );
   }
 
+  watchUsers(
+    onChange: (user: User) => void,
+    _onError: (error: Error) => void,
+  ): () => void {
+    this.watchers.add(onChange);
+
+    return () => {
+      this.watchers.delete(onChange);
+    };
+  }
+
+  private ensureUser(userId: string): User {
+    let user = this.users.get(userId);
+
+    if (!user) {
+      user = { id: userId, subscriptions: [], canReceiveDM: false };
+      this.users.set(userId, user);
+    }
+
+    return user;
+  }
+
+  getSubscription(
+    userId: string,
+    streamerId: string,
+  ): Promise<Subscription | null> {
+    if (!isNonEmptyString(userId) || !isNonEmptyString(streamerId)) {
+      return Promise.resolve(null);
+    }
+
+    const user = this.users.get(userId);
+
+    return Promise.resolve(
+      user?.subscriptions.find((s) => s.id === streamerId) ?? null,
+    );
+  }
+
+  // Wraps the synchronous SubscriptionSchema.parse() throw below into a
+  // rejected promise (matching FirestoreUserRepository's behavior) rather
+  // than letting it throw out of this call synchronously.
+  subscribe(
+    userId: string,
+    streamerId: string,
+    notificationMessage = "",
+  ): Promise<SubscribeResult> {
+    if (!isNonEmptyString(userId) || !isNonEmptyString(streamerId)) {
+      return Promise.resolve({ success: false, reason: "invalid_input" });
+    }
+
+    const user = this.ensureUser(userId);
+
+    if (user.subscriptions.some((s) => s.id === streamerId)) {
+      return Promise.resolve({ success: false, reason: "already_subscribed" });
+    }
+
+    if (user.subscriptions.length >= MAX_SUBSCRIPTIONS) {
+      return Promise.resolve({
+        success: false,
+        reason: "subscription_limit_reached",
+      });
+    }
+
+    let newSubscription: Subscription;
+
+    try {
+      newSubscription = SubscriptionSchema.parse({
+        id: streamerId,
+        notification_message: notificationMessage,
+      });
+    } catch (error) {
+      return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+    }
+
+    user.subscriptions = [...user.subscriptions, newSubscription];
+
+    const createdStreamer = !this.subscribers.has(streamerId);
+
+    this.subscribers.ensure(streamerId).add(userId);
+
+    if (createdStreamer) {
+      this.events.emit({ type: "streamerAdded", streamerId });
+    }
+
+    return Promise.resolve({ success: true, createdStreamer });
+  }
+
+  unsubscribe(userId: string, streamerId: string): Promise<UnsubscribeResult> {
+    if (!isNonEmptyString(userId) || !isNonEmptyString(streamerId)) {
+      return Promise.resolve({ success: false, reason: "invalid_input" });
+    }
+
+    const user = this.users.get(userId);
+
+    if (!user) {
+      return Promise.resolve({ success: false, reason: "user_not_found" });
+    }
+
+    if (!user.subscriptions.some((s) => s.id === streamerId)) {
+      return Promise.resolve({ success: false, reason: "not_subscribed" });
+    }
+
+    user.subscriptions = user.subscriptions.filter((s) => s.id !== streamerId);
+
+    let usersLeft = 0;
+
+    if (this.subscribers.has(streamerId)) {
+      const streamerSubscribers = this.subscribers.ensure(streamerId);
+
+      streamerSubscribers.delete(userId);
+      usersLeft = streamerSubscribers.size;
+
+      if (usersLeft === 0) {
+        this.subscribers.delete(streamerId);
+        this.events.emit({ type: "streamerEmpty", streamerId });
+      }
+    }
+
+    return Promise.resolve({ success: true, usersLeft });
+  }
+
+  // Same reason as subscribe() above for avoiding a synchronous throw.
+  updateSubscription(
+    userId: string,
+    streamerId: string,
+    data: Partial<Omit<Subscription, "id">>,
+  ): Promise<UpdateSubscriptionResult> {
+    if (!isNonEmptyString(userId) || !isNonEmptyString(streamerId)) {
+      return Promise.resolve({ success: false, reason: "invalid_input" });
+    }
+
+    const user = this.users.get(userId);
+
+    if (!user) {
+      return Promise.resolve({ success: false, reason: "user_not_found" });
+    }
+
+    const existing = user.subscriptions.find((s) => s.id === streamerId);
+
+    if (!existing) {
+      return Promise.resolve({
+        success: false,
+        reason: "subscription_not_found",
+      });
+    }
+
+    let updated: Subscription;
+
+    try {
+      updated = SubscriptionSchema.parse({ ...existing, ...data });
+    } catch (error) {
+      return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+    }
+
+    user.subscriptions = user.subscriptions.map((s) =>
+      s.id === streamerId ? updated : s,
+    );
+
+    return Promise.resolve({ success: true });
+  }
+
   seed(user: User): void {
     this.users.set(user.id, structuredClone(user));
+
+    for (const subscription of user.subscriptions) {
+      this.subscribers.ensure(subscription.id).add(user.id);
+    }
   }
 
   clear(): void {

@@ -8,8 +8,6 @@ import {
 import refresh from "passport-oauth2-refresh";
 import { env } from "../shared/config/env.js";
 import { assertDefined } from "../shared/utils/assert.js";
-import { TokenDecryptionError } from "../shared/utils/crypto.js";
-import { logger } from "../shared/logger/logger.js";
 import type {
   DiscordCredential,
   GoogleCredential,
@@ -19,6 +17,9 @@ import type {
   TwitchCredential,
 } from "../modules/auth/domain/Identity.js";
 import type { IdentityRepository } from "../modules/auth/ports/IdentityRepository.js";
+import { resolveIdentity } from "../modules/auth/application/resolveIdentity.js";
+import { IdentityConflictError } from "../modules/auth/domain/IdentityConflictError.js";
+import { ConflictError } from "./errors/ConflictError.js";
 import type { VerifyCallback } from "passport-oauth2";
 import { TwitchOAuth2Strategy, type TwitchProfile } from "./strategies/TwitchOAuth2Strategy.js";
 
@@ -83,6 +84,28 @@ function toSessionUser(identity: Identity): SessionUser {
   };
 }
 
+// The 4 sign-in-eligible providers below (Discord, Google, Twitch) each need
+// their own callback URL registered with that provider's app config, but all
+// follow the identical .../api/auth/{provider}/callback shape - duplicating
+// the isProduction ternary per-provider was how the dev fallback port (3000
+// here) drifted out of sync with authRoutes.ts's separate localhost:5000
+// client-redirect fallback in the past.
+function buildCallbackUrl(provider: string): string {
+  return env.isProduction
+    ? `${assertDefined(env.serverUrl, "Server URL is not defined")}/api/auth/${provider}/callback`
+    : `http://localhost:3000/api/auth/${provider}/callback`;
+}
+
+// Google's and Twitch's verify callbacks (both synchronous functions wrapping
+// an async IIFE) need the same "normalize a rejection to a real Error and
+// hand it to done()" translation; factored out so that isn't hand-copied
+// per provider.
+function runVerify(done: VerifyCallback, fn: () => Promise<void>): void {
+  fn().catch((error: unknown) => {
+    done(error instanceof Error ? error : new Error(String(error)));
+  });
+}
+
 export function configurePassport(
   repository: IdentityRepository,
 ): typeof passport {
@@ -94,21 +117,43 @@ export function configurePassport(
   });
 
   passport.deserializeUser(
-    async ({ id: uid }: { id: string }, done): Promise<void> => {
+    // 3-arg form (req first): passport's internal dispatch checks the
+    // registered function's arity and passes req only when it's declared -
+    // used here so the resolved Identity can be cached on req for later
+    // middleware/handlers in the same request (see express.d.ts's
+    // req.identity) instead of each independently re-fetching it.
+    async (
+      req: express.Request,
+      { id: uid }: { id: string },
+      done: (err: unknown, user?: Express.User | false | null) => void,
+    ): Promise<void> => {
       try {
-        const identity = await repository.getIdentity(uid);
+        const result = await resolveIdentity(
+          repository,
+          uid,
+          "Failed to decrypt stored tokens for session user; logging out",
+        );
 
-        done(null, identity ? toSessionUser(identity) : null);
-      } catch (error) {
-        if (error instanceof TokenDecryptionError) {
-          logger.warn(
-            { userId: uid, error },
-            "Failed to decrypt stored tokens for session user; logging out",
-          );
-          done(null, false);
-          return;
+        req.identity = result.status === "found" ? result.identity : null;
+
+        switch (result.status) {
+          case "found":
+            done(null, toSessionUser(result.identity));
+            return;
+
+          case "not_found":
+            done(null, null);
+            return;
+
+          case "decryption_failed":
+            // done(null, false) - not an error - is Passport's convention
+            // for "treat this session as unauthenticated", as opposed to
+            // done(error) which would surface as a 500 on every request
+            // using this session.
+            done(null, false);
+            return;
         }
-
+      } catch (error) {
         done(error, null);
       }
     },
@@ -126,9 +171,7 @@ export function configurePassport(
         "Discord Client Secret is not defined",
       ),
 
-      callbackURL: env.isProduction
-        ? `${assertDefined(env.serverUrl, "Server URL is not defined")}/api/auth/discord/callback`
-        : "http://localhost:3000/api/auth/discord/callback",
+      callbackURL: buildCallbackUrl("discord"),
 
       // "email" lets account linking (see IdentityRepository) match this
       // Discord account to an existing account signed up through another
@@ -202,6 +245,15 @@ export function configurePassport(
 
         done(null, toSessionUser(identity));
       } catch (error) {
+        // linkDiscordIdentity raises a transport-agnostic domain error for
+        // this specific conflict; translated to ConflictError only at this
+        // HTTP boundary so errorHandler.ts's 409 response is preserved
+        // without the repository depending on it.
+        if (error instanceof IdentityConflictError) {
+          done(new ConflictError(error.message));
+          return;
+        }
+
         done(error);
       }
     },
@@ -234,9 +286,7 @@ export function configurePassport(
             "Google Client Secret is not defined",
           ),
 
-          callbackURL: env.isProduction
-            ? `${assertDefined(env.serverUrl, "Server URL is not defined")}/api/auth/google/callback`
-            : "http://localhost:3000/api/auth/google/callback",
+          callbackURL: buildCallbackUrl("google"),
 
           scope: ["email", "profile"],
 
@@ -253,7 +303,7 @@ export function configurePassport(
           profile: GoogleProfile,
           done: VerifyCallback,
         ): void => {
-          (async (): Promise<void> => {
+          runVerify(done, async () => {
             // Requesting the "email" scope means Google always includes a
             // verified email on the profile; treat its absence as a hard
             // failure rather than silently linking/creating on an empty key.
@@ -276,8 +326,6 @@ export function configurePassport(
             );
 
             done(null, toSessionUser(identity));
-          })().catch((error: unknown) => {
-            done(error instanceof Error ? error : new Error(String(error)));
           });
         },
       ),
@@ -301,9 +349,7 @@ export function configurePassport(
             "Twitch Client Secret is not defined",
           ),
 
-          callbackURL: env.isProduction
-            ? `${assertDefined(env.serverUrl, "Server URL is not defined")}/api/auth/twitch/callback`
-            : "http://localhost:3000/api/auth/twitch/callback",
+          callbackURL: buildCallbackUrl("twitch"),
 
           // Only requesting user:read:email lets account linking match a
           // Twitch account to an existing account on the same verified
@@ -319,7 +365,7 @@ export function configurePassport(
           profile: TwitchProfile,
           done: VerifyCallback,
         ): void => {
-          (async (): Promise<void> => {
+          runVerify(done, async () => {
             const credential: TwitchCredential = {
               id: profile.id,
               login: profile.login,
@@ -334,8 +380,6 @@ export function configurePassport(
             );
 
             done(null, toSessionUser(identity));
-          })().catch((error: unknown) => {
-            done(error instanceof Error ? error : new Error(String(error)));
           });
         },
       ),

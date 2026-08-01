@@ -23,7 +23,7 @@ import { isNonEmptyString } from "../../../../shared/utils/validators.js";
 import { encryptSecret } from "../../../../shared/utils/crypto.js";
 import { getExistingDoc } from "../../../../shared/utils/firestore.js";
 import { toIdentity } from "./mappers/identityMapper.js";
-import { ConflictError } from "../../../../http/errors/ConflictError.js";
+import { IdentityConflictError } from "../../domain/IdentityConflictError.js";
 
 function discordLinkId(discordId: string): string {
   return `discord:${discordId}`;
@@ -251,7 +251,7 @@ export class FirestoreIdentityRepository implements IdentityRepository {
         discordLinkDoc.exists &&
         (discordLinkDoc.data() as { uid: string }).uid !== uid
       ) {
-        throw new ConflictError(
+        throw new IdentityConflictError(
           "This Discord account is already linked to a different account",
         );
       }

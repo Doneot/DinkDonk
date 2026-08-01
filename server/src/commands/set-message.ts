@@ -1,7 +1,12 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder } from "discord.js";
 import type { CommandContext } from "../modules/discord/domain/CommandContext.js";
-import { replyEphemeral, requireDMCapableUser } from "./shared/commandReplies.js";
+import {
+  describeReason,
+  replyEphemeral,
+  requireDMCapableUser,
+  resolveStreamerOrReply,
+} from "./shared/commandReplies.js";
 
 export const data = new SlashCommandBuilder()
   .setName("set-message")
@@ -27,12 +32,11 @@ export async function execute(
   const username = interaction.options.getString("username", true);
   const notificationMessage = interaction.options.getString("message", true);
 
-  const { subscriptionRepository, twitch } = context;
+  const { userRepository, twitch } = context;
 
-  const streamer = await twitch.getStreamer(username);
+  const streamer = await resolveStreamerOrReply(interaction, twitch, username);
 
   if (!streamer) {
-    await replyEphemeral(interaction, `❌ Could not find streamer \`${username}\`.`);
     return;
   }
 
@@ -42,7 +46,7 @@ export async function execute(
     return;
   }
 
-  const res = await subscriptionRepository.updateSubscription(
+  const res = await userRepository.updateSubscription(
     resolved.uid,
     streamer.id,
     { notification_message: notificationMessage },
@@ -52,6 +56,6 @@ export async function execute(
     interaction,
     res.success
       ? `✅ Notification message updated for **${streamer.display_name}**.`
-      : `❌ Cannot update message for **${streamer.display_name}**. Reason: ${res.reason}`,
+      : `❌ Cannot update message for **${streamer.display_name}**. ${describeReason(res.reason)}`,
   );
 }

@@ -130,7 +130,11 @@ describe("createDomainEventBus", () => {
     bus.emit({ type: "streamerAdded", streamerId: "streamer-1" });
     bus.on("streamerAdded", lateHandler);
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    // Flushes the microtask queue (emit() schedules via
+    // Promise.resolve().then(...)) instead of a fixed-duration real sleep,
+    // so this negative assertion can't flake under a slow/loaded runner.
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(lateHandler).not.toHaveBeenCalled();
   });
@@ -143,7 +147,11 @@ describe("createDomainEventBus", () => {
     bus.off("streamerAdded", handler);
     bus.emit({ type: "streamerAdded", streamerId: "streamer-1" });
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    // Flushes the microtask queue (emit() schedules via
+    // Promise.resolve().then(...)) instead of a fixed-duration real sleep,
+    // so this negative assertion can't flake under a slow/loaded runner.
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(handler).not.toHaveBeenCalled();
   });

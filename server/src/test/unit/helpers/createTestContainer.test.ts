@@ -3,18 +3,16 @@ import { describe, expect, it, vi } from "vitest";
 import { createTestContainer } from "../../helpers/createTestContainer.js";
 
 describe("createTestContainer", () => {
-  it("shares one event bus between the streamer and subscription repositories", () => {
+  it("shares one event bus between the streamer and user repositories", () => {
     const { repositories } = createTestContainer();
 
-    expect(repositories.streamers.events).toBe(
-      repositories.subscriptions.events,
-    );
+    expect(repositories.streamers.events).toBe(repositories.users.events);
   });
 
   it("shares the subscriber list between subscribing and reading subscribers", async () => {
     const { repositories } = createTestContainer();
 
-    await repositories.subscriptions.subscribe("user-1", "streamer-1");
+    await repositories.users.subscribe("user-1", "streamer-1");
 
     await expect(
       repositories.streamers.getSubscriberIds("streamer-1"),
@@ -24,9 +22,9 @@ describe("createTestContainer", () => {
   it("reflects an unsubscribe in the streamer repository's subscriber list", async () => {
     const { repositories } = createTestContainer();
 
-    await repositories.subscriptions.subscribe("user-1", "streamer-1");
-    await repositories.subscriptions.subscribe("user-2", "streamer-1");
-    await repositories.subscriptions.unsubscribe("user-1", "streamer-1");
+    await repositories.users.subscribe("user-1", "streamer-1");
+    await repositories.users.subscribe("user-2", "streamer-1");
+    await repositories.users.unsubscribe("user-1", "streamer-1");
 
     await expect(
       repositories.streamers.getSubscriberIds("streamer-1"),
@@ -39,7 +37,7 @@ describe("createTestContainer", () => {
 
     repositories.streamers.events.on("streamerAdded", listener);
 
-    await repositories.subscriptions.subscribe("user-1", "streamer-1");
+    await repositories.users.subscribe("user-1", "streamer-1");
 
     await vi.waitFor(() => {
       expect(listener).toHaveBeenCalledWith({
@@ -49,14 +47,14 @@ describe("createTestContainer", () => {
     });
   });
 
-  it("fires streamerEmpty (heard by a subscription-repository listener) when the last subscriber leaves via createStreamer/deleteStreamerIfEmpty", async () => {
+  it("fires streamerEmpty (heard by a user-repository listener) when the last subscriber leaves via createStreamer/deleteStreamerIfEmpty", async () => {
     const { repositories } = createTestContainer();
     const listener = vi.fn();
 
-    repositories.subscriptions.events.on("streamerEmpty", listener);
+    repositories.users.events.on("streamerEmpty", listener);
 
-    await repositories.subscriptions.subscribe("user-1", "streamer-1");
-    await repositories.subscriptions.unsubscribe("user-1", "streamer-1");
+    await repositories.users.subscribe("user-1", "streamer-1");
+    await repositories.users.unsubscribe("user-1", "streamer-1");
 
     await vi.waitFor(() => {
       expect(listener).toHaveBeenCalledWith({

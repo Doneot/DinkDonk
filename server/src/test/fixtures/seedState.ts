@@ -39,7 +39,7 @@ export async function seedState(
   }
 
   for (const subscription of state.subscriptions ?? []) {
-    await repositories.subscriptions.subscribe(
+    await repositories.users.subscribe(
       subscription.userId,
       subscription.streamerId,
       subscription.notificationMessage ?? "",

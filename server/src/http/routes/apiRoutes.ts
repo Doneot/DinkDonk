@@ -30,12 +30,22 @@ import {
   type SetMessageRequest,
 } from "../schemas/subscriptions.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
+import { ConflictError } from "../errors/ConflictError.js";
+import { BadRequestError } from "../errors/BadRequestError.js";
+import type { SubscribeFailureReason } from "../../modules/users/domain/SubscribeResult.js";
+import type {
+  SavePushSubscribeResult,
+  DeletePushSubscribeResult,
+} from "../../modules/notifications/types/PushSubscribeResult.js";
 import type {
   CanReceiveDmResponse,
   NotificationChannelsResponse,
   PublicKeyResponse,
+  SavePushResponse,
   StatusResponse,
   StreamerSummaryResponse,
+  SubscribeResponse,
+  UnsubscribeResponse,
   UserCountResponse,
 } from "../schemas/responses.js";
 import {
@@ -56,6 +66,54 @@ type CreateApiRouterOptions = {
   // has one by the time routes are configured.
   webPushPublicKey: string;
 };
+
+// Translates a SubscribeResult/UnsubscribeResult/UpdateSubscriptionResult
+// failure `reason` code into the AppError subclass whose status code best
+// matches it, at the HTTP boundary - the repository layer itself stays
+// transport-agnostic and keeps returning plain result objects.
+const SUBSCRIBE_REASON_MESSAGES: Record<SubscribeFailureReason, string> = {
+  invalid_input: "That wasn't a valid request.",
+  already_subscribed: "You're already subscribed to this streamer.",
+  subscription_limit_reached:
+    "You've reached the maximum number of subscriptions.",
+  user_not_found: "We couldn't find your account.",
+  not_subscribed: "You're not subscribed to this streamer.",
+  subscription_not_found: "We couldn't find that subscription.",
+};
+
+function throwForSubscribeFailure(reason: SubscribeFailureReason): never {
+  const message = SUBSCRIBE_REASON_MESSAGES[reason];
+
+  switch (reason) {
+    case "already_subscribed":
+    case "subscription_limit_reached":
+      throw new ConflictError(message);
+    case "user_not_found":
+    case "not_subscribed":
+    case "subscription_not_found":
+      throw new NotFoundError(message);
+    case "invalid_input":
+      throw new BadRequestError(message);
+  }
+}
+
+// Union of every reason code SavePushSubscribeResult/DeletePushSubscribeResult
+// can fail with (see modules/notifications/types/PushSubscribeResult.ts) -
+// same rationale as SubscribeFailureReason above.
+type PushFailureReason =
+  | Extract<SavePushSubscribeResult, { success: false }>["reason"]
+  | Extract<DeletePushSubscribeResult, { success: false }>["reason"];
+
+// Both reasons describe a malformed request rather than a missing resource
+// or a conflict, so they always map to 400 - unlike throwForSubscribeFailure
+// above, there's no reason here that needs a different status code.
+function throwForPushFailure(reason: PushFailureReason): never {
+  throw new BadRequestError(
+    reason === "invalid_user"
+      ? "We couldn't identify your account."
+      : "That push subscription isn't valid.",
+  );
+}
 
 export function createApiRouter({
   repositories,
@@ -153,7 +211,14 @@ export function createApiRouter({
 
     async (req, res) => {
       const user = requireUser(req);
-      const identity = await repositories.identities.getIdentity(user.id);
+      // req.identity is populated once per request by passport.ts's
+      // deserializeUser (see express.d.ts) - reuse it instead of a third
+      // read of the same document (deserializeUser + ensureFreshToken have
+      // each already read it once by the time this handler runs).
+      const identity =
+        req.identity !== undefined
+          ? req.identity
+          : await repositories.identities.getIdentity(user.id);
       const canReceiveDM = identity?.discord
         ? await discord.canSendDirectMessage(identity.discord.id)
         : false;
@@ -215,7 +280,7 @@ export function createApiRouter({
       const streamers = await twitch.fetchStreamers(ids);
 
       if (!streamers.length) {
-        throw new NotFoundError("streamer");
+        throw new NotFoundError("We couldn't find that streamer.");
       }
 
       const payload = streamers.map(
@@ -255,7 +320,11 @@ export function createApiRouter({
         userAgent ? { userAgent } : {},
       );
 
-      res.status(result.success ? 201 : 400).json(result);
+      if (!result.success) {
+        throwForPushFailure(result.reason);
+      }
+
+      res.status(201).json({ id: result.id } satisfies SavePushResponse);
     },
   );
 
@@ -275,7 +344,11 @@ export function createApiRouter({
           subscriptionId,
         );
 
-      res.status(result.success ? 200 : 400).json(result);
+      if (!result.success) {
+        throwForPushFailure(result.reason);
+      }
+
+      res.status(200).json({});
     },
   );
 
@@ -288,19 +361,34 @@ export function createApiRouter({
       const user = requireUser(req);
       const { streamerId } = validatedBody<SubscribeRequest>(req);
 
-      const result = await repositories.subscriptions.subscribe(
+      // Defense in depth alongside streamerIdSchema's charset restriction:
+      // confirms streamerId actually names a real Twitch streamer before
+      // it's ever used to build a Firestore document path, rather than
+      // trusting whatever the client sent (the Discord commands already get
+      // this for free since they resolve the id via Twitch first).
+      const [streamer] = await twitch.fetchStreamers([streamerId]);
+
+      if (!streamer) {
+        throw new NotFoundError("We couldn't find that streamer.");
+      }
+
+      const result = await repositories.users.subscribe(
         user.id,
 
-        streamerId,
+        streamer.id,
 
         "",
       );
 
-      if (result.success) {
-        streamerSubscriptionsTotal.inc({ action: "subscribed" });
+      if (!result.success) {
+        throwForSubscribeFailure(result.reason);
       }
 
-      res.status(result.success ? 201 : 400).json(result);
+      streamerSubscriptionsTotal.inc({ action: "subscribed" });
+
+      res.status(201).json({
+        createdStreamer: result.createdStreamer,
+      } satisfies SubscribeResponse);
     },
   );
 
@@ -313,16 +401,20 @@ export function createApiRouter({
       const user = requireUser(req);
       const { streamerId } = validatedQuery<UnsubscribeRequest>(req);
 
-      const result = await repositories.subscriptions.unsubscribe(
+      const result = await repositories.users.unsubscribe(
         user.id,
         streamerId,
       );
 
-      if (result.success) {
-        streamerSubscriptionsTotal.inc({ action: "unsubscribed" });
+      if (!result.success) {
+        throwForSubscribeFailure(result.reason);
       }
 
-      res.status(result.success ? 200 : 400).json(result);
+      streamerSubscriptionsTotal.inc({ action: "unsubscribed" });
+
+      res
+        .status(200)
+        .json({ usersLeft: result.usersLeft } satisfies UnsubscribeResponse);
     },
   );
 
@@ -335,7 +427,7 @@ export function createApiRouter({
       const user = requireUser(req);
       const { id: streamerId, message } = validatedBody<SetMessageRequest>(req);
 
-      const result = await repositories.subscriptions.updateSubscription(
+      const result = await repositories.users.updateSubscription(
         user.id,
 
         streamerId,
@@ -345,7 +437,11 @@ export function createApiRouter({
         },
       );
 
-      res.status(result.success ? 200 : 400).json(result);
+      if (!result.success) {
+        throwForSubscribeFailure(result.reason);
+      }
+
+      res.status(200).json({});
     },
   );
 

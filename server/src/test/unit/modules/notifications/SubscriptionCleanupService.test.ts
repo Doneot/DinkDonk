@@ -113,6 +113,28 @@ describe("SubscriptionCleanupService", () => {
         "sub-follow",
       ]);
     });
+
+    it("does not double-process the same streamer when two collections race", async () => {
+      // streamersBeingCollected exists specifically so garbageCollectStreamer
+      // (event-triggered) and garbageCollectSubscriptions (the periodic
+      // sweep) can't both delete the same streamer's EventSub subscription
+      // and double-count the "deleted" metric when they overlap for the
+      // same id. Two concurrent garbageCollectStreamer calls for the same
+      // streamer reproduce that exact race without needing both entry
+      // points.
+      const { service, twitch } = setup({
+        subscriptions: [buildEventSubSubscription({ id: "sub-1" })],
+      });
+
+      const unsubscribe = vi.spyOn(twitch, "unsubscribeFromEvent");
+
+      await Promise.all([
+        service.garbageCollectStreamer("streamer-1"),
+        service.garbageCollectStreamer("streamer-1"),
+      ]);
+
+      expect(unsubscribe).toHaveBeenCalledOnce();
+    });
   });
 
   describe("garbageCollectSubscriptions", () => {

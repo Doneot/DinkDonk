@@ -12,7 +12,7 @@ import {
 } from "../../../modules/auth/infrastructure/firestore/records/IdentityRecord.js";
 
 import { isNonEmptyString } from "../../../shared/utils/validators.js";
-import { ConflictError } from "../../../http/errors/ConflictError.js";
+import { IdentityConflictError } from "../../../modules/auth/domain/IdentityConflictError.js";
 
 export class InMemoryIdentityRepository implements IdentityRepository {
   private readonly identities = new Map<string, Identity>();
@@ -104,7 +104,7 @@ export class InMemoryIdentityRepository implements IdentityRepository {
 
     if (linkedUid !== undefined && linkedUid !== uid) {
       return Promise.reject(
-        new ConflictError(
+        new IdentityConflictError(
           "This Discord account is already linked to a different account",
         ),
       );

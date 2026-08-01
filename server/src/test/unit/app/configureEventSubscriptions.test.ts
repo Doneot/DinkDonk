@@ -7,7 +7,7 @@ import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
 
 import { InMemoryStreamerRepository } from "../../repositories/inMemory/InMemoryStreamerRepository.js";
-import { InMemorySubscriptionRepository } from "../../repositories/inMemory/InMemorySubscriptionRepository.js";
+import { InMemoryUserRepository } from "../../repositories/inMemory/InMemoryUserRepository.js";
 
 function setup() {
   // Mirrors production wiring: both repositories share one event bus (see
@@ -15,7 +15,7 @@ function setup() {
   // announced the same way.
   const events = createDomainEventBus(logger);
   const streamers = new InMemoryStreamerRepository(events);
-  const subscriptions = new InMemorySubscriptionRepository(events);
+  const users = new InMemoryUserRepository(events);
   const twitch = new EventEmitter();
 
   const handleStreamerAdded = vi.fn().mockResolvedValue(undefined);
@@ -24,7 +24,7 @@ function setup() {
   const garbageCollectSubscriptions = vi.fn().mockResolvedValue(undefined);
 
   const container = {
-    repositories: { streamers, subscriptions },
+    repositories: { streamers, users },
     services: {
       eventSubSync: { handleStreamerAdded, syncEventSubSubscriptions },
       subscriptionCleanup: {
@@ -39,7 +39,7 @@ function setup() {
 
   return {
     streamers,
-    subscriptions,
+    users,
     twitch,
     handleStreamerAdded,
     syncEventSubSubscriptions,
@@ -58,37 +58,37 @@ describe("configureEventSubscriptions", () => {
   });
 
   it("subscribes to Twitch when the first user subscribes to a streamer", async () => {
-    const { subscriptions, handleStreamerAdded } = setup();
+    const { users, handleStreamerAdded } = setup();
 
-    await subscriptions.subscribe("user-1", "streamer-1", "");
+    await users.subscribe("user-1", "streamer-1", "");
 
     expect(handleStreamerAdded.mock.calls).toEqual([["streamer-1"]]);
   });
 
   it("does not resubscribe when a second user subscribes", async () => {
-    const { subscriptions, handleStreamerAdded } = setup();
+    const { users, handleStreamerAdded } = setup();
 
-    await subscriptions.subscribe("user-1", "streamer-1", "");
-    await subscriptions.subscribe("user-2", "streamer-1", "");
+    await users.subscribe("user-1", "streamer-1", "");
+    await users.subscribe("user-2", "streamer-1", "");
 
     expect(handleStreamerAdded).toHaveBeenCalledOnce();
   });
 
   it("garbage collects a streamer once its last subscriber leaves", async () => {
-    const { subscriptions, garbageCollectStreamer } = setup();
+    const { users, garbageCollectStreamer } = setup();
 
-    await subscriptions.subscribe("user-1", "streamer-1", "");
-    await subscriptions.unsubscribe("user-1", "streamer-1");
+    await users.subscribe("user-1", "streamer-1", "");
+    await users.unsubscribe("user-1", "streamer-1");
 
     expect(garbageCollectStreamer.mock.calls).toEqual([["streamer-1"]]);
   });
 
   it("keeps a streamer that still has subscribers", async () => {
-    const { subscriptions, garbageCollectStreamer } = setup();
+    const { users, garbageCollectStreamer } = setup();
 
-    await subscriptions.subscribe("user-1", "streamer-1", "");
-    await subscriptions.subscribe("user-2", "streamer-1", "");
-    await subscriptions.unsubscribe("user-1", "streamer-1");
+    await users.subscribe("user-1", "streamer-1", "");
+    await users.subscribe("user-2", "streamer-1", "");
+    await users.unsubscribe("user-1", "streamer-1");
 
     expect(garbageCollectStreamer).not.toHaveBeenCalled();
   });

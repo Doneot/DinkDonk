@@ -1,7 +1,12 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder } from "discord.js";
 import type { CommandContext } from "../modules/discord/domain/CommandContext.js";
-import { replyEphemeral, requireDMCapableUser } from "./shared/commandReplies.js";
+import {
+  describeReason,
+  replyEphemeral,
+  requireDMCapableUser,
+  resolveStreamerOrReply,
+} from "./shared/commandReplies.js";
 
 export const data = new SlashCommandBuilder()
   .setName("subscribe")
@@ -28,13 +33,11 @@ export async function execute(
 
   const notificationMessage = interaction.options.getString("message");
 
-  const { subscriptionRepository, twitch } = context;
+  const { userRepository, twitch } = context;
 
-  const streamer = await twitch.getStreamer(username);
+  const streamer = await resolveStreamerOrReply(interaction, twitch, username);
 
   if (!streamer) {
-    await replyEphemeral(interaction, `❌ Could not find streamer \`${username}\`.`);
-
     return;
   }
 
@@ -44,7 +47,7 @@ export async function execute(
     return;
   }
 
-  const res = await subscriptionRepository.subscribe(
+  const res = await userRepository.subscribe(
     resolved.uid,
     streamer.id,
     notificationMessage || undefined,
@@ -54,6 +57,6 @@ export async function execute(
     interaction,
     res.success
       ? `✅ Subscribed to **${streamer.display_name}**!`
-      : `❌ Cannot subscribe to **${streamer.display_name}**. Reason: ${res.reason}`,
+      : `❌ Cannot subscribe to **${streamer.display_name}**. ${describeReason(res.reason)}`,
   );
 }

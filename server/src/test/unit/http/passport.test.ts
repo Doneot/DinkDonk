@@ -2,7 +2,9 @@ import type { Profile } from "passport-discord";
 import type { Profile as GoogleProfile } from "passport-google-oauth20";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { SessionUser } from "../../../modules/auth/domain/Identity.js";
+import type { Identity, SessionUser } from "../../../modules/auth/domain/Identity.js";
+import { IdentityConflictError } from "../../../modules/auth/domain/IdentityConflictError.js";
+import { ConflictError } from "../../../http/errors/ConflictError.js";
 import { env } from "../../../shared/config/env.js";
 import { TokenDecryptionError } from "../../../shared/utils/crypto.js";
 import { logger } from "../../../shared/logger/logger.js";
@@ -11,7 +13,9 @@ import { buildIdentity, buildSessionUser } from "../../builders/auth.js";
 import { InMemoryIdentityRepository } from "../../repositories/inMemory/InMemoryIdentityRepository.js";
 
 type SerializeUser = (user: Express.User, done: DoneCallback) => void;
+type FakeDeserializeReq = { identity?: Identity | null };
 type DeserializeUser = (
+  req: FakeDeserializeReq,
   payload: { id: string },
   done: DoneCallback,
 ) => Promise<void>;
@@ -250,7 +254,7 @@ describe("configurePassport", () => {
       repository.seed(identity);
 
       const [error, resolved] = await invoke<SessionUser>((done) => {
-        void registered.deserialize?.({ id: identity.uid }, done);
+        void registered.deserialize?.({}, { id: identity.uid }, done);
       });
 
       expect(error).toBeNull();
@@ -264,6 +268,31 @@ describe("configurePassport", () => {
       });
       expect(resolved).not.toHaveProperty("accessToken");
       expect(resolved).not.toHaveProperty("refreshToken");
+    });
+
+    it("caches the resolved identity on req for later middleware/handlers to reuse", async () => {
+      const { repository } = setup();
+      const identity = buildIdentity();
+      const req: FakeDeserializeReq = {};
+
+      repository.seed(identity);
+
+      await invoke((done) => {
+        void registered.deserialize?.(req, { id: identity.uid }, done);
+      });
+
+      expect(req.identity).toEqual(identity);
+    });
+
+    it("caches null on req when no identity is found", async () => {
+      setup();
+      const req: FakeDeserializeReq = {};
+
+      await invoke((done) => {
+        void registered.deserialize?.(req, { id: "ghost" }, done);
+      });
+
+      expect(req.identity).toBeNull();
     });
 
     it("falls back to the Google name/avatar when there is no Discord credential", async () => {
@@ -282,7 +311,7 @@ describe("configurePassport", () => {
       repository.seed(identity);
 
       const [error, resolved] = await invoke<SessionUser>((done) => {
-        void registered.deserialize?.({ id: identity.uid }, done);
+        void registered.deserialize?.({}, { id: identity.uid }, done);
       });
 
       expect(error).toBeNull();
@@ -312,7 +341,7 @@ describe("configurePassport", () => {
       repository.seed(identity);
 
       const [error, resolved] = await invoke<SessionUser>((done) => {
-        void registered.deserialize?.({ id: identity.uid }, done);
+        void registered.deserialize?.({}, { id: identity.uid }, done);
       });
 
       expect(error).toBeNull();
@@ -330,7 +359,7 @@ describe("configurePassport", () => {
       setup();
 
       const [error, resolved] = await invoke((done) => {
-        void registered.deserialize?.({ id: "ghost" }, done);
+        void registered.deserialize?.({}, { id: "ghost" }, done);
       });
 
       expect(error).toBeNull();
@@ -345,7 +374,7 @@ describe("configurePassport", () => {
       );
 
       const [error, resolved] = await invoke((done) => {
-        void registered.deserialize?.({ id: "user-1" }, done);
+        void registered.deserialize?.({}, { id: "user-1" }, done);
       });
 
       expect(error).toBeInstanceOf(Error);
@@ -361,7 +390,7 @@ describe("configurePassport", () => {
       );
 
       const [error, resolved] = await invoke((done) => {
-        void registered.deserialize?.({ id: "user-1" }, done);
+        void registered.deserialize?.({}, { id: "user-1" }, done);
       });
 
       // done(null, false) - not an error - is Passport's convention for
@@ -600,6 +629,34 @@ describe("configurePassport", () => {
       });
 
       expect(error).toBeInstanceOf(Error);
+    });
+
+    it("translates the repository's IdentityConflictError into a ConflictError at the HTTP boundary", async () => {
+      const { repository, strategy } = setup();
+
+      repository.seed(buildIdentity({ uid: "existing-uid", discord: undefined }));
+
+      vi.spyOn(repository, "linkDiscordIdentity").mockRejectedValue(
+        new IdentityConflictError(
+          "This Discord account is already linked to a different account",
+        ),
+      );
+
+      const req: FakeRequest = {
+        session: {
+          linkDiscordUid: "existing-uid",
+          linkDiscordUidExpiresAt: Date.now() + 60_000,
+        },
+      };
+
+      const [error] = await invoke((done) => {
+        void strategy.verify(req, "access-token", "refresh-token", PROFILE, done);
+      });
+
+      expect(error).toBeInstanceOf(ConflictError);
+      expect((error as ConflictError).message).toBe(
+        "This Discord account is already linked to a different account",
+      );
     });
   });
 

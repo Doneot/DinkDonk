@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
+import { toast } from "react-toastify";
 import { useAuth } from "../context/authContextValue";
 import { useNavigate } from "react-router-dom";
 
@@ -22,8 +23,12 @@ const UserMenu = () => {
   }, []);
 
   const handleLogout = async () => {
-    await logout();
-    navigate("/");
+    try {
+      await logout();
+      navigate("/");
+    } catch {
+      toast.error("Failed to log out. Please try again.");
+    }
   };
 
   return (

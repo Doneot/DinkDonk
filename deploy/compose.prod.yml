@@ -1,11 +1,21 @@
 name: dinkdonk
 
+# Docker's default json-file driver has no size cap on its own - without
+# this, any service's logs can grow unbounded and fill the disk, undermining
+# the resource budgeting below. Applied to every service via the anchor.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   caddy:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.caddy
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       backend:
         condition: service_healthy
@@ -18,6 +28,18 @@ services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
+    # This whole stack shares a 6vCPU/12GB VPS with other, unrelated apps -
+    # every service below gets an explicit ceiling so a runaway process here
+    # can't starve either its own siblings or those other apps. Sized as a
+    # deliberately conservative starting budget (see the summary at the
+    # bottom of this file); memory is a hard cap (OOM-killed if exceeded),
+    # cpus is a ceiling on burst, not a reservation, so idle capacity is
+    # still available to the rest of the host.
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
     networks:
       - public
       - private
@@ -27,6 +49,7 @@ services:
       context: ../server
       dockerfile: Dockerfile.prod
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       redis:
         condition: service_healthy
@@ -67,6 +90,11 @@ services:
     # up to ~10s in its worst case; Compose's default 10s grace period would
     # SIGKILL it mid-teardown, so give it comfortable headroom.
     stop_grace_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
     networks:
       - public
       - private
@@ -74,11 +102,28 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *default-logging
     # Rate-limit counters and EventSub replay dedup are both short-lived
     # (TTL-bound) and non-critical if lost - an appendonly volume would add
     # persistence for data that's explicitly designed not to need it, at the
     # cost of extra disk I/O on every write.
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    # maxmemory is a safety net alongside that TTL-based design (a bug or an
+    # attack generating keys faster than they expire shouldn't be able to
+    # consume unbounded host memory); volatile-ttl evicts the
+    # closest-to-expiring keys first, which fits data that's already meant
+    # to be short-lived.
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "256mb",
+        "--maxmemory-policy",
+        "volatile-ttl",
+      ]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -87,12 +132,21 @@ services:
       start_period: 5s
     expose:
       - "6379"
+    # Comfortably above the 256mb --maxmemory above: that flag bounds the
+    # dataset itself, this bounds the whole redis-server process (dataset +
+    # connection/client buffers + its own overhead).
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 320M
     networks:
       - private
 
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
+    logging: *default-logging
     # See compose.dev.yml for why this is warn rather than the default.
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -105,12 +159,18 @@ services:
       - prometheus_data:/prometheus
     expose:
       - "9090"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 768M
     networks:
       - private
 
   grafana:
     image: grafana/grafana:latest
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       - prometheus
     secrets:
@@ -127,9 +187,24 @@ services:
       - ./monitoring/grafana/assets/user_profile.png:/usr/share/grafana/public/img/user_profile.png:ro
     expose:
       - "3000"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384M
     networks:
       - private
 
+# Resource budget for this stack (see each service's `deploy.resources.limits`
+# above): caddy 0.5 CPU/128M + backend 1.0 CPU/768M + redis 0.5 CPU/320M +
+# prometheus 0.75 CPU/768M + grafana 0.5 CPU/384M = 3.25 CPU / ~2.3GB ceiling.
+# Deliberately well under the VPS's 6 vCPU / 12GB total, leaving room for
+# compose.staging.yml's stack (if co-located on the same host) plus whatever
+# unrelated apps also run there. `cpus` is a burst ceiling, not a
+# reservation - idle capacity is still available to the rest of the host;
+# `memory` is a hard cap, so these are intentionally generous rather than
+# tight. Revisit with real numbers from Grafana/`docker stats` once this has
+# run under production load for a while.
 volumes:
   caddy_data:
   caddy_config:

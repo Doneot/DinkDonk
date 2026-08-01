@@ -6,7 +6,7 @@ import { logger } from "../../../shared/logger/logger.js";
 import type { Streamer } from "../../../modules/streamers/domain/Streamer.js";
 
 import { streamerRepositoryBehavior } from "../contracts/StreamerRepository.behavior.js";
-import { FakeFirestore } from "../../helpers/fakeFirestore.js";
+import { FakeFirestore, FakeQuery } from "../../helpers/fakeFirestore.js";
 
 streamerRepositoryBehavior("FirestoreStreamerRepository", () => {
   const firestore = new FakeFirestore();
@@ -219,6 +219,40 @@ describe("FirestoreStreamerRepository", () => {
       const { repository } = setup();
 
       await expect(repository.deleteStreamerIfEmpty(id)).resolves.toBe(false);
+    });
+
+    // FakeFirestore has no real concurrency to test this against directly
+    // (see its own doc comment), so this instead proves the structural
+    // property that makes Firestore's own optimistic-retry mechanism able to
+    // do its job: the subscriber-count read is always the very first thing
+    // to happen after runTransaction() is invoked, never before it. Mirrors
+    // FirestoreUserRepository.test.ts's identical guard for the same
+    // race (a subscriber added concurrently with a cleanup sweep).
+    describe("concurrency safety: reads happen inside the transaction", () => {
+      it("reads the subscriber count via the transaction, not before it", async () => {
+        const { firestore, repository } = setup();
+
+        firestore.write("streamers/streamer-1", { id: "streamer-1" });
+
+        const runTransaction = vi.spyOn(
+          FakeFirestore.prototype,
+          "runTransaction",
+        );
+        const get = vi.spyOn(FakeQuery.prototype, "get");
+
+        await repository.deleteStreamerIfEmpty("streamer-1");
+
+        expect(runTransaction).toHaveBeenCalled();
+        expect(get).toHaveBeenCalled();
+
+        const runTransactionOrder = runTransaction.mock.invocationCallOrder[0];
+        const firstGetOrder = get.mock.invocationCallOrder[0];
+
+        expect(runTransactionOrder).toBeDefined();
+        expect(firstGetOrder).toBeDefined();
+
+        expect(firstGetOrder).toBeGreaterThan(runTransactionOrder!);
+      });
     });
   });
 });

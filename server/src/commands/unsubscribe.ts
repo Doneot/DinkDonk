@@ -1,7 +1,12 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder } from "discord.js";
 import type { CommandContext } from "../modules/discord/domain/CommandContext.js";
-import { replyEphemeral, requireDMCapableUser } from "./shared/commandReplies.js";
+import {
+  describeReason,
+  replyEphemeral,
+  requireDMCapableUser,
+  resolveStreamerOrReply,
+} from "./shared/commandReplies.js";
 
 export const data = new SlashCommandBuilder()
   .setName("unsubscribe")
@@ -19,12 +24,11 @@ export async function execute(
 ): Promise<void> {
   const username = interaction.options.getString("username", true);
 
-  const { subscriptionRepository, twitch } = context;
+  const { userRepository, twitch } = context;
 
-  const streamer = await twitch.getStreamer(username);
+  const streamer = await resolveStreamerOrReply(interaction, twitch, username);
 
   if (!streamer) {
-    await replyEphemeral(interaction, `❌ Could not find streamer \`${username}\`.`);
     return;
   }
 
@@ -34,7 +38,7 @@ export async function execute(
     return;
   }
 
-  const res = await subscriptionRepository.unsubscribe(
+  const res = await userRepository.unsubscribe(
     resolved.uid,
     streamer.id,
   );
@@ -43,6 +47,6 @@ export async function execute(
     interaction,
     res.success
       ? `✅ Unsubscribed from **${streamer.display_name}**.`
-      : `❌ Cannot unsubscribe from **${streamer.display_name}**. Reason: ${res.reason}`,
+      : `❌ Cannot unsubscribe from **${streamer.display_name}**. ${describeReason(res.reason)}`,
   );
 }

@@ -4,7 +4,7 @@ export class BadRequestError extends AppError {
   readonly statusCode = 400;
   readonly code = "validation_error";
 
-  constructor(message = "Bad Request", details: Record<string, unknown> = {}) {
+  constructor(message = "Bad Request", details?: Record<string, unknown>) {
     super(message, details);
   }
 }

@@ -3,7 +3,16 @@ import tseslint from "typescript-eslint";
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**", "eslint.config.js", "coverage/**"],
+    // scripts/ holds standalone Node utility scripts (plain .mjs, not part
+    // of the app's TypeScript project/build), so type-aware linting has no
+    // tsconfig to attach them to.
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "eslint.config.js",
+      "coverage/**",
+      "scripts/**",
+    ],
   },
 
   js.configs.recommended,

@@ -4,6 +4,7 @@ import type { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios";
 import { env } from "../../../shared/config/env.js";
 import { logger } from "../../../shared/logger/logger.js";
 import { assertDefined } from "../../../shared/utils/assert.js";
+import { keepAliveHttpsAgent } from "../../../infrastructure/http/httpsAgent.js";
 import { normalizeTwitchLogin } from "./normalizeTwitchLogin.js";
 
 import { mapTwitchStreamer } from "./mappers/mapTwitchStreamer.js";
@@ -86,7 +87,10 @@ export class TwitchClient
 
   constructor({
     publicUrl,
-    http = axios.create({ timeout: REQUEST_TIMEOUT_MS }),
+    http = axios.create({
+      timeout: REQUEST_TIMEOUT_MS,
+      httpsAgent: keepAliveHttpsAgent,
+    }),
     clientId = assertDefined(
       env.twitch.clientId,
       "Twitch Client ID is not defined",
@@ -303,14 +307,25 @@ export class TwitchClient
     return data[0] || null;
   }
 
-  async searchStreamers(query: string | string[]): Promise<TwitchStreamer[]> {
-    const result = await this.request<TwitchStreamer>("search/channels", {
-      params: {
-        query,
-      },
-    });
+  // A single page, not request()'s exhaustive cursor-following - this backs
+  // an interactive search-as-you-type box, where only the first handful of
+  // results are ever shown, so fetching every match a broad query returns
+  // (potentially many pages) would add unnecessary latency and burn Twitch's
+  // shared rate-limit budget for no UI benefit.
+  private static readonly SEARCH_RESULTS_LIMIT = 20;
 
-    return result.map(mapTwitchStreamer);
+  async searchStreamers(query: string | string[]): Promise<TwitchStreamer[]> {
+    const { data } = await this.requestPage<TwitchStreamer>(
+      "search/channels",
+      {
+        params: {
+          query,
+          first: TwitchClient.SEARCH_RESULTS_LIMIT,
+        },
+      },
+    );
+
+    return data.map(mapTwitchStreamer);
   }
 
   getStream(streamerId: string): Promise<TwitchStream[]> {

@@ -10,10 +10,7 @@ import { assertDefined } from "../../shared/utils/assert.js";
 import { TwitchClient } from "../../modules/twitch/infrastructure/TwitchClient.js";
 
 import type { Repositories } from "./repositories.js";
-import type { UserRepository } from "../../modules/users/ports/UserRepository.js";
-import type { IdentityRepository } from "../../modules/auth/ports/IdentityRepository.js";
-import type { StreamerRepository } from "../../modules/streamers/ports/StreamerRepository.js";
-import type { SubscriptionRepository } from "../../modules/subscriptions/ports/SubscriptionRepository.js";
+import type { CommandContext } from "../../modules/discord/domain/CommandContext.js";
 import type { Runtime } from "../runtime/Runtime.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,18 +21,11 @@ export function createProviders(repositories: Repositories, runtime: Runtime) {
     client: new TwitchClient({ publicUrl: runtime.publicUrl }),
   });
 
-  const context: {
-    twitch: TwitchClient;
-    userRepository: UserRepository;
-    identityRepository: IdentityRepository;
-    streamerRepository: StreamerRepository;
-    subscriptionRepository: SubscriptionRepository;
-  } = {
+  const context: CommandContext = {
     twitch: twitch.client,
     userRepository: repositories.users,
     identityRepository: repositories.identities,
     streamerRepository: repositories.streamers,
-    subscriptionRepository: repositories.subscriptions,
   };
 
   const discord = new DiscordBot({

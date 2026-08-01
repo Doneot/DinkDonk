@@ -17,6 +17,7 @@ const Dashboard = () => {
       return canDM;
     } catch (err) {
       console.error("Failed to check DM permission", err);
+      throw err;
     }
   };
 

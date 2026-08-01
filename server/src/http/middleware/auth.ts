@@ -82,7 +82,13 @@ export function createFreshTokenMiddleware(
     }
 
     try {
-      const identity = await repository.getIdentity(uid);
+      // req.identity is populated once per request by passport.ts's
+      // deserializeUser (see express.d.ts) - reuse it instead of a second
+      // Firestore read for the same document when it's already available.
+      const identity =
+        req.identity !== undefined
+          ? req.identity
+          : await repository.getIdentity(uid);
       const discord = identity?.discord;
 
       if (!discord) {

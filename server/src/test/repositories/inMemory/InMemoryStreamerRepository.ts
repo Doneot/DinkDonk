@@ -15,8 +15,10 @@ export class InMemoryStreamerRepository implements StreamerRepository {
     private readonly subscribers: InMemorySubscriberStore = new InMemorySubscriberStore(),
   ) {}
 
-  getStreamers(): Promise<Streamer[]> {
-    return Promise.resolve([...this.streamers.values()]);
+  getStreamers(limit?: number): Promise<Streamer[]> {
+    const all = [...this.streamers.values()];
+
+    return Promise.resolve(limit === undefined ? all : all.slice(0, limit));
   }
 
   getStreamer(id: string): Promise<Streamer | null> {
@@ -28,10 +30,14 @@ export class InMemoryStreamerRepository implements StreamerRepository {
   }
 
   createStreamer(id: string): Promise<void> {
+    const created = !this.streamers.has(id);
+
     this.streamers.set(id, { id });
     this.subscribers.ensure(id);
 
-    this.events.emit({ type: "streamerAdded", streamerId: id });
+    if (created) {
+      this.events.emit({ type: "streamerAdded", streamerId: id });
+    }
 
     return Promise.resolve();
   }

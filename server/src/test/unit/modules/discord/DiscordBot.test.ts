@@ -213,7 +213,8 @@ describe("DiscordBot", () => {
       client.emit("ready");
 
       expect(info).toHaveBeenCalledWith(
-        "Discord bot logged in as DinkDonk#0001",
+        { tag: "DinkDonk#0001" },
+        "Discord bot logged in",
       );
     });
 
@@ -380,6 +381,53 @@ describe("DiscordBot", () => {
       expect(error.mock.calls[0]?.[0]).toMatchObject({
         userId: "user-1",
         message: "Unknown user",
+      });
+    });
+
+    describe("result caching", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("skips a second probe DM for the same user within the TTL window", async () => {
+        vi.useFakeTimers();
+        const { bot, client } = setup();
+
+        await expect(bot.canSendDirectMessage("user-1")).resolves.toBe(true);
+
+        vi.advanceTimersByTime(4 * 60 * 1000);
+
+        await expect(bot.canSendDirectMessage("user-1")).resolves.toBe(true);
+
+        expect(client.users.fetch).toHaveBeenCalledOnce();
+        expect(client.send).toHaveBeenCalledOnce();
+      });
+
+      it("re-probes once the TTL window has elapsed", async () => {
+        vi.useFakeTimers();
+        const { bot, client } = setup();
+
+        await expect(bot.canSendDirectMessage("user-1")).resolves.toBe(true);
+
+        // DM_CAPABILITY_CACHE_TTL_MS is 5 minutes.
+        vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+
+        await expect(bot.canSendDirectMessage("user-1")).resolves.toBe(true);
+
+        expect(client.users.fetch).toHaveBeenCalledTimes(2);
+        expect(client.send).toHaveBeenCalledTimes(2);
+      });
+
+      it("caches per user rather than globally", async () => {
+        vi.useFakeTimers();
+        const { bot, client } = setup();
+
+        await expect(bot.canSendDirectMessage("user-1")).resolves.toBe(true);
+        await expect(bot.canSendDirectMessage("user-2")).resolves.toBe(true);
+
+        expect(client.users.fetch).toHaveBeenCalledTimes(2);
+        expect(client.users.fetch).toHaveBeenCalledWith("user-1");
+        expect(client.users.fetch).toHaveBeenCalledWith("user-2");
       });
     });
   });

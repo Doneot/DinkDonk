@@ -98,7 +98,7 @@ This layer should expose routes and translate HTTP <-> application calls, but sh
 
 ## modules/
 
-Bounded modules, one per domain concept: `auth`, `discord`, `notifications`, `streamers`, `subscriptions`, `twitch`, `users`. Each module is organized the same way (not every module has every layer, but the layering is consistent where it appears):
+Bounded modules, one per domain concept: `auth`, `discord`, `notifications`, `streamers`, `twitch`, `users`. Each module is organized the same way (not every module has every layer, but the layering is consistent where it appears):
 
 ```txt
 modules/<name>/domain/            entities, value objects, plain business types (no framework deps)
@@ -120,7 +120,7 @@ server/src/modules/notifications/infrastructure/channels/DiscordNotificationChan
 server/src/modules/notifications/infrastructure/channels/WebPushNotificationChannel.ts
 server/src/modules/notifications/application/NotificationManager.ts
 server/src/modules/notifications/application/EventSubSyncService.ts
-server/src/modules/subscriptions/infrastructure/firestore/FirestoreSubscriptionRepository.ts
+server/src/modules/users/infrastructure/firestore/FirestoreUserRepository.ts
 server/src/modules/twitch/infrastructure/TwitchClient.ts
 server/src/modules/discord/infrastructure/DiscordBot.ts
 ```
@@ -142,6 +142,10 @@ Repository methods should preserve existing user/streamer data unless intentiona
 ```txt
 Partial user updates must not reset streamer subscriptions.
 ```
+
+There used to be a separate `subscriptions` module; it's been folded into `users`, since a `Subscription` only ever exists embedded in `User.subscriptions` rather than as its own aggregate - `FirestoreUserRepository` now owns `subscribe`/`unsubscribe`/`getSubscription`/`updateSubscription` directly (this closed a real bidirectional infrastructure coupling the two modules previously had: each imported the other's Firestore-specific schema/mapper).
+
+**Known, accepted debt:** deciding *when* a streamer/subscriber change is domain-event-worthy (`streamerAdded` when a streamer's first subscriber shows up, `streamerEmpty` when its last one leaves) is still done inline inside Firestore transaction bodies - in `FirestoreUserRepository.subscribe()`/`unsubscribe()` and separately in `FirestoreStreamerRepository.createStreamer()` - rather than in a dedicated application-layer service that owns "what makes a streamer newly-added/newly-empty" as its own testable concern. This has already caused one real bug (the two emission sites drifted out of sync on the `streamerAdded` guard; fixed and now covered by a regression test). The larger relayering - moving that decision out of the Firestore adapters entirely - was deliberately deferred rather than rushed alongside the `subscriptions`/`users` merge above: it's real design work (what should that service's interface look like, how does it compose with the existing transactional read-modify-write) that deserves its own focused pass rather than being squeezed into an already-large change. Revisit if a similar event-emission decision needs to be added elsewhere in this area - that's the signal this debt is starting to cost more than it saves.
 
 ---
 

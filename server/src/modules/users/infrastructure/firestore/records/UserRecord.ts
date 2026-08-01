@@ -1,15 +1,10 @@
 import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 
-import { SubscriptionSchema } from "../../../../subscriptions/schemas/SubscriptionSchema.js";
+import { SubscriptionSchema } from "../../../schemas/SubscriptionSchema.js";
+import { MAX_SUBSCRIPTIONS } from "../../../domain/Subscription.js";
 
 extendZodWithOpenApi(z);
-
-// 200 is a soft product limit, not a hard technical one - it's here so a
-// runaway subscriptions array fails predictably with a clear Zod error well
-// before it could ever approach Firestore's 1 MiB document-size ceiling
-// (which would otherwise fail with an opaque Firestore error).
-const MAX_SUBSCRIPTIONS = 200;
 
 export const UserRecordSchema = z.object({
   subscriptions: z.array(SubscriptionSchema).max(MAX_SUBSCRIPTIONS).default([]),

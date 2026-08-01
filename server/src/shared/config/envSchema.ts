@@ -51,12 +51,16 @@ const BaseEnvSchema = z.object({
         return z.NEVER;
       }
 
-      const tooShort = secrets.find((secret) => secret.length < 16);
+      // 32 (not 16) to match the openssl rand -hex 32 guidance in
+      // deploy/.env.example - a 16-character floor validates length, not
+      // entropy, and would happily accept a low-entropy value like 16
+      // repeated characters.
+      const tooShort = secrets.find((secret) => secret.length < 32);
 
       if (tooShort) {
         ctx.addIssue({
           code: "custom",
-          message: "Each SESSION_SECRET must be at least 16 characters",
+          message: "Each SESSION_SECRET must be at least 32 characters",
         });
         return z.NEVER;
       }
@@ -86,12 +90,14 @@ const BaseEnvSchema = z.object({
         return z.NEVER;
       }
 
-      const tooShort = keys.find((key) => key.length < 16);
+      // 32 (not 16) to match the openssl rand -hex 32 guidance in
+      // deploy/.env.example - see SESSION_SECRET's identical comment above.
+      const tooShort = keys.find((key) => key.length < 32);
 
       if (tooShort) {
         ctx.addIssue({
           code: "custom",
-          message: "Each ENCRYPTION_KEY must be at least 16 characters",
+          message: "Each ENCRYPTION_KEY must be at least 32 characters",
         });
         return z.NEVER;
       }
@@ -151,9 +157,11 @@ const BaseEnvSchema = z.object({
   // Optional: when set, /metrics requires `Authorization: Bearer <token>`.
   // Left unset in deployments that instead rely on network isolation (e.g.
   // Prometheus reaching the backend only over a private Docker network).
+  // 32 (not 16) to match the openssl rand -hex 32 guidance in
+  // deploy/.env.example - see SESSION_SECRET's identical comment above.
   METRICS_TOKEN: optionalSecretFromEnv("metrics_token").refine(
-    (value) => value === undefined || value.length >= 16,
-    "METRICS_TOKEN must be at least 16 characters",
+    (value) => value === undefined || value.length >= 32,
+    "METRICS_TOKEN must be at least 32 characters",
   ),
 
   REQUEST_LOGGING_ENABLED: booleanFromEnv,

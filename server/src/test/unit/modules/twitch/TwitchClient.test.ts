@@ -410,6 +410,27 @@ describe("TwitchClient", () => {
         "https://api.twitch.tv/helix/search/channels",
       );
     });
+
+    it("requests a single bounded page rather than following pagination", async () => {
+      const { client, request } = createClient();
+
+      request.mockResolvedValue({
+        data: {
+          data: [{ id: "streamer-1" }],
+          // A cursor would tell request() to fetch another page - proves
+          // searchStreamers deliberately doesn't follow it.
+          pagination: { cursor: "next-page-cursor" },
+        },
+      });
+
+      await client.searchStreamers("streamer");
+
+      expect(request).toHaveBeenCalledOnce();
+      expect(request.mock.calls[0]?.[0]?.params).toMatchObject({
+        query: "streamer",
+        first: 20,
+      });
+    });
   });
 
   describe("EventSub subscriptions", () => {
@@ -467,6 +488,24 @@ describe("TwitchClient", () => {
 
       expect(config?.url).toBe("https://api.twitch.tv/helix/streams");
       expect(config?.params).toEqual({ user_id: "streamer-1" });
+    });
+  });
+
+  describe("default http client", () => {
+    it("reuses connections via the shared keep-alive agent", async () => {
+      const axios = await import("axios");
+      const { keepAliveHttpsAgent } = await import(
+        "../../../../infrastructure/http/httpsAgent.js"
+      );
+      const create = vi.spyOn(axios.default, "create");
+
+      new TwitchClient({ publicUrl: "http://localhost:3000" });
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ httpsAgent: keepAliveHttpsAgent }),
+      );
+
+      create.mockRestore();
     });
   });
 });

@@ -88,7 +88,7 @@ export function registerShutdownHooks(
 
     shuttingDown = true;
 
-    logger.info(`Shutting down gracefully (${reason})`);
+    logger.info({ reason }, "Shutting down gracefully");
 
     let hadFailure = false;
 

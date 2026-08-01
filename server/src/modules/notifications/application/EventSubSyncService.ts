@@ -21,6 +21,12 @@ const DEAD_SUBSCRIPTION_STATUSES = new Set([
   "failed_to_connect",
 ]);
 
+// Mirrors SubscriptionCleanupService's batching: bounds how many
+// ensureSubscription calls run concurrently so a cold start or a bulk
+// EventSub revocation needing many new subscriptions at once doesn't fire
+// hundreds of simultaneous Twitch API calls in one burst.
+const SYNC_BATCH_SIZE = 25;
+
 export class EventSubSyncService {
   constructor(
     private readonly twitch: TwitchSubscriptionProvider,
@@ -34,15 +40,21 @@ export class EventSubSyncService {
       this.getStreamOnlineSubscriptions(),
     ]);
 
-    for (const streamer of streamers) {
-      try {
-        await this.ensureSubscription(streamer.id, subscriptions);
-      } catch (error) {
-        logger.error(
-          { err: error, streamerId: streamer.id },
-          "Failed to sync EventSub subscription for streamer; continuing with remaining streamers",
-        );
-      }
+    for (let i = 0; i < streamers.length; i += SYNC_BATCH_SIZE) {
+      const batch = streamers.slice(i, i + SYNC_BATCH_SIZE);
+
+      await Promise.all(
+        batch.map(async (streamer) => {
+          try {
+            await this.ensureSubscription(streamer.id, subscriptions);
+          } catch (error) {
+            logger.error(
+              { error, streamerId: streamer.id },
+              "Failed to sync EventSub subscription for streamer; continuing with remaining streamers",
+            );
+          }
+        }),
+      );
     }
   }
 
@@ -76,7 +88,7 @@ export class EventSubSyncService {
 
     eventSubSubscriptionsCreatedTotal.inc();
 
-    logger.info(`Creating Twitch EventSub subscription for ${streamerId}`);
+    logger.info({ streamerId }, "Creating Twitch EventSub subscription");
 
     await this.twitch.subscribeToEvent("stream.online", {
       broadcaster_user_id: streamerId,

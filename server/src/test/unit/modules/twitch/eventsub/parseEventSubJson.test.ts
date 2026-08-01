@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BadRequestError } from "../../../../../http/errors/BadRequestError.js";
+import { EventSubValidationError } from "../../../../../modules/twitch/eventsub/EventSubValidationError.js";
 import { parseEventSubJson } from "../../../../../modules/twitch/eventsub/parseEventSubJson.js";
 
 describe("parseEventSubJson", () => {
@@ -18,9 +18,9 @@ describe("parseEventSubJson", () => {
   );
 
   it.each(["", "{", "{'challenge': 'abc'}", "undefined"])(
-    "throws BadRequestError for malformed JSON %j",
+    "throws EventSubValidationError for malformed JSON %j",
     (raw) => {
-      expect(() => parseEventSubJson(raw)).toThrow(BadRequestError);
+      expect(() => parseEventSubJson(raw)).toThrow(EventSubValidationError);
       expect(() => parseEventSubJson(raw)).toThrow("Invalid JSON");
     },
   );

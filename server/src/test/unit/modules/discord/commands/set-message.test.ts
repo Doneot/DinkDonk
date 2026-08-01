@@ -22,21 +22,26 @@ function createInteraction(options: Record<string, string | null> = {}) {
   };
 }
 
-function createContext(overrides: Partial<CommandContext> = {}): CommandContext {
+function createContext(
+  overrides: Omit<Partial<CommandContext>, "userRepository"> & {
+    userRepository?: Partial<CommandContext["userRepository"]>;
+  } = {},
+): CommandContext {
+  const { userRepository, ...rest } = overrides;
+
   return {
     twitch: { getStreamer: vi.fn().mockResolvedValue(null) },
     userRepository: {
       getUser: vi.fn().mockResolvedValue(buildUser({ canReceiveDM: true })),
+      updateSubscription: vi.fn(),
+      ...userRepository,
     },
     identityRepository: {
       getIdentityByDiscordUid: vi
         .fn()
         .mockResolvedValue(buildIdentity({ uid: TEST_USER_ID })),
     },
-    subscriptionRepository: {
-      updateSubscription: vi.fn(),
-    },
-    ...overrides,
+    ...rest,
   } as unknown as CommandContext;
 }
 
@@ -69,7 +74,7 @@ describe("set-message command", () => {
       } as unknown as CommandContext["twitch"],
       userRepository: {
         getUser: vi.fn().mockResolvedValue(buildUser({ canReceiveDM: false })),
-      } as unknown as CommandContext["userRepository"],
+      },
     });
 
     await execute(interaction, context);
@@ -92,9 +97,7 @@ describe("set-message command", () => {
           .fn()
           .mockResolvedValue({ id: "streamer-1", display_name: "Streamer" }),
       } as unknown as CommandContext["twitch"],
-      subscriptionRepository: {
-        updateSubscription,
-      } as unknown as CommandContext["subscriptionRepository"],
+      userRepository: { updateSubscription },
     });
 
     await execute(interaction, context);
@@ -119,19 +122,19 @@ describe("set-message command", () => {
           .fn()
           .mockResolvedValue({ id: "streamer-1", display_name: "Streamer" }),
       } as unknown as CommandContext["twitch"],
-      subscriptionRepository: {
+      userRepository: {
         updateSubscription: vi.fn().mockResolvedValue({
           success: false,
           reason: "subscription_not_found",
         }),
-      } as unknown as CommandContext["subscriptionRepository"],
+      },
     });
 
     await execute(interaction, context);
 
     expect(reply).toHaveBeenCalledWith({
       content:
-        "❌ Cannot update message for **Streamer**. Reason: subscription_not_found",
+        "❌ Cannot update message for **Streamer**. I couldn't find that subscription.",
       flags: MessageFlags.Ephemeral,
     });
   });

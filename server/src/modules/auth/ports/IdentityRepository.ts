@@ -40,8 +40,8 @@ export interface IdentityRepository {
    * account by matching verified email - this is precisely for the case
    * where the Discord account's email doesn't match the signed-in account's,
    * so that automatic matching wouldn't have linked them. Throws
-   * ConflictError if this Discord account is already linked to a different
-   * uid.
+   * IdentityConflictError if this Discord account is already linked to a
+   * different uid.
    *
    * Backfills the account's own email/emailVerified from this Discord
    * profile only when it doesn't already have one - an account that already

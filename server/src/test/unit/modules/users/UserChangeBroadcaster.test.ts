@@ -1,44 +1,29 @@
-import type { Firestore } from "firebase-admin/firestore";
 import { describe, expect, it, vi } from "vitest";
 
 import { UserChangeBroadcaster } from "../../../../modules/users/application/UserChangeBroadcaster.js";
+import type { UserRepository } from "../../../../modules/users/ports/UserRepository.js";
+import type { User } from "../../../../modules/users/domain/User.js";
 import type { SocketServer } from "../../../../realtime/socketServer.js";
 import { logger } from "../../../../shared/logger/logger.js";
 
-type DocChange = {
-  type: "added" | "modified" | "removed";
-  doc: { id: string; data: () => Record<string, unknown> };
-};
-
-type SnapshotListener = (snapshot: { docChanges: () => DocChange[] }) => void;
-type SnapshotErrorListener = (error: Error) => void;
-
-function docChange(
-  type: DocChange["type"],
-  id: string,
-  data: Record<string, unknown> = {},
-): DocChange {
-  return { type, doc: { id, data: () => data } };
-}
+type ChangeListener = (user: User) => void;
+type ErrorListener = (error: Error) => void;
 
 function setup() {
   const unsubscribe = vi.fn();
-  const listeners: SnapshotListener[] = [];
-  const errorListeners: SnapshotErrorListener[] = [];
-  const collection = vi.fn().mockReturnValue({
-    onSnapshot: (
-      listener: SnapshotListener,
-      onError?: SnapshotErrorListener,
-    ) => {
-      listeners.push(listener);
+  const changeListeners: ChangeListener[] = [];
+  const errorListeners: ErrorListener[] = [];
 
-      if (onError) {
-        errorListeners.push(onError);
-      }
+  const watchUsers = vi.fn(
+    (onChange: ChangeListener, onError: ErrorListener) => {
+      changeListeners.push(onChange);
+      errorListeners.push(onError);
 
       return unsubscribe;
     },
-  });
+  );
+
+  const userRepository = { watchUsers } as unknown as UserRepository;
 
   const notifyUser =
     vi.fn<(userId: string, event: string, payload: unknown) => void>();
@@ -46,11 +31,11 @@ function setup() {
 
   return {
     unsubscribe,
-    collection,
+    watchUsers,
     notifyUser,
-    emit: (...changes: DocChange[]) => {
-      for (const listener of listeners) {
-        listener({ docChanges: () => changes });
+    emit: (user: User) => {
+      for (const listener of changeListeners) {
+        listener(user);
       }
     },
     emitError: (error: Error) => {
@@ -58,90 +43,53 @@ function setup() {
         onError(error);
       }
     },
-    listenerCount: () => listeners.length,
-    broadcaster: new UserChangeBroadcaster(
-      { collection } as unknown as Firestore,
-      socketServer,
-    ),
+    listenerCount: () => changeListeners.length,
+    broadcaster: new UserChangeBroadcaster(userRepository, socketServer),
   };
 }
 
+const baseUser: User = {
+  id: "user-1",
+  canReceiveDM: true,
+  subscriptions: [{ id: "streamer-1", notification_message: "hi" }],
+};
+
 describe("UserChangeBroadcaster", () => {
-  it("listens to the users collection on start", () => {
-    const { broadcaster, collection } = setup();
+  it("watches for user changes on start", () => {
+    const { broadcaster, watchUsers } = setup();
 
     broadcaster.start();
 
-    expect(collection.mock.calls).toEqual([["users"]]);
+    expect(watchUsers).toHaveBeenCalledOnce();
   });
 
-  it("pushes modified user documents to the owning socket, mapped through the domain schema", () => {
+  it("pushes a changed user to their owning socket", () => {
     const { broadcaster, emit, notifyUser } = setup();
 
     broadcaster.start();
 
-    emit(
-      docChange("modified", "user-1", {
-        canReceiveDM: true,
-        subscriptions: [{ id: "streamer-1", notification_message: "hi" }],
-      }),
-    );
+    emit(baseUser);
 
     expect(notifyUser.mock.calls).toEqual([
-      [
-        "user-1",
-        "user_data_updated",
-        {
-          id: "user-1",
-          canReceiveDM: true,
-          subscriptions: [{ id: "streamer-1", notification_message: "hi" }],
-        },
-      ],
+      ["user-1", "user_data_updated", baseUser],
     ]);
   });
 
-  it.each(["added", "removed"] as const)("ignores %s documents", (type) => {
+  it("forwards every user reported in turn", () => {
     const { broadcaster, emit, notifyUser } = setup();
 
     broadcaster.start();
 
-    emit(docChange(type, "user-1"));
-
-    expect(notifyUser).not.toHaveBeenCalled();
-  });
-
-  it("forwards every modified document in a snapshot", () => {
-    const { broadcaster, emit, notifyUser } = setup();
-
-    broadcaster.start();
-
-    emit(
-      docChange("modified", "user-1"),
-      docChange("added", "user-2"),
-      docChange("modified", "user-3"),
-    );
+    emit(baseUser);
+    emit({ ...baseUser, id: "user-2" });
 
     expect(notifyUser.mock.calls.map((call) => call[0])).toEqual([
       "user-1",
-      "user-3",
+      "user-2",
     ]);
   });
 
-  it("logs and skips a document that fails schema validation instead of throwing", () => {
-    const error = vi.spyOn(logger, "error").mockReturnValue();
-    const { broadcaster, emit, notifyUser } = setup();
-
-    broadcaster.start();
-
-    expect(() =>
-      emit(docChange("modified", "user-1", { canReceiveDM: "not-a-boolean" })),
-    ).not.toThrow();
-
-    expect(notifyUser).not.toHaveBeenCalled();
-    expect(error).toHaveBeenCalledOnce();
-  });
-
-  it("logs when the snapshot listener itself errors", () => {
+  it("logs when the change listener itself errors", () => {
     const error = vi.spyOn(logger, "error").mockReturnValue();
     const { broadcaster, emitError } = setup();
 

@@ -1,4 +1,4 @@
-import type { Subscription } from "../../subscriptions/domain/Subscription.js";
+import type { Subscription } from "./Subscription.js";
 
 export interface User {
   canReceiveDM?: boolean;

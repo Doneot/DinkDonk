@@ -1,8 +1,6 @@
 import type { SocketServer } from "../../../realtime/socketServer.js";
-import type { Firestore } from "firebase-admin/firestore";
+import type { UserRepository } from "../ports/UserRepository.js";
 
-import { UserRecordSchema } from "../infrastructure/firestore/records/UserRecord.js";
-import { toUser } from "../infrastructure/firestore/mappers/userMapper.js";
 import { logger } from "../../../shared/logger/logger.js";
 
 // A fatal onSnapshot error (auth expiry, network blip) terminates the
@@ -20,7 +18,7 @@ export class UserChangeBroadcaster {
   private stopped = true;
 
   constructor(
-    private readonly firestore: Firestore,
+    private readonly users: UserRepository,
     private readonly socketServer: SocketServer,
   ) {}
 
@@ -31,29 +29,9 @@ export class UserChangeBroadcaster {
       return;
     }
 
-    this.unsubscribe = this.firestore.collection("users").onSnapshot(
-      (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          if (change.type !== "modified") {
-            return;
-          }
-
-          try {
-            const record = UserRecordSchema.parse(change.doc.data());
-            const user = toUser(change.doc.id, record);
-
-            this.socketServer.notifyUser(
-              user.id,
-              "user_data_updated",
-              user,
-            );
-          } catch (error) {
-            logger.error(
-              { error, userId: change.doc.id },
-              "Failed to broadcast a malformed user record",
-            );
-          }
-        });
+    this.unsubscribe = this.users.watchUsers(
+      (user) => {
+        this.socketServer.notifyUser(user.id, "user_data_updated", user);
       },
       (error) => {
         logger.error({ error }, "User change listener failed");

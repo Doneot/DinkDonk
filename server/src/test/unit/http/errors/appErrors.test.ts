@@ -34,8 +34,8 @@ describe("AppError subclasses", () => {
     );
   });
 
-  it("defaults BadRequestError details to an empty object", () => {
-    expect(new BadRequestError().details).toEqual({});
+  it("omits BadRequestError details when none are given", () => {
+    expect(new BadRequestError().details).toBeUndefined();
   });
 
   it("keeps BadRequestError validation details", () => {

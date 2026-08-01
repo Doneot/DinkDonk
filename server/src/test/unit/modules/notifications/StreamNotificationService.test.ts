@@ -54,8 +54,7 @@ function setup({
   const userRepository = new InMemoryUserRepository();
   const streamerRepository = new InMemoryStreamerRepository();
 
-  // Subscriptions now live on the User record itself (StreamNotificationService
-  // no longer depends on SubscriptionRepository), so merge them into the
+  // Subscriptions live on the User record itself, so merge them into the
   // seeded users before storing.
   const usersById = new Map(
     users.map((user) => [user.id, structuredClone(user)]),
@@ -205,26 +204,25 @@ describe("StreamNotificationService", () => {
     expect(notify.mock.calls[0]?.[0]).toMatchObject({ id: "user-1" });
   });
 
-  it("isolates one subscriber's repository failure instead of failing the whole run", async () => {
+  it("isolates one subscriber's notification-send failure instead of failing the whole run", async () => {
     const error = vi.spyOn(logger, "error").mockReturnValue();
-    const { service, notify, userRepository } = setup({
+    const { service, notify } = setup({
       streamers: [
         buildStreamer({ id: "streamer-1", users: ["user-1", "user-2"] }),
       ],
       users: [buildUser({ id: "user-1" }), buildUser({ id: "user-2" })],
     });
 
-    vi.spyOn(userRepository, "getUser").mockImplementation((id) =>
-      id === "user-1"
-        ? Promise.reject(new Error("firestore unavailable"))
-        : InMemoryUserRepository.prototype.getUser.call(userRepository, id),
+    notify.mockImplementation((user) =>
+      user.id === "user-1"
+        ? Promise.reject(new Error("discord unavailable"))
+        : Promise.resolve([]),
     );
 
     await expect(service.handleStreamOnline(event)).resolves.toBeUndefined();
 
-    // user-2's notification still goes out despite user-1's lookup failing.
-    expect(notify).toHaveBeenCalledOnce();
-    expect(notify.mock.calls[0]?.[0]).toMatchObject({ id: "user-2" });
+    // user-2's notification still goes out despite user-1's send failing.
+    expect(notify).toHaveBeenCalledTimes(2);
 
     expect(error).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -233,6 +231,43 @@ describe("StreamNotificationService", () => {
         error: expect.any(Error) as Error,
       }),
       "Failed to notify subscriber of stream going live",
+    );
+  });
+
+  it("isolates one batch's repository failure from other batches' delivery", async () => {
+    const error = vi.spyOn(logger, "error").mockReturnValue();
+
+    // NOTIFY_BATCH_SIZE is 25 - 26 subscribers spans exactly two batches.
+    const subscriberIds = Array.from({ length: 26 }, (_, i) => `user-${i}`);
+
+    const { service, notify, userRepository } = setup({
+      streamers: [buildStreamer({ id: "streamer-1", users: subscriberIds })],
+      users: subscriberIds.map((id) => buildUser({ id })),
+    });
+
+    vi.spyOn(userRepository, "getUsersByIds").mockImplementation((ids) =>
+      ids.includes("user-0")
+        ? Promise.reject(new Error("firestore unavailable"))
+        : InMemoryUserRepository.prototype.getUsersByIds.call(
+            userRepository,
+            ids,
+          ),
+    );
+
+    await expect(service.handleStreamOnline(event)).resolves.toBeUndefined();
+
+    // The second batch (containing user-25) is still notified despite the
+    // first batch's read failing outright.
+    expect(notify).toHaveBeenCalledOnce();
+    expect(notify.mock.calls[0]?.[0]).toMatchObject({ id: "user-25" });
+
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userIds: expect.arrayContaining(["user-0"]) as string[],
+        streamerId: "streamer-1",
+        error: expect.any(Error) as Error,
+      }),
+      "Failed to load a batch of subscribers to notify of stream going live",
     );
   });
 

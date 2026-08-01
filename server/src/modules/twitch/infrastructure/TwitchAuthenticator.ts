@@ -3,6 +3,7 @@ import type { AxiosInstance } from "axios";
 
 import { env } from "../../../shared/config/env.js";
 import { assertDefined } from "../../../shared/utils/assert.js";
+import { keepAliveHttpsAgent } from "../../../infrastructure/http/httpsAgent.js";
 
 export type TwitchAuthenticatorOptions = {
   http?: AxiosInstance;
@@ -30,7 +31,10 @@ export class TwitchAuthenticator {
   private readonly clientSecret: string;
 
   constructor({
-    http = axios.create({ timeout: REQUEST_TIMEOUT_MS }),
+    http = axios.create({
+      timeout: REQUEST_TIMEOUT_MS,
+      httpsAgent: keepAliveHttpsAgent,
+    }),
     clientId = assertDefined(
       env.twitch.clientId,
       "Twitch Client ID is not defined",

@@ -43,21 +43,18 @@ afterEach(() => {
 });
 
 describe("createContainer", () => {
-  it("shares one event bus between the streamer and subscription repositories", () => {
+  it("shares one event bus between the streamer and user repositories", () => {
     const container = createContainer(fakeRuntime());
 
     expect(container.repositories.streamers.events).toBe(
-      container.repositories.subscriptions.events,
+      container.repositories.users.events,
     );
   });
 
-  it("shares the streamer/subscription repositories between subscribing and reading subscribers", async () => {
+  it("shares the streamer/user repositories between subscribing and reading subscribers", async () => {
     const container = createContainer(fakeRuntime());
 
-    await container.repositories.subscriptions.subscribe(
-      "user-1",
-      "streamer-1",
-    );
+    await container.repositories.users.subscribe("user-1", "streamer-1");
 
     await expect(
       container.repositories.streamers.getSubscriberIds("streamer-1"),

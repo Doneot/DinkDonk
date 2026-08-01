@@ -6,7 +6,7 @@ import { Server, type Socket } from "socket.io";
 import { env } from "../shared/config/env.js";
 import { logger } from "../shared/logger/logger.js";
 import type { IdentityRepository } from "../modules/auth/ports/IdentityRepository.js";
-import { TokenDecryptionError } from "../shared/utils/crypto.js";
+import { resolveIdentity } from "../modules/auth/application/resolveIdentity.js";
 
 type AuthenticatedSocket = Socket & {
   userId: string;
@@ -106,7 +106,7 @@ export function createSocketServer(
 
     sockets.add(authenticatedSocket);
 
-    logger.info(`Socket connected for user ${userId}`);
+    logger.info({ userId }, "Socket connected");
 
     authenticatedSocket.on(
       "disconnect",
@@ -133,25 +133,22 @@ export function createSocketServer(
   ): Promise<void> {
     if (identityRepository) {
       try {
-        const identity = await identityRepository.getIdentity(userId);
+        const result = await resolveIdentity(
+          identityRepository,
+          userId,
+          "Failed to decrypt stored tokens for socket connection; disconnecting",
+        );
 
-        if (!identity) {
+        if (result.status !== "found") {
           socket.disconnect(true);
 
           return;
         }
       } catch (error) {
-        if (error instanceof TokenDecryptionError) {
-          logger.warn(
-            { userId, error },
-            "Failed to decrypt stored tokens for socket connection; disconnecting",
-          );
-        } else {
-          logger.error(
-            { userId, error },
-            "Failed to resolve identity for socket connection",
-          );
-        }
+        logger.error(
+          { userId, error },
+          "Failed to resolve identity for socket connection",
+        );
 
         socket.disconnect(true);
 

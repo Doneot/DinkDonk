@@ -299,7 +299,7 @@ describe("POST /api/auth/logout", () => {
 
     const response = await request(app).post("/api/auth/logout").expect(200);
 
-    expect(response.body).toEqual({ ok: true });
+    expect(response.body).toEqual({});
     const setCookie = response.headers["set-cookie"] as unknown as
       string[] | undefined;
 

@@ -22,21 +22,26 @@ function createInteraction(options: Record<string, string | null> = {}) {
   };
 }
 
-function createContext(overrides: Partial<CommandContext> = {}): CommandContext {
+function createContext(
+  overrides: Omit<Partial<CommandContext>, "userRepository"> & {
+    userRepository?: Partial<CommandContext["userRepository"]>;
+  } = {},
+): CommandContext {
+  const { userRepository, ...rest } = overrides;
+
   return {
     twitch: { getStreamer: vi.fn().mockResolvedValue(null) },
     userRepository: {
       getUser: vi.fn().mockResolvedValue(buildUser({ canReceiveDM: true })),
+      subscribe: vi.fn(),
+      ...userRepository,
     },
     identityRepository: {
       getIdentityByDiscordUid: vi
         .fn()
         .mockResolvedValue(buildIdentity({ uid: TEST_USER_ID })),
     },
-    subscriptionRepository: {
-      subscribe: vi.fn(),
-    },
-    ...overrides,
+    ...rest,
   } as unknown as CommandContext;
 }
 
@@ -63,7 +68,7 @@ describe("subscribe command", () => {
       } as unknown as CommandContext["twitch"],
       userRepository: {
         getUser: vi.fn().mockResolvedValue(buildUser({ canReceiveDM: false })),
-      } as unknown as CommandContext["userRepository"],
+      },
     });
 
     await execute(interaction, context);
@@ -86,9 +91,7 @@ describe("subscribe command", () => {
           .fn()
           .mockResolvedValue({ id: "streamer-1", display_name: "Streamer" }),
       } as unknown as CommandContext["twitch"],
-      subscriptionRepository: {
-        subscribe,
-      } as unknown as CommandContext["subscriptionRepository"],
+      userRepository: { subscribe },
     });
 
     await execute(interaction, context);
@@ -112,17 +115,17 @@ describe("subscribe command", () => {
           .fn()
           .mockResolvedValue({ id: "streamer-1", display_name: "Streamer" }),
       } as unknown as CommandContext["twitch"],
-      subscriptionRepository: {
+      userRepository: {
         subscribe: vi
           .fn()
           .mockResolvedValue({ success: false, reason: "already_subscribed" }),
-      } as unknown as CommandContext["subscriptionRepository"],
+      },
     });
 
     await execute(interaction, context);
 
     expect(reply).toHaveBeenCalledWith({
-      content: "❌ Cannot subscribe to **Streamer**. Reason: already_subscribed",
+      content: "❌ Cannot subscribe to **Streamer**. You're already subscribed to this streamer.",
       flags: MessageFlags.Ephemeral,
     });
   });

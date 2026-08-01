@@ -5,7 +5,15 @@ export interface StreamerRepository {
   /** Emits "streamerAdded" when a new streamer is created. */
   readonly events: DomainEventBus;
 
-  getStreamers(): Promise<Streamer[]>;
+  /**
+   * Unlike UserRepository.getUsers(), `limit` doesn't default to a cap when
+   * omitted: EventSubSyncService's periodic sync is a real production
+   * caller that needs the complete streamer set to keep every streamer's
+   * EventSub subscription alive, so silently truncating it would be a
+   * functional regression, not just a performance one. Callers that only
+   * need a bounded page (e.g. future admin tooling) can pass one explicitly.
+   */
+  getStreamers(limit?: number): Promise<Streamer[]>;
   getStreamer(id: string): Promise<Streamer | null>;
   createStreamer(id: string): Promise<void>;
   deleteStreamer(id: string): Promise<void>;

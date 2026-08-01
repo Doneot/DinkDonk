@@ -34,7 +34,7 @@ export async function startSshTunnel(): Promise<Tunnel> {
   let exited = false;
 
   process.once("exit", () => {
-    logger.info(`SSH tunnel process ${process.pid} exited`);
+    logger.info({ pid: process.pid }, "SSH tunnel process exited");
     exited = true;
   });
 

@@ -2,11 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
 
 import {
+  describeReason,
   replyEphemeral,
   requireDMCapableUser,
+  resolveStreamerOrReply,
 } from "../../../../../commands/shared/commandReplies.js";
 import type { UserRepository } from "../../../../../modules/users/ports/UserRepository.js";
 import type { IdentityRepository } from "../../../../../modules/auth/ports/IdentityRepository.js";
+import type { TwitchStreamerProvider } from "../../../../../modules/twitch/ports/TwitchGateway.js";
 import { buildUser } from "../../../../builders/user.js";
 import { buildIdentity } from "../../../../builders/auth.js";
 import { TEST_USER_ID } from "../../../../constants.js";
@@ -49,6 +52,55 @@ describe("replyEphemeral", () => {
       content: "hello",
       flags: MessageFlags.Ephemeral,
     });
+  });
+});
+
+describe("resolveStreamerOrReply", () => {
+  it("returns the streamer when Twitch resolves the username", async () => {
+    const { interaction, reply } = createInteraction();
+    const streamer = { id: "streamer-1", login: "tester", display_name: "Tester" };
+    const twitch = {
+      getStreamer: vi.fn().mockResolvedValue(streamer),
+    } as unknown as Pick<TwitchStreamerProvider, "getStreamer">;
+
+    const result = await resolveStreamerOrReply(interaction, twitch, "tester");
+
+    expect(result).toEqual(streamer);
+    expect(reply).not.toHaveBeenCalled();
+  });
+
+  it("replies ephemerally and returns null when Twitch doesn't know the username", async () => {
+    const { interaction, reply } = createInteraction();
+    const twitch = {
+      getStreamer: vi.fn().mockResolvedValue(null),
+    } as unknown as Pick<TwitchStreamerProvider, "getStreamer">;
+
+    const result = await resolveStreamerOrReply(interaction, twitch, "ghost");
+
+    expect(result).toBeNull();
+    expect(reply).toHaveBeenCalledWith({
+      content: "❌ Could not find streamer `ghost`.",
+      flags: MessageFlags.Ephemeral,
+    });
+  });
+});
+
+describe("describeReason", () => {
+  it.each([
+    ["invalid_input", "That wasn't a valid request."],
+    ["already_subscribed", "You're already subscribed to this streamer."],
+    [
+      "user_not_found",
+      "I couldn't find your account. Please sign in on the website first.",
+    ],
+    ["not_subscribed", "You're not subscribed to this streamer."],
+    ["subscription_not_found", "I couldn't find that subscription."],
+  ])("maps %s to user-facing copy", (reason, expected) => {
+    expect(describeReason(reason)).toBe(expected);
+  });
+
+  it("falls back to a generic message for an unrecognized reason", () => {
+    expect(describeReason("something_new")).toBe("Something went wrong.");
   });
 });
 

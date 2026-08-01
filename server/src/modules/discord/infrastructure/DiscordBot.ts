@@ -52,6 +52,12 @@ type DiscordApiError = Error & {
 // hit repeatedly in quick succession.
 const DM_CAPABILITY_CACHE_TTL_MS = 5 * 60 * 1000;
 
+// Without a sweep, every unique user who is ever DM-capability-checked would
+// leave a permanent entry here for the life of the process, since expired
+// entries are otherwise only overwritten (not removed) on that user's next
+// check - unbounded growth on a long-running instance.
+const DM_CAPABILITY_CACHE_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+
 type DiscordClient = Client & {
   commands: Collection<string, Command>;
 };
@@ -73,6 +79,8 @@ export class DiscordBot implements DiscordService {
     string,
     { result: boolean; expiresAt: number }
   >();
+
+  private readonly dmCapabilityCacheSweep: NodeJS.Timeout;
 
   constructor({
     token,
@@ -101,6 +109,18 @@ export class DiscordBot implements DiscordService {
     this.client.commands = new Collection<string, Command>();
 
     this.registerEventHandlers();
+
+    this.dmCapabilityCacheSweep = setInterval(() => {
+      const now = Date.now();
+
+      for (const [userId, entry] of this.dmCapabilityCache) {
+        if (entry.expiresAt <= now) {
+          this.dmCapabilityCache.delete(userId);
+        }
+      }
+    }, DM_CAPABILITY_CACHE_SWEEP_INTERVAL_MS);
+
+    this.dmCapabilityCacheSweep.unref();
   }
 
   get isReady(): boolean {
@@ -113,6 +133,8 @@ export class DiscordBot implements DiscordService {
   }
 
   async stop(): Promise<void> {
+    clearInterval(this.dmCapabilityCacheSweep);
+
     await this.client.destroy();
   }
 
@@ -152,7 +174,7 @@ export class DiscordBot implements DiscordService {
         return;
       }
 
-      logger.info(`Discord bot logged in as ${this.client.user.tag}`);
+      logger.info({ tag: this.client.user.tag }, "Discord bot logged in");
     });
 
     this.client.on(

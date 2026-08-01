@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { REST, Routes } from "discord.js";
 import { assertDefined } from "./shared/utils/assert.js";
 import { env } from "./shared/config/env.js";
+import { logger } from "./shared/logger/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -50,15 +51,19 @@ async function registerCommands(): Promise<void> {
     body: commands,
   });
 
-  const scope = env.isProduction
-    ? "globally"
-    : `for guild ${env.discord.guildId}`;
-
-  console.log(`Registered ${commands.length} Discord slash commands ${scope}.`);
+  logger.info(
+    {
+      count: commands.length,
+      scope: env.isProduction ? "global" : env.discord.guildId,
+    },
+    "Registered Discord slash commands",
+  );
 }
 
-registerCommands().catch((error: unknown): never => {
-  console.error("Failed to register Discord slash commands:", error);
+registerCommands().catch((error: unknown) => {
+  logger.error({ error }, "Failed to register Discord slash commands");
 
-  process.exit(1);
+  logger.flush(() => {
+    process.exit(1);
+  });
 });

@@ -6,6 +6,7 @@ import type { TwitchEventSubStreamOnlineEvent } from "../../modules/twitch/domai
 import { eventSubHeadersSchema } from "../schemas/eventSub.js";
 import { verifyEventSubSignature } from "../../modules/twitch/eventsub/EventSubSignatureVerifier.js";
 import { dispatchEventSubNotification } from "../../modules/twitch/eventsub/EventSubDispatcher.js";
+import { EventSubValidationError } from "../../modules/twitch/eventsub/EventSubValidationError.js";
 import { BadRequestError } from "../errors/BadRequestError.js";
 import {
   eventSubRequestsTotal,
@@ -61,6 +62,16 @@ export function createEventSubRouter({
         "twitch-eventsub-message-type": messageType,
       } = headers.data;
 
+      // This whole handler deliberately stays outside the AppError/JSON
+      // envelope convention the rest of the HTTP API follows: it's not
+      // consumed by DinkDonk's own client, only by Twitch's EventSub
+      // delivery system, which only inspects the status code and (for
+      // challenge verification below) a text/plain body - a JSON error
+      // envelope here would be meaningless to that consumer. The
+      // EventSubValidationError -> BadRequestError translation further down
+      // is the one exception, kept because it's reachable from
+      // dispatchEventSubNotification's shared parsing/dispatch logic rather
+      // than being this route's own response.
       if (
         !verifyEventSubSignature({
           secret,
@@ -98,6 +109,15 @@ export function createEventSubRouter({
         // this same message id is actually reprocessed instead of being
         // silently treated as an already-handled duplicate.
         await replayStore.forget(messageId);
+
+        // EventSubDispatcher/parseEventSubJson raise a transport-agnostic
+        // domain error for a malformed payload; translated to BadRequestError
+        // only at this HTTP boundary so the 400 response contract is
+        // preserved without the dispatch/parsing logic depending on it.
+        if (error instanceof EventSubValidationError) {
+          throw new BadRequestError(error.message, error.details);
+        }
+
         throw error;
       }
 

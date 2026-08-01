@@ -2,6 +2,8 @@ import { MessageFlags } from "discord.js";
 import type { ChatInputCommandInteraction } from "discord.js";
 
 import type { User } from "../../modules/users/domain/User.js";
+import type { SubscribeFailureReason } from "../../modules/users/domain/SubscribeResult.js";
+import type { TwitchStreamer } from "../../modules/twitch/domain/Twitch.js";
 import type { CommandContext } from "../../modules/discord/domain/CommandContext.js";
 
 /**
@@ -21,7 +23,7 @@ export function replyEphemeral(
  * any account that linked Discord as a secondary provider (Google/Twitch
  * primary), so every command that reads or writes a user's data must resolve
  * through here rather than using interaction.user.id directly as a
- * UserRepository/SubscriptionRepository key.
+ * UserRepository key.
  */
 export async function resolveUid(
   interaction: ChatInputCommandInteraction,
@@ -41,6 +43,55 @@ export async function resolveUid(
   }
 
   return identity.uid;
+}
+
+/**
+ * Shared by every subscription command: resolves the username option to a
+ * real Twitch streamer, replying ephemerally and returning null when Twitch
+ * doesn't know it, so callers can bail out with `if (!streamer) return;`.
+ */
+export async function resolveStreamerOrReply(
+  interaction: ChatInputCommandInteraction,
+  twitch: Pick<CommandContext["twitch"], "getStreamer">,
+  username: string,
+): Promise<TwitchStreamer | null> {
+  const streamer = await twitch.getStreamer(username);
+
+  if (!streamer) {
+    await replyEphemeral(interaction, `❌ Could not find streamer \`${username}\`.`);
+
+    return null;
+  }
+
+  return streamer;
+}
+
+// Internal SubscribeResult/UnsubscribeResult/UpdateSubscriptionResult reason
+// codes, translated to a sentence rather than shown to users verbatim (e.g.
+// "Reason: already_subscribed") - keeps the two free to diverge, since a
+// reason code is an internal implementation detail while this copy is a
+// user-facing contract.
+// Typed against SubscribeFailureReason via `satisfies` (rather than
+// `Record<SubscribeFailureReason, string>` directly) so this keeps its wider
+// `Record<string, string>` declared type below - describeReason() is a
+// defensive boundary function meant to tolerate an arbitrary/unrecognized
+// reason value gracefully, not just the five currently known ones - while
+// still getting a compile error here if a reason code is ever added to
+// SubscribeResult/UnsubscribeResult/UpdateSubscriptionResult without a
+// corresponding entry.
+const REASON_MESSAGES: Record<string, string> = {
+  invalid_input: "That wasn't a valid request.",
+  already_subscribed: "You're already subscribed to this streamer.",
+  subscription_limit_reached:
+    "You've reached the maximum number of subscriptions.",
+  user_not_found: "I couldn't find your account. Please sign in on the website first.",
+  not_subscribed: "You're not subscribed to this streamer.",
+  subscription_not_found: "I couldn't find that subscription.",
+} satisfies Record<SubscribeFailureReason, string>;
+
+/** Maps a subscription-command result's `reason` code to user-facing copy. */
+export function describeReason(reason: string): string {
+  return REASON_MESSAGES[reason] ?? "Something went wrong.";
 }
 
 /**

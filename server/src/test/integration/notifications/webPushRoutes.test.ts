@@ -16,7 +16,7 @@ import {
 import { TestClient } from "../../helpers/TestClient.js";
 
 const SUBSCRIPTION = {
-  endpoint: "https://push.example.com/subscription-1",
+  endpoint: "https://fcm.googleapis.com/fcm/send/subscription-1",
   keys: { p256dh: "p256dh-key", auth: "auth-key" },
 };
 
@@ -118,7 +118,6 @@ describe("POST /api/notifications/web-push/subscriptions", () => {
       .expect(201);
 
     expect(savePushResponseSchema.parse(response.body)).toEqual({
-      success: true,
       id: SUBSCRIPTION_ID,
     });
     await expect(
@@ -165,9 +164,9 @@ describe("POST /api/notifications/web-push/subscriptions", () => {
       .send({ subscription: SUBSCRIPTION })
       .expect(400);
 
-    expect(savePushResponseSchema.parse(response.body)).toEqual({
-      success: false,
-      reason: "invalid_push_subscription",
+    expect(response.body).toEqual({
+      error: "validation_error",
+      message: "That push subscription isn't valid.",
     });
   });
 });
@@ -186,9 +185,7 @@ describe("DELETE /api/notifications/web-push/subscriptions", () => {
       .query({ subscriptionId: SUBSCRIPTION_ID })
       .expect(200);
 
-    expect(deletePushResponseSchema.parse(response.body)).toEqual({
-      success: true,
-    });
+    expect(deletePushResponseSchema.parse(response.body)).toEqual({});
     await expect(
       ctx.repositories.pushSubscriptions.getPushSubscriptions("user-1"),
     ).resolves.toEqual([]);
@@ -234,9 +231,9 @@ describe("DELETE /api/notifications/web-push/subscriptions", () => {
       .query({ subscriptionId: SUBSCRIPTION_ID })
       .expect(400);
 
-    expect(deletePushResponseSchema.parse(response.body)).toEqual({
-      success: false,
-      reason: "invalid_user",
+    expect(response.body).toEqual({
+      error: "validation_error",
+      message: "We couldn't identify your account.",
     });
   });
 

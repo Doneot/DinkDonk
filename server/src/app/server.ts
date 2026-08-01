@@ -20,17 +20,32 @@ export function createServer(container: Container): Server {
 
   const sessionMiddleware = createSessionMiddleware(container.firestore);
 
-  const sockets = createSocketServer(httpServer, {
-    sessionMiddleware,
-    identityRepository: container.repositories.identities,
-  });
+  // Populated once `sockets` exists below. Declared as an indirection so
+  // `app` can be built (and attached to httpServer) before `sockets` does -
+  // socket.io's `new Server(httpServer, ...)` calls engine.io's attach(),
+  // which snapshots httpServer's current "request" listeners so it can
+  // delegate any request whose path it doesn't own back to them. If Express
+  // isn't registered yet when that snapshot is taken, it's permanently left
+  // out of the delegation chain: every request would then reach both
+  // engine.io's listener and Express's independently, double-handling
+  // socket.io's own requests and corrupting their responses.
+  let disconnectUser = (_userId: string): void => {};
 
   const app = createApp({
     ...container,
     sessionMiddleware,
     twitch: container.twitch.client,
-    disconnectUser: (userId) => sockets.disconnectUser(userId),
+    disconnectUser: (userId) => disconnectUser(userId),
   });
+
+  httpServer.on("request", app);
+
+  const sockets = createSocketServer(httpServer, {
+    sessionMiddleware,
+    identityRepository: container.repositories.identities,
+  });
+
+  disconnectUser = (userId) => sockets.disconnectUser(userId);
 
   return {
     httpServer,

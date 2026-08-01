@@ -132,6 +132,23 @@ describe("POST /api/can-receive-dm", () => {
     vi.restoreAllMocks();
   });
 
+  it("reads the identity once for the whole request instead of once per middleware/handler", async () => {
+    const { ctx, client } = await createClient({
+      state: { users: [buildUser({ id: "user-1", canReceiveDM: false })] },
+    });
+
+    const getIdentity = vi.spyOn(ctx.repositories.identities, "getIdentity");
+
+    await client.post("/api/can-receive-dm").expect(200);
+
+    // Session deserialization (global middleware), ensureFreshToken, and
+    // this handler each used to independently fetch identities/{uid} - now
+    // they share the one read deserializeUser already did for the request.
+    expect(getIdentity).toHaveBeenCalledOnce();
+
+    vi.restoreAllMocks();
+  });
+
   it("reports false without asking Discord for a Google/Twitch-only identity", async () => {
     const { ctx, client } = await createClient({
       identity: buildIdentity({

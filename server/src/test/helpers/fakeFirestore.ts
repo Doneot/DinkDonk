@@ -25,6 +25,11 @@ export class FakeFirestore {
     return updateFunction(new FakeTransaction());
   }
 
+  /** Mirrors Firestore#getAll(...refs): batched reads, snapshots in order. */
+  getAll(...refs: FakeDocumentReference[]): Promise<FakeDocumentSnapshot[]> {
+    return Promise.all(refs.map((ref) => ref.get()));
+  }
+
   /** Raw document contents, for asserting exactly what was persisted. */
   read(path: string): DocumentData | undefined {
     const value = this.documents.get(path);

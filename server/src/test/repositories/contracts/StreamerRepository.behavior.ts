@@ -41,6 +41,18 @@ export function streamerRepositoryBehavior(
       expect(streamers).toHaveLength(2);
     });
 
+    it("bounds the result to the given limit", async () => {
+      const repository = createRepository();
+
+      repository.seed(buildStreamer({ id: "1" }));
+      repository.seed(buildStreamer({ id: "2" }));
+      repository.seed(buildStreamer({ id: "3" }));
+
+      const streamers = await repository.getStreamers(2);
+
+      expect(streamers).toHaveLength(2);
+    });
+
     it("creates a streamer", async () => {
       const repository = createRepository();
 
@@ -77,6 +89,20 @@ export function streamerRepositoryBehavior(
         type: "streamerAdded",
         streamerId: "streamer-1",
       });
+    });
+
+    it("does not re-emit streamerAdded for a streamer that already exists", async () => {
+      const repository = createRepository();
+
+      const listener = vi.fn();
+
+      await repository.createStreamer("streamer-1");
+
+      repository.events.on("streamerAdded", listener);
+
+      await repository.createStreamer("streamer-1");
+
+      expect(listener).not.toHaveBeenCalled();
     });
 
     it("clear removes every streamer", async () => {

@@ -4,6 +4,11 @@ services:
       context: ../server
       dockerfile: ../server/Dockerfile.dev
     restart: unless-stopped
+    # Unlike Dockerfile.prod's dedicated `USER node`, this stays root: the
+    # bind-mounted ../server (below) needs to be writable by whatever
+    # uid/gid owns node_modules installs and any files the dev server itself
+    # writes, which varies by host - dev-only, never applies to the actual
+    # deployed image.
     user: root
     working_dir: /app
     depends_on:
@@ -24,7 +29,18 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "256mb",
+        "--maxmemory-policy",
+        "volatile-ttl",
+      ]
     ports:
       - "6379:6379"
 

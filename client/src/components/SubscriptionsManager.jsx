@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import api from "../services/api";
+import { notifyActionError } from "../services/errorToast";
 import StreamerSearch from "./StreamerSearch";
 import SubscriptionsList from "./SubscriptionsList";
 import { useAuth } from "../context/authContextValue";
@@ -89,7 +90,7 @@ const SubscriptionsManager = ({ canReceiveDM }) => {
           ],
         }));
       } catch (err) {
-        console.error("Subscribe failed", err);
+        notifyActionError(err, "Failed to subscribe.");
       }
     },
     [setUser],
@@ -115,7 +116,7 @@ const SubscriptionsManager = ({ canReceiveDM }) => {
             return next;
           });
         })
-        .catch((err) => console.error("Unsubscribe failed", err));
+        .catch((err) => notifyActionError(err, "Failed to unsubscribe."));
     },
     [setUser],
   );
@@ -140,7 +141,9 @@ const SubscriptionsManager = ({ canReceiveDM }) => {
             id,
             message,
           })
-          .catch((err) => console.error("Failed to update message", err));
+          .catch((err) =>
+            notifyActionError(err, "Failed to update notification message."),
+          );
       }, 600);
     },
     [setUser],

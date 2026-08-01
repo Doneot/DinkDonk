@@ -19,6 +19,9 @@ const fakeContainer = {
   redis: { connect: redisConnect, quit: vi.fn().mockResolvedValue(undefined) },
   twitch: { start: twitchStart, stop: vi.fn().mockResolvedValue(undefined) },
   discord: { start: discordStart, stop: vi.fn().mockResolvedValue(undefined) },
+  repositories: {
+    users: { watchUsers: vi.fn().mockReturnValue(vi.fn()) },
+  },
   services: {
     subscriptionCleanup: { garbageCollectSubscriptions },
   },

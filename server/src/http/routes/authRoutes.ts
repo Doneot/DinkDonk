@@ -225,7 +225,7 @@ export function createAuthRouter({
           // itself touch a socket that authenticated before logout.
           disconnectUser?.(userId);
 
-          res.json({ ok: true });
+          res.status(200).json({});
         });
       });
     },

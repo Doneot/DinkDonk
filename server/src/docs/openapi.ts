@@ -7,7 +7,7 @@ import {
 import { z } from "zod";
 
 import { PushSubscriptionSchema } from "../modules/notifications/schemas/PushSubscriptionSchema.js";
-import { SubscriptionSchema } from "../modules/subscriptions/schemas/SubscriptionSchema.js";
+import { SubscriptionSchema } from "../modules/users/schemas/SubscriptionSchema.js";
 import { StreamerSchema } from "../modules/streamers/schemas/StreamerSchema.js";
 import { UserRecordSchema } from "../modules/users/infrastructure/firestore/records/UserRecord.js";
 

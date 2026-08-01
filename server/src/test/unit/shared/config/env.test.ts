@@ -127,18 +127,18 @@ describe("env", () => {
   it("keeps a single SESSION_SECRET as a one-element list", async () => {
     const env = await loadEnv();
 
-    expect(env.sessionSecret).toEqual(["test-session-secret"]);
+    expect(env.sessionSecret).toEqual(["test-session-secret-32-bytes-long!!"]);
   });
 
   it("splits a comma-separated SESSION_SECRET for rotation", async () => {
     const env = await loadEnv({
       SESSION_SECRET:
-        "new-session-secret-bytes-long!!, old-session-secret-bytes-long!!",
+        "new-session-secret-32-bytes-long!!, old-session-secret-32-bytes-long!!",
     });
 
     expect(env.sessionSecret).toEqual([
-      "new-session-secret-bytes-long!!",
-      "old-session-secret-bytes-long!!",
+      "new-session-secret-32-bytes-long!!",
+      "old-session-secret-32-bytes-long!!",
     ]);
   });
 
