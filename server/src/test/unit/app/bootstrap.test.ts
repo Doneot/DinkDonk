@@ -163,4 +163,27 @@ describe("bootstrap", () => {
       );
     });
   });
+
+  it("starts up normally when Redis isn't configured at all, without attempting to connect it", async () => {
+    vi.spyOn(logger, "info").mockReturnValue();
+
+    // createRedisClient() returns undefined when REDIS_URL is unset - there
+    // is no client object here at all, so container.redis is undefined
+    // rather than an object with a connect() method to call. Restored in
+    // finally so this doesn't leak into other tests via the shared
+    // module-level fakeContainer.
+    const originalRedis = fakeContainer.redis;
+
+    fakeContainer.redis = undefined as unknown as typeof fakeContainer.redis;
+
+    try {
+      await bootstrap();
+
+      expect(redisConnect).not.toHaveBeenCalled();
+      expect(shutdown).not.toHaveBeenCalled();
+      expect(httpServerListen).toHaveBeenCalledOnce();
+    } finally {
+      fakeContainer.redis = originalRedis;
+    }
+  });
 });

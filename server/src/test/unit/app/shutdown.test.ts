@@ -16,7 +16,7 @@ type ExitSpy = MockInstance<typeof process.exit>;
 
 const SIGNALS: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGBREAK"];
 
-function setup() {
+function setup({ withRedis = true }: { withRedis?: boolean } = {}) {
   const calls: string[] = [];
 
   const record =
@@ -49,7 +49,9 @@ function setup() {
     twitch: { stop: twitchStop },
     discord: { stop: discordStop },
     firestore: { terminate: firestoreTerminate },
-    redis: { quit: redisQuit },
+    // Undefined when REDIS_URL isn't configured at all (see
+    // createRedisClient()) - there's no client, and so nothing to quit.
+    redis: withRedis ? { quit: redisQuit } : undefined,
   } as unknown as Container;
 
   const broadcaster = { stop: vi.fn(record("broadcaster")) };
@@ -151,6 +153,31 @@ describe("registerShutdownHooks", () => {
       "firestore",
       "redis",
     ]);
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it("tears down cleanly without a redis.quit() step when Redis wasn't configured", async () => {
+    vi.spyOn(logger, "info").mockReturnValue();
+    vi.spyOn(logger, "flush").mockImplementation((callback?: () => void) =>
+      callback?.(),
+    );
+
+    const exit = stubExit();
+
+    const { calls, redisQuit } = setup({ withRedis: false });
+
+    await emitSignal(exit);
+
+    expect(calls).toEqual([
+      "broadcaster",
+      "scheduler",
+      "runtime",
+      "sockets",
+      "discord",
+      "twitch",
+      "firestore",
+    ]);
+    expect(redisQuit).not.toHaveBeenCalled();
     expect(exit).toHaveBeenCalledWith(0);
   });
 

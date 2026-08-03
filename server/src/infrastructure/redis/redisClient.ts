@@ -11,8 +11,22 @@ import { logger } from "../../shared/logger/logger.js";
  * automatically by default; the error listener below is required so a
  * connection blip logs instead of crashing the process via Node's default
  * unhandled-'error'-event behavior.
+ *
+ * Returns undefined when REDIS_URL isn't configured - every caller already
+ * treats `redis` as optional and falls back to an in-process equivalent
+ * (see configureMiddleware.ts/http/middleware/auth.ts), so this just lets a
+ * contributor run the backend without standing up Redis at all.
  */
-export function createRedisClient(): Redis {
+export function createRedisClient(): Redis | undefined {
+  if (!env.redisUrl) {
+    logger.info(
+      "REDIS_URL not set; rate limiting, EventSub replay dedup, and the " +
+        "distributed token-refresh lock will run in-process only",
+    );
+
+    return undefined;
+  }
+
   const client = new Redis(env.redisUrl, {
     // Fail a command quickly rather than queuing it indefinitely while
     // disconnected, so callers (rate limiter, replay store) can fail open

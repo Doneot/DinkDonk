@@ -11,7 +11,6 @@ const REQUIRED_FIREBASE_KEYS = [
 function baseEnv(overrides: Record<string, string | undefined> = {}) {
   return {
     SERVER_URL: "http://localhost:3000",
-    REDIS_URL: "redis://localhost:6379",
     SESSION_SECRET: "session-secret-16-bytes-long!!!!",
     ENCRYPTION_KEY: "encryption-key-32-bytes-long!!!!",
     DISCORD_CLIENT_ID: "discord-client-id",
@@ -165,6 +164,30 @@ describe("EnvSchema", () => {
   it("rejects an invalid CLIENT_ORIGIN instead of silently accepting a value CORS/socket.io can never match against a real Origin header", () => {
     expect(
       messagesFor(baseEnv({ CLIENT_ORIGIN: "not-a-url" })),
+    ).not.toHaveLength(0);
+  });
+
+  // Every Redis-backed feature (rate limiting, EventSub replay dedup, the
+  // distributed token-refresh lock) already falls back to an in-process
+  // equivalent when redis is undefined - see createRedisClient() - so a
+  // contributor can run the backend directly without standing up Redis.
+  it("leaves REDIS_URL undefined when unset", () => {
+    const parsed = EnvSchema.parse(baseEnv());
+
+    expect(parsed.REDIS_URL).toBeUndefined();
+  });
+
+  it("accepts a valid REDIS_URL", () => {
+    const parsed = EnvSchema.parse(
+      baseEnv({ REDIS_URL: "redis://localhost:6379" }),
+    );
+
+    expect(parsed.REDIS_URL).toBe("redis://localhost:6379");
+  });
+
+  it("rejects an invalid REDIS_URL", () => {
+    expect(
+      messagesFor(baseEnv({ REDIS_URL: "not-a-url" })),
     ).not.toHaveLength(0);
   });
 

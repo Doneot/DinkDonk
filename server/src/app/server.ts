@@ -31,11 +31,19 @@ export function createServer(container: Container): Server {
   // socket.io's own requests and corrupting their responses.
   let disconnectUser = (_userId: string): void => {};
 
+  // Destructured out of the spread below rather than left in: container.redis
+  // is `Redis | undefined` (undefined when REDIS_URL isn't configured - see
+  // createRedisClient()), but createApp's `redis?: Redis` can't accept an
+  // explicit `undefined` under exactOptionalPropertyTypes - it must be
+  // omitted entirely, not present-and-undefined.
+  const { redis, ...containerRest } = container;
+
   const app = createApp({
-    ...container,
+    ...containerRest,
     sessionMiddleware,
     twitch: container.twitch.client,
     disconnectUser: (userId) => disconnectUser(userId),
+    ...(redis ? { redis } : {}),
   });
 
   httpServer.on("request", app);

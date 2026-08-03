@@ -117,6 +117,8 @@ The frontend env should only contain public `VITE_*` values.
 
 ## Start backend
 
+Recommended: Docker Compose, matching production's topology and giving you Redis plus the Prometheus/Grafana monitoring stack for free.
+
 First launch or after dependency changes:
 
 ```bash
@@ -130,6 +132,17 @@ docker compose -f deploy/compose.dev.yml up
 ```
 
 The backend uses bind mounts and nodemon for hot reload.
+
+### Without Docker
+
+Docker isn't required. `REDIS_URL` is optional - every Redis-backed feature (rate limiting, EventSub replay dedup, the distributed token-refresh lock) falls back to an in-process equivalent when it's unset, so you can run the backend directly:
+
+```bash
+cd server
+npm run dev
+```
+
+Leave `REDIS_URL` out of `server/.env.development` entirely to run this way. This is fine for solo development; it just means rate limiting/replay dedup reset on every restart and don't apply across multiple instances - exactly the tradeoff production avoids by setting `REDIS_URL`. If you want real Redis without the rest of the Compose stack, run `docker run -p 6379:6379 redis:7-alpine` (or a local Redis install) and set `REDIS_URL=redis://localhost:6379`.
 
 ## Start frontend
 

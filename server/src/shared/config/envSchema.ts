@@ -25,8 +25,15 @@ const BaseEnvSchema = z.object({
   // correctly across a restart and across multiple backend instances - see
   // infrastructure/redis/redisClient.ts. Confined to the private,
   // internal-only Docker network in every compose file, so (like Prometheus
-  // in the same network) it isn't password-protected.
-  REDIS_URL: z.url().min(1),
+  // in the same network) it isn't password-protected. Optional: every
+  // Redis-backed feature (rate limiting, replay dedup, the distributed
+  // token-refresh lock) is already built to fall back to an in-process
+  // equivalent when redis is undefined - see configureMiddleware.ts and
+  // http/middleware/auth.ts - so a contributor can run the backend directly
+  // with `npm run dev` without standing up Redis at all. compose.prod.yml
+  // and compose.staging.yml both always set this directly, so production
+  // deployments are unaffected.
+  REDIS_URL: z.url().optional(),
 
   // Feeds both Express's CORS middleware and Socket.IO's CORS config (see
   // configureMiddleware.ts/socketServer.ts), compared directly against the

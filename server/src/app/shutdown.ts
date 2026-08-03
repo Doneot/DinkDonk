@@ -148,8 +148,10 @@ export function registerShutdownHooks(
         track(firestore.terminate(), "firestore.terminate"),
 
         // quit() sends a graceful QUIT and waits for pending replies, unlike
-        // disconnect() which drops the connection immediately.
-        track(redis.quit(), "redis.quit"),
+        // disconnect() which drops the connection immediately. redis is
+        // undefined when REDIS_URL isn't configured (see
+        // createRedisClient()) - nothing to quit in that case.
+        ...(redis ? [track(redis.quit(), "redis.quit")] : []),
       ]);
 
       logger.info("Shutdown complete");

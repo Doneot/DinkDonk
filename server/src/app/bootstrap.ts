@@ -110,7 +110,10 @@ export async function bootstrap() {
   // the HTTP API and EventSub webhook consumer along with it. ioredis keeps
   // retrying the connection in the background per its default reconnect
   // strategy, so this just logs rather than gating startup on it.
-  container.redis.connect().catch((error: unknown) => {
+  // Undefined when REDIS_URL isn't configured at all (see
+  // createRedisClient()) - nothing to connect in that case, same degraded-
+  // but-functional mode as a genuine connection failure below.
+  container.redis?.connect().catch((error: unknown) => {
     logger.error(
       { error },
       "Redis failed to connect at startup; rate limiting and EventSub replay dedup will run degraded until it reconnects",

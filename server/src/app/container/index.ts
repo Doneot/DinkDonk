@@ -17,7 +17,7 @@ import type { Runtime } from "../runtime/Runtime.js";
 
 export interface Container {
   firestore: FirebaseFirestore.Firestore;
-  redis: Redis;
+  redis: Redis | undefined;
   twitch: TwitchProvider;
   discord: DiscordBot;
 
