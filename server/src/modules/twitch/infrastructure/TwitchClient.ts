@@ -62,18 +62,6 @@ export class TwitchApiError extends Error {
   }
 }
 
-type TwitchStream = {
-  id: string;
-
-  user_id: string;
-
-  user_name: string;
-
-  title: string;
-
-  viewer_count: number;
-};
-
 export class TwitchClient
   implements TwitchStreamerProvider, TwitchSubscriptionProvider
 {
@@ -209,11 +197,23 @@ export class TwitchClient
           throw new TwitchApiError(err.message, endpoint, method, status);
         }
 
+        // Twitch's Helix API doesn't send a standard Retry-After header on a
+        // 429 - it signals when the rate-limit bucket refills via
+        // Ratelimit-Reset, a Unix epoch-seconds timestamp (see
+        // https://dev.twitch.tv/docs/api/guide/#rate-limits). Checking
+        // Retry-After too, for any other retryable (5xx/network) failure
+        // that might set it, before falling back to the fixed per-attempt
+        // delay.
+        const rateLimitResetEpochSeconds = Number(
+          err.response?.headers?.["ratelimit-reset"],
+        );
         const retryAfterSeconds = Number(err.response?.headers?.["retry-after"]);
 
-        const delayMs = Number.isFinite(retryAfterSeconds)
-          ? retryAfterSeconds * 1000
-          : 500 * attempt;
+        const delayMs = Number.isFinite(rateLimitResetEpochSeconds)
+          ? Math.max(0, rateLimitResetEpochSeconds * 1000 - Date.now())
+          : Number.isFinite(retryAfterSeconds)
+            ? retryAfterSeconds * 1000
+            : 500 * attempt;
 
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
@@ -326,18 +326,6 @@ export class TwitchClient
     );
 
     return data.map(mapTwitchStreamer);
-  }
-
-  getStream(streamerId: string): Promise<TwitchStream[]> {
-    return this.request<TwitchStream>("streams", {
-      params: {
-        user_id: streamerId,
-      },
-
-      headers: {
-        "Cache-Control": "no-cache",
-      },
-    });
   }
 
   getEventSubSubscriptions(): Promise<TwitchEventSubSubscription[]> {

@@ -156,6 +156,18 @@ export function createSocketServer(
       }
     }
 
+    // The client can disconnect while the identity resolution above was in
+    // flight (a very real scenario - flaky reconnect churn is exactly what
+    // MAX_SOCKETS_PER_USER's oldest-out eviction anticipates). socket.io
+    // fires its one-shot 'disconnect' event immediately when that happens,
+    // before this async handler resumes - registering the socket anyway
+    // would attach a 'disconnect' listener that can now never fire, leaking
+    // a dead entry into clientsByUserId forever and letting it count toward
+    // (and evict a real connection from) the per-user cap.
+    if (!socket.connected) {
+      return;
+    }
+
     registerSocket(socket, userId);
   }
 

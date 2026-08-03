@@ -37,6 +37,8 @@ export const env = {
 
   eventSubGarbageCollectionIntervalMs: parsedEnv.EVENTSUB_GC_INTERVAL_MS,
 
+  sessionGarbageCollectionIntervalMs: parsedEnv.SESSION_GC_INTERVAL_MS,
+
   twitch: {
     clientId: parsedEnv.TWITCH_CLIENT_ID,
     clientSecret: parsedEnv.TWITCH_CLIENT_SECRET,

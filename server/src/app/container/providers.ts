@@ -34,9 +34,6 @@ export function createProviders(repositories: Repositories, runtime: Runtime) {
     commandDirectory: path.join(__dirname, "../../commands"),
 
     context,
-
-    onDmCapabilityChanged: (userId, canReceiveDM) =>
-      repositories.users.updateUser(userId, { canReceiveDM }),
   });
 
   return {

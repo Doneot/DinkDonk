@@ -62,11 +62,20 @@ vi.mock("../../../app/configureEventSubscriptions.js", () => ({
 const schedulerStart = vi.fn();
 const schedulerStop = vi.fn();
 
-vi.mock("../../../app/SubscriptionCleanupScheduler.js", () => ({
-  SubscriptionCleanupScheduler: vi.fn().mockImplementation(function () {
+vi.mock("../../../app/IntervalScheduler.js", () => ({
+  IntervalScheduler: vi.fn().mockImplementation(function () {
     return { start: schedulerStart, stop: schedulerStop };
   }),
 }));
+
+vi.mock(
+  "../../../modules/auth/infrastructure/firestore/FirestoreSessionRepository.js",
+  () => ({
+    FirestoreSessionRepository: vi.fn().mockImplementation(function () {
+      return { purgeExpiredSessions: vi.fn().mockResolvedValue(0) };
+    }),
+  }),
+);
 
 const shutdown = vi.fn().mockResolvedValue(undefined);
 
@@ -87,11 +96,13 @@ afterEach(() => {
 });
 
 describe("bootstrap", () => {
-  it("starts listening and the cleanup scheduler once Twitch and Discord are both up", async () => {
+  it("starts listening and both cleanup schedulers once Twitch and Discord are both up", async () => {
     await bootstrap();
 
     expect(httpServerListen).toHaveBeenCalledOnce();
-    expect(schedulerStart).toHaveBeenCalledOnce();
+    // Subscription garbage collection and expired-session cleanup are each
+    // their own IntervalScheduler instance - see bootstrap.ts.
+    expect(schedulerStart).toHaveBeenCalledTimes(2);
     expect(shutdown).not.toHaveBeenCalled();
   });
 
@@ -131,5 +142,25 @@ describe("bootstrap", () => {
     await bootstrap();
 
     expect(broadcasterStart).toHaveBeenCalledOnce();
+  });
+
+  it("keeps serving traffic when Redis fails to connect at startup, since rate limiting and replay dedup fail open without it", async () => {
+    const error = vi.spyOn(logger, "error").mockReturnValue();
+
+    redisConnect.mockRejectedValue(new Error("redis unreachable"));
+
+    await bootstrap();
+
+    expect(shutdown).not.toHaveBeenCalled();
+    expect(httpServerListen).toHaveBeenCalledOnce();
+    expect(schedulerStart).toHaveBeenCalledTimes(2);
+
+    // The rejection is still surfaced, just not treated as fatal.
+    await vi.waitFor(() => {
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({ error: expect.any(Error) as Error }),
+        "Redis failed to connect at startup; rate limiting and EventSub replay dedup will run degraded until it reconnects",
+      );
+    });
   });
 });

@@ -169,6 +169,28 @@ describe("POST /api/notifications/web-push/subscriptions", () => {
       message: "That push subscription isn't valid.",
     });
   });
+
+  it("returns 409 when the repository rejects at the subscription limit", async () => {
+    const { ctx, client } = await createClient();
+
+    vi.spyOn(
+      ctx.repositories.pushSubscriptions,
+      "savePushSubscription",
+    ).mockResolvedValue({
+      success: false,
+      reason: "push_subscription_limit_reached",
+    });
+
+    const response = await client
+      .post("/api/notifications/web-push/subscriptions")
+      .send({ subscription: SUBSCRIPTION })
+      .expect(409);
+
+    expect(response.body).toEqual({
+      error: "conflict",
+      message: "You've reached the maximum number of push subscriptions.",
+    });
+  });
 });
 
 describe("DELETE /api/notifications/web-push/subscriptions", () => {

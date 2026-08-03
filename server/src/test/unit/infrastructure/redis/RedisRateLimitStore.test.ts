@@ -16,6 +16,53 @@ function fakeRedis() {
   };
 }
 
+/**
+ * A minimal in-process stand-in for Redis's actual key/TTL semantics,
+ * driving `eval()` calls through equivalent JS logic keyed off which script
+ * was sent (rather than a real Lua interpreter). Used so the decrement
+ * leaked-key regression test below exercises the store's real DEL/PEXPIRE
+ * decision-making end to end, instead of just asserting on the raw script
+ * text like the other tests in this file.
+ */
+const fakeLuaState = new Map<string, { value: number; expiresAt: number | null }>();
+
+function fakeLuaRedis() {
+  fakeLuaState.clear();
+
+  return {
+    eval: vi.fn(
+      (script: string, _numKeys: number, key: string, windowMs: number) => {
+        const entry = fakeLuaState.get(key);
+
+        if (script.includes("DECR")) {
+          const value = (entry?.value ?? 0) - 1;
+
+          if (value <= 0) {
+            fakeLuaState.delete(key);
+          } else if (!entry?.expiresAt) {
+            fakeLuaState.set(key, { value, expiresAt: Date.now() + windowMs });
+          } else {
+            fakeLuaState.set(key, { value, expiresAt: entry.expiresAt });
+          }
+
+          return Promise.resolve(null);
+        }
+
+        const value = (entry?.value ?? 0) + 1;
+        const expiresAt =
+          value === 1 ? Date.now() + windowMs : (entry?.expiresAt ?? null);
+
+        fakeLuaState.set(key, { value, expiresAt });
+
+        return Promise.resolve([
+          value,
+          expiresAt ? expiresAt - Date.now() : -1,
+        ]);
+      },
+    ),
+  } as unknown as Redis & { eval: ReturnType<typeof vi.fn> };
+}
+
 describe("RedisRateLimitStore", () => {
   describe("increment", () => {
     it("runs the atomic increment script against the prefixed key with the configured window", async () => {
@@ -95,14 +142,40 @@ describe("RedisRateLimitStore", () => {
   });
 
   describe("decrement", () => {
-    it("decrements the prefixed key", async () => {
+    it("runs the atomic decrement script against the prefixed key with the configured window", async () => {
       const redis = fakeRedis();
 
       const store = new RedisRateLimitStore(redis, { prefix: "rl:api:" });
 
+      store.init({ windowMs: 900_000 } as RateLimitOptions);
+
       await store.decrement("1.2.3.4");
 
-      expect(redis.decr).toHaveBeenCalledWith("rl:api:1.2.3.4");
+      expect(redis.eval).toHaveBeenCalledWith(
+        expect.stringContaining("DECR"),
+        1,
+        "rl:api:1.2.3.4",
+        900_000,
+      );
+    });
+
+    it("deletes the key once its count would leave it without a TTL, rather than DECR alone leaking a key that never expires", async () => {
+      // A bare DECR on a key that has already expired (or never existed)
+      // creates it fresh at -1 with no TTL at all - only increment()'s own
+      // script ever attaches one, and only on that key's first hit. This
+      // exercises the real Lua script end to end against an in-process
+      // Redis-like key store rather than asserting on the script text, so a
+      // regression in the script's actual DEL/PEXPIRE behavior would be
+      // caught, not just a change to how it's invoked.
+      const store = new RedisRateLimitStore(fakeLuaRedis(), {
+        prefix: "rl:api:",
+      });
+
+      store.init({ windowMs: 900_000 } as RateLimitOptions);
+
+      await store.decrement("1.2.3.4");
+
+      expect(fakeLuaState.has("rl:api:1.2.3.4")).toBe(false);
     });
   });
 

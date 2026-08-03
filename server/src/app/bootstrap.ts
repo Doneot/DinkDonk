@@ -3,8 +3,9 @@ import { createContainer } from "./container/index.js";
 import { createServer } from "./server.js";
 import { UserChangeBroadcaster } from "../modules/users/application/UserChangeBroadcaster.js";
 import { configureEventSubscriptions } from "./configureEventSubscriptions.js";
-import { SubscriptionCleanupScheduler } from "./SubscriptionCleanupScheduler.js";
+import { IntervalScheduler } from "./IntervalScheduler.js";
 import { registerShutdownHooks } from "./shutdown.js";
+import { FirestoreSessionRepository } from "../modules/auth/infrastructure/firestore/FirestoreSessionRepository.js";
 
 import { env } from "../shared/config/env.js";
 import { logger } from "../shared/logger/logger.js";
@@ -16,11 +17,33 @@ export async function bootstrap() {
 
   const server = createServer(container);
 
-  const cleanupScheduler = new SubscriptionCleanupScheduler({
+  const cleanupScheduler = new IntervalScheduler({
     intervalMs: env.eventSubGarbageCollectionIntervalMs,
 
-    garbageCollectSubscriptions: () =>
+    taskName: "subscription garbage collection",
+
+    run: () =>
       container.services.subscriptionCleanup.garbageCollectSubscriptions(),
+  });
+
+  // Own repository instance rather than threading the one createSessionMiddleware
+  // constructs internally (see http/configureMiddleware.ts) through server.ts -
+  // the class is stateless aside from a Firestore collection reference, so a
+  // second instance pointed at the same collection is safe.
+  const sessionCleanupScheduler = new IntervalScheduler({
+    intervalMs: env.sessionGarbageCollectionIntervalMs,
+
+    taskName: "expired session cleanup",
+
+    run: async () => {
+      const deleted = await new FirestoreSessionRepository(
+        container.firestore,
+      ).purgeExpiredSessions();
+
+      if (deleted > 0) {
+        logger.info({ deleted }, "Purged expired session documents");
+      }
+    },
   });
 
   const userChangeBroadcaster = new UserChangeBroadcaster(
@@ -44,19 +67,17 @@ export async function bootstrap() {
     container,
     server,
     userChangeBroadcaster,
-    cleanupScheduler,
+    [cleanupScheduler, sessionCleanupScheduler],
   );
 
-  const [twitchStart, discordStart, redisStart] = await Promise.allSettled([
+  const [twitchStart, discordStart] = await Promise.allSettled([
     container.twitch.start(),
     container.discord.start(),
-    container.redis.connect(),
   ]);
 
   for (const [name, result] of [
     ["Twitch", twitchStart],
     ["Discord", discordStart],
-    ["Redis", redisStart],
   ] as const) {
     if (result.status === "rejected") {
       const error = new Error(`Failed to start ${name} client`, {
@@ -79,6 +100,23 @@ export async function bootstrap() {
     }
   }
 
+  // Redis only backs the rate limiter and the EventSub replay store, both of
+  // which are deliberately built to fail open on a Redis error (see
+  // RedisReplayStore.rememberIfNew and RedisRateLimitStore's
+  // passOnStoreError) so a transient outage degrades those features rather
+  // than the whole app. Treating a connection failure here as equally fatal
+  // as Twitch/Discord failing to start would be a strictly worse failure
+  // mode than that: a Redis blip during a routine restart would take down
+  // the HTTP API and EventSub webhook consumer along with it. ioredis keeps
+  // retrying the connection in the background per its default reconnect
+  // strategy, so this just logs rather than gating startup on it.
+  container.redis.connect().catch((error: unknown) => {
+    logger.error(
+      { error },
+      "Redis failed to connect at startup; rate limiting and EventSub replay dedup will run degraded until it reconnects",
+    );
+  });
+
   // Node's default behavior for an unhandled 'error' event on a stream is to
   // throw, crashing the process with a raw stack trace that bypasses both
   // structured logging and the graceful shutdown() path - leaking the
@@ -98,4 +136,6 @@ export async function bootstrap() {
   });
 
   cleanupScheduler.start();
+
+  sessionCleanupScheduler.start();
 }

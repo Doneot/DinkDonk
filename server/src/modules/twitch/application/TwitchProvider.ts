@@ -103,9 +103,14 @@ export class TwitchProvider extends EventEmitter {
     );
 
     await Promise.all(
-      matchingSubscriptions.map((subscription) => {
+      matchingSubscriptions.map(async (subscription) => {
+        await this.client.unsubscribeFromEvent(subscription.id);
+
+        // Only counted once the delete actually succeeded - matching
+        // SubscriptionCleanupService.collectStreamer/EventSubSyncService's
+        // same rule, so this counter can't be inflated by a failed delete
+        // (e.g. a Twitch API error mid-shutdown).
         eventSubSubscriptionsDeletedTotal.inc();
-        return this.client.unsubscribeFromEvent(subscription.id);
       }),
     );
 

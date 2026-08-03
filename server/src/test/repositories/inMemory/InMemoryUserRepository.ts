@@ -12,6 +12,7 @@ import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
 import { SubscriptionSchema } from "../../../modules/users/schemas/SubscriptionSchema.js";
+import { UserUpdateSchema } from "../../../modules/users/infrastructure/firestore/records/UserRecord.js";
 
 import { isNonEmptyString } from "../../../shared/utils/validators.js";
 import { InMemorySubscriberStore } from "./InMemorySubscriberStore.js";
@@ -50,12 +51,20 @@ export class InMemoryUserRepository implements UserRepository {
       return Promise.reject(new Error("Invalid user id"));
     }
 
+    let validated: UserUpdate;
+
+    try {
+      validated = UserUpdateSchema.parse(data) as UserUpdate;
+    } catch (error) {
+      return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+    }
+
     const existing = this.users.get(userId);
     const isModification = existing !== undefined;
 
     const updated: User = {
       ...(existing ?? { id: userId, subscriptions: [], canReceiveDM: false }),
-      ...data,
+      ...validated,
     };
 
     this.users.set(userId, updated);
@@ -224,10 +233,18 @@ export class InMemoryUserRepository implements UserRepository {
       });
     }
 
+    // Defense-in-depth alongside the Partial<Omit<Subscription, "id">> patch
+    // type, matching FirestoreUserRepository.updateSubscription: even if a
+    // caller's `data` were cast/widened to smuggle an `id` through, it's
+    // stripped here so it can't override the entry being updated and
+    // desync it from the `subscribers` store below (which stays keyed by
+    // the original id).
+    const { id: _ignoredId, ...patch } = data as Partial<Subscription>;
+
     let updated: Subscription;
 
     try {
-      updated = SubscriptionSchema.parse({ ...existing, ...data });
+      updated = SubscriptionSchema.parse({ ...existing, ...patch });
     } catch (error) {
       return Promise.reject(error instanceof Error ? error : new Error(String(error)));
     }

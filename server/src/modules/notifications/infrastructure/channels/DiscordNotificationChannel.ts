@@ -5,15 +5,20 @@ import type {
   NotificationResult,
 } from "../../domain/Notification.js";
 import type { UserRepository } from "../../../users/ports/UserRepository.js";
+import type { IdentityRepository } from "../../../auth/ports/IdentityRepository.js";
 
 type DiscordMessenger = {
   notifyUser(userId: string, message: string): Promise<void>;
+
+  invalidateDmCapabilityCache(userId: string): void;
 };
 
 type DiscordNotificationChannelOptions = {
   discord: DiscordMessenger;
 
   userRepository: UserRepository;
+
+  identityRepository: IdentityRepository;
 };
 
 // Discord error codes that mean this user can never be DM'd again until they
@@ -34,10 +39,18 @@ export class DiscordNotificationChannel {
 
   private readonly userRepository: UserRepository;
 
-  constructor({ discord, userRepository }: DiscordNotificationChannelOptions) {
+  private readonly identityRepository: IdentityRepository;
+
+  constructor({
+    discord,
+    userRepository,
+    identityRepository,
+  }: DiscordNotificationChannelOptions) {
     this.discord = discord;
 
     this.userRepository = userRepository;
+
+    this.identityRepository = identityRepository;
   }
 
   async send(
@@ -54,9 +67,31 @@ export class DiscordNotificationChannel {
       };
     }
 
+    // user.id is this app's own canonical uid, NOT necessarily the Discord
+    // snowflake notifyUser() needs - the two only coincide for Discord-
+    // primary signups (see FirestoreIdentityRepository#upsertDiscordIdentity
+    // vs. the Google/Twitch upserts, which mint a random uid). Every other
+    // Discord-DM call site in this codebase already resolves through
+    // identity.discord.id (see authRoutes.ts, apiRoutes.ts,
+    // commands/shared/commandReplies.ts's resolveUid) - this one previously
+    // didn't, silently breaking DM delivery for any account that linked
+    // Discord as a secondary provider.
+    const identity = await this.identityRepository.getIdentity(user.id);
+    const discordId = identity?.discord?.id;
+
+    if (!discordId) {
+      return {
+        sent: false,
+
+        skipped: true,
+
+        reason: "dm_disabled",
+      };
+    }
+
     try {
       await this.discord.notifyUser(
-        user.id,
+        discordId,
 
         `${notification.body}\n${notification.url}`,
       );
@@ -72,6 +107,12 @@ export class DiscordNotificationChannel {
       };
 
       if (err.code !== undefined && PERMANENT_DM_FAILURE_CODES.has(err.code)) {
+        // Evicts any still-fresh cached `true` from an earlier probe -
+        // otherwise a routine POST /can-receive-dm or OAuth callback within
+        // that cache's TTL would silently overwrite the `false` below back
+        // to `true`, since canSendDirectMessage() never touches this write.
+        this.discord.invalidateDmCapabilityCache(discordId);
+
         await this.userRepository.updateUser(user.id, {
           canReceiveDM: false,
         });

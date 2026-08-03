@@ -172,16 +172,6 @@ describe("TwitchClient", () => {
       });
     });
 
-    it("merges caller-supplied headers", async () => {
-      const { client, request } = createClient();
-
-      await client.getStream("streamer-1");
-
-      expect(request.mock.calls[0]?.[0]?.headers).toMatchObject({
-        "Cache-Control": "no-cache",
-      });
-    });
-
     it.each(["ENOTFOUND", "ECONNRESET", "ECONNREFUSED"])(
       "retries after a %s failure and returns the eventual data",
       async (code) => {
@@ -274,6 +264,37 @@ describe("TwitchClient", () => {
       expect(request).toHaveBeenCalledTimes(1);
 
       await vi.advanceTimersByTimeAsync(1_000);
+
+      await expect(pending).resolves.toEqual([{ id: "streamer-1" }]);
+      expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries a 429 after the delay given in the Ratelimit-Reset header, preferring it over Retry-After", async () => {
+      vi.useFakeTimers();
+
+      const { client, request } = createClient();
+
+      // Twitch's actual rate-limit signal, a Unix epoch-seconds reset time -
+      // unlike the standard Retry-After header, which Twitch doesn't send.
+      const resetEpochSeconds = Math.floor((Date.now() + 3_000) / 1000);
+      const rateLimited = httpError(429, {
+        "ratelimit-reset": String(resetEpochSeconds),
+        // Present too, to prove Ratelimit-Reset wins when both are set.
+        "retry-after": "1",
+      });
+
+      request
+        .mockRejectedValueOnce(rateLimited)
+        .mockResolvedValue({ data: { data: [{ id: "streamer-1" }] } });
+
+      const pending = client.getEventSubSubscriptions();
+
+      // Not yet elapsed if Ratelimit-Reset (~3s) is being honored rather
+      // than Retry-After (1s).
+      await vi.advanceTimersByTimeAsync(1_500);
+      expect(request).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(2_000);
 
       await expect(pending).resolves.toEqual([{ id: "streamer-1" }]);
       expect(request).toHaveBeenCalledTimes(2);
@@ -475,19 +496,6 @@ describe("TwitchClient", () => {
 
       expect(config?.method).toBe("DELETE");
       expect(config?.params).toEqual({ id: "sub-1" });
-    });
-  });
-
-  describe("getStream", () => {
-    it("queries live streams for a broadcaster", async () => {
-      const { client, request } = createClient();
-
-      await client.getStream("streamer-1");
-
-      const config = request.mock.calls[0]?.[0];
-
-      expect(config?.url).toBe("https://api.twitch.tv/helix/streams");
-      expect(config?.params).toEqual({ user_id: "streamer-1" });
     });
   });
 

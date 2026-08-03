@@ -43,6 +43,90 @@ export class InMemoryIdentityRepository implements IdentityRepository {
     return this.getIdentity(uid);
   }
 
+  // Mirrors FirestoreIdentityRepository#upsertIdentity: computed once so
+  // "which email wins" and "was this sign-in's email actually verified" stay
+  // consistent between the merge below and reassignStaleEmailLink - an
+  // unverified email must never demote an already-verified one, nor claim
+  // someone else's identityLinks/email:* slot. emailLinkAvailableToThisUid
+  // additionally guards a repeat sign-in (an existing direct provider link)
+  // whose provider reports a verified email a genuinely DIFFERENT account
+  // already owns - without it, this account's own stored email would get
+  // silently overwritten to a value it has no actual identityLinks claim on
+  // (that index itself is never touched here regardless, so this is a
+  // display-consistency guard, not a security one).
+  private mergeEmail(
+    existing: Identity | undefined,
+    email: string | null,
+    emailVerified: boolean,
+    emailLinkAvailableToThisUid: boolean,
+  ): { email: string | null; emailVerified: boolean } {
+    const emailIsClaimable = emailVerified === true && emailLinkAvailableToThisUid;
+
+    return emailIsClaimable
+      ? { email: email ?? existing?.email ?? null, emailVerified: true }
+      : {
+          email: existing?.email ?? email ?? null,
+          emailVerified: existing?.emailVerified ?? false,
+        };
+  }
+
+  // Only differs from "is emailLinkKey unclaimed" in the repeat-sign-in
+  // case: a brand-new account has no conflict to check, and the by-email
+  // auto-link case resolves uid FROM this same key, so it's trivially its
+  // own owner there too.
+  private isEmailLinkAvailableToUid(
+    emailLinkKey: string | undefined,
+    uid: string,
+  ): boolean {
+    const owner = emailLinkKey ? this.links.get(emailLinkKey) : undefined;
+
+    return owner === undefined || owner === uid;
+  }
+
+  // Mirrors FirestoreIdentityRepository#upsertIdentity's staleEmailLinkRef
+  // handling: on a repeat sign-in (an existing direct provider link, as
+  // opposed to a brand-new account) whose newly-verified email differs from
+  // what's already stored, the OLD identityLinks/email:{oldEmail} entry -
+  // if it still points to this uid - must stop pointing here. Left alone,
+  // it becomes a permanent, stale claim on an email this account no longer
+  // owns: a future sign-in via ANY provider reporting that same email as
+  // verified again (plausible once the mailbox is recycled/reassigned)
+  // would resolve straight onto this account, a silent account takeover.
+  private reassignStaleEmailLink(
+    uid: string,
+    isRepeatSignIn: boolean,
+    existing: Identity | undefined,
+    emailIsVerified: boolean,
+    newEmail: string | null,
+  ): void {
+    const staleKey = existing?.email
+      ? `email:${existing.email.toLowerCase()}`
+      : null;
+    const newKey = newEmail ? `email:${newEmail.toLowerCase()}` : null;
+
+    if (
+      !isRepeatSignIn ||
+      !emailIsVerified ||
+      !staleKey ||
+      // Compares the normalized (lowercased) keys, not the raw email
+      // strings - the old and new email can differ only by letter-casing
+      // (e.g. "Old@Example.com" then "old@example.com" for the same
+      // address) while resolving to the SAME identityLinks key. A raw
+      // comparison would treat that as a real change and delete this
+      // account's own, still-valid email claim (only surviving today
+      // because the caller happens to unconditionally re-insert any missing
+      // emailLinkKey right after this runs - not something this method
+      // should depend on).
+      staleKey === newKey
+    ) {
+      return;
+    }
+
+    if (this.links.get(staleKey) === uid) {
+      this.links.delete(staleKey);
+    }
+  }
+
   upsertDiscordIdentity(
     profile: DiscordCredential,
     email: string | null,
@@ -51,6 +135,7 @@ export class InMemoryIdentityRepository implements IdentityRepository {
     const discordLinkKey = `discord:${profile.id}`;
     const emailLinkKey =
       email && emailVerified ? `email:${email.toLowerCase()}` : undefined;
+    const isRepeatSignIn = this.links.has(discordLinkKey);
 
     // Same three-case priority as FirestoreIdentityRepository: an existing
     // direct link, then a same-verified-email account to link onto, then a
@@ -62,13 +147,22 @@ export class InMemoryIdentityRepository implements IdentityRepository {
       profile.id;
 
     const existing = this.identities.get(uid);
+    const emailLinkAvailableToThisUid = this.isEmailLinkAvailableToUid(
+      emailLinkKey,
+      uid,
+    );
+    const emailMerge = this.mergeEmail(
+      existing,
+      email,
+      emailVerified,
+      emailLinkAvailableToThisUid,
+    );
 
     // Mirrors FirestoreIdentityRepository: validates the FULL merged record,
     // not just the new Discord credential, and preserves any other
     // previously-linked provider already on this uid.
     const merged = IdentityRecordSchema.parse({
-      email: email ?? existing?.email ?? null,
-      emailVerified: emailVerified || existing?.emailVerified || false,
+      ...emailMerge,
       discord: profile,
       google: existing?.google,
       twitch: existing?.twitch,
@@ -82,6 +176,14 @@ export class InMemoryIdentityRepository implements IdentityRepository {
       ...(merged.google ? { google: merged.google } : {}),
       ...(merged.twitch ? { twitch: merged.twitch } : {}),
     };
+
+    this.reassignStaleEmailLink(
+      uid,
+      isRepeatSignIn,
+      existing,
+      emailVerified === true,
+      merged.email,
+    );
 
     this.identities.set(uid, identity);
     this.links.set(discordLinkKey, uid);
@@ -125,6 +227,19 @@ export class InMemoryIdentityRepository implements IdentityRepository {
       emailVerified: existing.email ? existing.emailVerified : emailVerified,
       discord: profile,
     };
+
+    // Re-linking to a different Discord account than the one already on
+    // file must repoint (not leave behind) the OLD discord:{oldId} link -
+    // mirrors FirestoreIdentityRepository.linkDiscordIdentity's
+    // staleDiscordLinkRef cleanup, so a later plain sign-in via the old
+    // Discord account doesn't silently resolve back onto this uid.
+    if (
+      existing.discord &&
+      existing.discord.id !== profile.id &&
+      this.links.get(`discord:${existing.discord.id}`) === uid
+    ) {
+      this.links.delete(`discord:${existing.discord.id}`);
+    }
 
     this.identities.set(uid, identity);
     this.links.set(discordLinkKey, uid);
@@ -178,6 +293,7 @@ export class InMemoryIdentityRepository implements IdentityRepository {
     const googleLinkKey = `google:${profile.id}`;
     const emailLinkKey =
       email && emailVerified ? `email:${email.toLowerCase()}` : undefined;
+    const isRepeatSignIn = this.links.has(googleLinkKey);
 
     const uid =
       this.links.get(googleLinkKey) ??
@@ -185,10 +301,19 @@ export class InMemoryIdentityRepository implements IdentityRepository {
       randomUUID();
 
     const existing = this.identities.get(uid);
+    const emailLinkAvailableToThisUid = this.isEmailLinkAvailableToUid(
+      emailLinkKey,
+      uid,
+    );
+    const emailMerge = this.mergeEmail(
+      existing,
+      email,
+      emailVerified,
+      emailLinkAvailableToThisUid,
+    );
 
     const merged = IdentityRecordSchema.parse({
-      email: email ?? existing?.email ?? null,
-      emailVerified: emailVerified || existing?.emailVerified || false,
+      ...emailMerge,
       discord: existing?.discord,
       google: profile,
       twitch: existing?.twitch,
@@ -202,6 +327,14 @@ export class InMemoryIdentityRepository implements IdentityRepository {
       ...(merged.discord ? { discord: merged.discord } : {}),
       ...(merged.twitch ? { twitch: merged.twitch } : {}),
     };
+
+    this.reassignStaleEmailLink(
+      uid,
+      isRepeatSignIn,
+      existing,
+      emailVerified === true,
+      merged.email,
+    );
 
     this.identities.set(uid, identity);
     this.links.set(googleLinkKey, uid);
@@ -221,6 +354,7 @@ export class InMemoryIdentityRepository implements IdentityRepository {
     const twitchLinkKey = `twitch:${profile.id}`;
     const emailLinkKey =
       email && emailVerified ? `email:${email.toLowerCase()}` : undefined;
+    const isRepeatSignIn = this.links.has(twitchLinkKey);
 
     const uid =
       this.links.get(twitchLinkKey) ??
@@ -228,10 +362,19 @@ export class InMemoryIdentityRepository implements IdentityRepository {
       randomUUID();
 
     const existing = this.identities.get(uid);
+    const emailLinkAvailableToThisUid = this.isEmailLinkAvailableToUid(
+      emailLinkKey,
+      uid,
+    );
+    const emailMerge = this.mergeEmail(
+      existing,
+      email,
+      emailVerified,
+      emailLinkAvailableToThisUid,
+    );
 
     const merged = IdentityRecordSchema.parse({
-      email: email ?? existing?.email ?? null,
-      emailVerified: emailVerified || existing?.emailVerified || false,
+      ...emailMerge,
       discord: existing?.discord,
       google: existing?.google,
       twitch: profile,
@@ -245,6 +388,14 @@ export class InMemoryIdentityRepository implements IdentityRepository {
       ...(merged.discord ? { discord: merged.discord } : {}),
       ...(merged.google ? { google: merged.google } : {}),
     };
+
+    this.reassignStaleEmailLink(
+      uid,
+      isRepeatSignIn,
+      existing,
+      emailVerified === true,
+      merged.email,
+    );
 
     this.identities.set(uid, identity);
     this.links.set(twitchLinkKey, uid);

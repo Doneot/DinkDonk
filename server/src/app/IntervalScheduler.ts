@@ -1,27 +1,31 @@
 import { logger } from "../shared/logger/logger.js";
 
-type SubscriptionCleanupSchedulerOptions = {
+type IntervalSchedulerOptions = {
   intervalMs: number;
 
-  garbageCollectSubscriptions: () => Promise<void>;
+  /** A short, log-friendly description of what run() does, e.g. "subscription garbage collection". */
+  taskName: string;
+
+  run: () => Promise<void>;
 };
 
-export class SubscriptionCleanupScheduler {
+export class IntervalScheduler {
   private readonly intervalMs: number;
 
-  private readonly garbageCollectSubscriptions: () => Promise<void>;
+  private readonly taskName: string;
+
+  private readonly run: () => Promise<void>;
 
   private timer: NodeJS.Timeout | null = null;
 
   private running = false;
 
-  constructor({
-    intervalMs,
-    garbageCollectSubscriptions,
-  }: SubscriptionCleanupSchedulerOptions) {
+  constructor({ intervalMs, taskName, run }: IntervalSchedulerOptions) {
     this.intervalMs = intervalMs;
 
-    this.garbageCollectSubscriptions = garbageCollectSubscriptions;
+    this.taskName = taskName;
+
+    this.run = run;
   }
 
   start(): void {
@@ -35,7 +39,7 @@ export class SubscriptionCleanupScheduler {
       // takes longer than intervalMs.
       if (this.running) {
         logger.warn(
-          "Subscription garbage collection still running from the previous tick; skipping this one",
+          `${this.taskName} still running from the previous tick; skipping this one`,
         );
 
         return;
@@ -43,13 +47,13 @@ export class SubscriptionCleanupScheduler {
 
       this.running = true;
 
-      this.garbageCollectSubscriptions()
+      this.run()
         .catch((error: unknown) => {
           logger.error(
             {
               error,
             },
-            "Failed to execute subscription garbage collection",
+            `Failed to execute ${this.taskName}`,
           );
         })
         .finally(() => {

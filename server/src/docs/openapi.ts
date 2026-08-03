@@ -11,10 +11,7 @@ import { SubscriptionSchema } from "../modules/users/schemas/SubscriptionSchema.
 import { StreamerSchema } from "../modules/streamers/schemas/StreamerSchema.js";
 import { UserRecordSchema } from "../modules/users/infrastructure/firestore/records/UserRecord.js";
 
-import {
-  deletePushSubscriptionSchema,
-  savePushSubscriptionSchema,
-} from "../http/schemas/notifications.js";
+import { savePushSubscriptionSchema } from "../http/schemas/notifications.js";
 import {
   searchStreamersQuerySchema,
   batchStreamerInfoSchema,
@@ -51,10 +48,6 @@ registry.register("Streamer", StreamerSchema);
 registry.register("User", UserRecordSchema);
 
 registry.register("SavePushSubscriptionRequest", savePushSubscriptionSchema);
-registry.register(
-  "DeletePushSubscriptionRequest",
-  deletePushSubscriptionSchema,
-);
 
 registry.register("SearchStreamerRequest", searchStreamersQuerySchema);
 registry.register("BatchStreamerInfoRequest", batchStreamerInfoSchema);

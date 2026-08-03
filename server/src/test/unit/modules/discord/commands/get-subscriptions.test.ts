@@ -6,11 +6,23 @@ import type { CommandContext } from "../../../../../modules/discord/domain/Comma
 import type { TwitchEventSubSubscription } from "../../../../../modules/twitch/domain/Twitch.js";
 
 function createInteraction() {
-  const reply = vi.fn().mockResolvedValue(undefined);
+  const state = { deferred: false };
+  const deferReply = vi.fn().mockImplementation(() => {
+    state.deferred = true;
+    return Promise.resolve();
+  });
+  const editReply = vi.fn().mockResolvedValue(undefined);
 
   return {
-    reply,
-    interaction: { reply } as unknown as ChatInputCommandInteraction,
+    deferReply,
+    editReply,
+    interaction: {
+      get deferred() {
+        return state.deferred;
+      },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction,
   };
 }
 
@@ -25,30 +37,37 @@ function createContext(
 }
 
 describe("get-subscriptions command", () => {
-  it("replies ephemerally that there are no subscriptions", async () => {
-    const { interaction, reply } = createInteraction();
+  it("defers the reply immediately, before the Twitch call", async () => {
+    const { interaction, deferReply } = createInteraction();
     const context = createContext([]);
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith({
+    expect(deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
+  });
+
+  it("replies ephemerally that there are no subscriptions", async () => {
+    const { interaction, editReply } = createInteraction();
+    const context = createContext([]);
+
+    await execute(interaction, context);
+
+    expect(editReply).toHaveBeenCalledWith({
       content: "No current subscription",
-      flags: MessageFlags.Ephemeral,
     });
   });
 
   it("replies ephemerally with a subscriptions file when subscriptions exist", async () => {
-    const { interaction, reply } = createInteraction();
+    const { interaction, editReply } = createInteraction();
     const context = createContext([
       { id: "sub-1" } as unknown as TwitchEventSubSubscription,
     ]);
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith(
+    expect(editReply).toHaveBeenCalledWith(
       expect.objectContaining({
         content: "**Current subscriptions:**",
-        flags: MessageFlags.Ephemeral,
         files: expect.arrayContaining([expect.anything()]) as unknown[],
       }),
     );
@@ -58,5 +77,11 @@ describe("get-subscriptions command", () => {
     const { data } = await import("../../../../../commands/get-subscriptions.js");
 
     expect(data.toJSON().default_member_permissions).toBe("8");
+  });
+
+  it("restricts the command to guild context, since default_member_permissions alone isn't enforced in a DM", async () => {
+    const { data } = await import("../../../../../commands/get-subscriptions.js");
+
+    expect(data.toJSON().contexts).toEqual([0]);
   });
 });

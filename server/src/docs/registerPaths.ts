@@ -248,6 +248,7 @@ export function registerPaths(registry: OpenAPIRegistry): void {
       // the same AppError-shaped 400, see errorHandler.ts.
       400: validationErrorResponse,
       401: unauthorizedResponse,
+      409: conflictResponse,
     },
   });
 

@@ -1,6 +1,6 @@
 import type { Container } from "./container/index.js";
 import type { Server } from "./server.js";
-import type { SubscriptionCleanupScheduler } from "./SubscriptionCleanupScheduler.js";
+import type { IntervalScheduler } from "./IntervalScheduler.js";
 import type { UserChangeBroadcaster } from "../modules/users/application/UserChangeBroadcaster.js";
 import { env } from "../shared/config/env.js";
 import { logger } from "../shared/logger/logger.js";
@@ -77,7 +77,7 @@ export function registerShutdownHooks(
   { twitch, discord, firestore, redis }: Container,
   { httpServer, sockets }: Server,
   userChangeBroadCaster: UserChangeBroadcaster,
-  cleanScheduler: SubscriptionCleanupScheduler,
+  schedulers: IntervalScheduler[],
 ): ShutdownHandle {
   let shuttingDown = false;
 
@@ -110,7 +110,9 @@ export function registerShutdownHooks(
       // can't bypass the rest of teardown and the process.exit() call.
       userChangeBroadCaster.stop();
 
-      cleanScheduler.stop();
+      for (const scheduler of schedulers) {
+        scheduler.stop();
+      }
 
       await track(runtime.dispose(), "runtime.dispose");
 

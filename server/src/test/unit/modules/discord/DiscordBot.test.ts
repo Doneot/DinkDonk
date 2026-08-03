@@ -1,4 +1,6 @@
 import { EventEmitter } from "node:events";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -52,6 +54,10 @@ class MockSlashCommandBuilder {
   setDefaultMemberPermissions(): this {
     return this;
   }
+
+  setContexts(): this {
+    return this;
+  }
 }
 
 const clients: MockClient[] = [];
@@ -98,6 +104,7 @@ vi.mock("discord.js", () => ({
   MessageFlags: { Ephemeral: 64 },
   Partials: { Channel: 1 },
   PermissionFlagsBits: { Administrator: 8 },
+  InteractionContextType: { Guild: 0, BotDM: 1, PrivateChannel: 2 },
 }));
 
 const { DiscordBot } =
@@ -106,20 +113,16 @@ const { DiscordBot } =
 const COMMAND_DIRECTORY = path.join(process.cwd(), "src", "commands");
 
 function setup({
-  onDmCapabilityChanged,
+  commandDirectory = COMMAND_DIRECTORY,
 }: {
-  onDmCapabilityChanged?: (
-    userId: string,
-    canReceiveDM: boolean,
-  ) => Promise<void>;
+  commandDirectory?: string;
 } = {}) {
   const context = {} as CommandContext;
 
   const bot = new DiscordBot({
     token: "discord-token",
-    commandDirectory: COMMAND_DIRECTORY,
+    commandDirectory,
     context,
-    ...(onDmCapabilityChanged ? { onDmCapabilityChanged } : {}),
   });
 
   const client = clients.at(-1);
@@ -137,6 +140,7 @@ function createInteraction(
     isChatInputCommand?: boolean;
     replied?: boolean;
     deferred?: boolean;
+    userId?: string;
   } = {},
 ) {
   return {
@@ -144,7 +148,9 @@ function createInteraction(
     replied: overrides.replied ?? false,
     deferred: overrides.deferred ?? false,
     isChatInputCommand: () => overrides.isChatInputCommand ?? true,
+    user: { id: overrides.userId ?? "discord-user-1" },
     reply: vi.fn().mockResolvedValue(undefined),
+    editReply: vi.fn().mockResolvedValue(undefined),
     followUp: vi.fn().mockResolvedValue(undefined),
   };
 }
@@ -195,6 +201,34 @@ describe("DiscordBot", () => {
         "unsubscribe",
       ]);
       expect(client.login).toHaveBeenCalledWith("discord-token");
+    });
+
+    it("warns and keeps the later registration when two command files share the same name", async () => {
+      const warn = vi.spyOn(logger, "warn").mockReturnValue();
+      const dir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "dinkdonk-duplicate-commands-"),
+      );
+
+      try {
+        const source =
+          'export const data = { name: "dup", toJSON: () => ({ name: "dup" }) };\n' +
+          "export async function execute() {}\n";
+
+        fs.writeFileSync(path.join(dir, "a-first.js"), source);
+        fs.writeFileSync(path.join(dir, "b-second.js"), source);
+
+        const { bot, client } = setup({ commandDirectory: dir });
+
+        await bot.start();
+
+        expect(client.commands.size).toBe(1);
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({ command: "dup" }),
+          "Command name already registered by another file; overwriting the earlier registration",
+        );
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     });
 
     it("destroys the client on stop", async () => {
@@ -277,6 +311,61 @@ describe("DiscordBot", () => {
       expect(interaction.reply).not.toHaveBeenCalled();
     });
 
+    it("rate-limits a user who invokes commands too quickly, without running the command", async () => {
+      const { client } = setup();
+      const execute = vi.fn().mockResolvedValue(undefined);
+
+      client.commands.set("test-command", {
+        data: { name: "test-command" },
+        execute,
+      });
+
+      // COMMAND_RATE_LIMIT_MAX is 5 within the window - the 6th invocation
+      // from the same Discord user in quick succession should be rejected.
+      for (let i = 0; i < 5; i += 1) {
+        client.emit("interactionCreate", createInteraction());
+      }
+
+      const limited = createInteraction();
+
+      client.emit("interactionCreate", limited);
+
+      await flush();
+
+      expect(execute).toHaveBeenCalledTimes(5);
+      expect(limited.reply).toHaveBeenCalledWith({
+        content:
+          "You're using commands too quickly - please wait a few seconds and try again.",
+        flags: 64,
+      });
+    });
+
+    it("rate-limits each Discord user independently", async () => {
+      const { client } = setup();
+      const execute = vi.fn().mockResolvedValue(undefined);
+
+      client.commands.set("test-command", {
+        data: { name: "test-command" },
+        execute,
+      });
+
+      for (let i = 0; i < 5; i += 1) {
+        client.emit(
+          "interactionCreate",
+          createInteraction({ userId: "discord-user-1" }),
+        );
+      }
+
+      const otherUser = createInteraction({ userId: "discord-user-2" });
+
+      client.emit("interactionCreate", otherUser);
+
+      await flush();
+
+      expect(execute).toHaveBeenCalledTimes(6);
+      expect(otherUser.reply).not.toHaveBeenCalled();
+    });
+
     it("replies with an ephemeral error when the command throws", async () => {
       const error = vi.spyOn(logger, "error").mockReturnValue();
       const { client } = setup();
@@ -306,29 +395,81 @@ describe("DiscordBot", () => {
       });
     });
 
-    it.each([
-      ["replied", { replied: true }],
-      ["deferred", { deferred: true }],
-    ])(
-      "follows up when the interaction was already %s",
-      async (_label, state) => {
-        const { client } = setup();
+    it("logs (rather than crashing the process) when both the command and the fallback reply fail", async () => {
+      const error = vi.spyOn(logger, "error").mockReturnValue();
+      const { client } = setup();
 
-        client.commands.set("test-command", {
-          data: { name: "test-command" },
-          execute: vi.fn().mockRejectedValue(new Error("command exploded")),
-        });
+      client.commands.set("test-command", {
+        data: { name: "test-command" },
+        execute: vi.fn().mockRejectedValue(new Error("command exploded")),
+      });
 
-        const interaction = createInteraction(state);
+      const interaction = createInteraction();
 
-        client.emit("interactionCreate", interaction);
+      // The interaction itself has become unusable by the time the fallback
+      // error reply is attempted (e.g. Discord's ~3s ack window already
+      // elapsed) - this second failure must not propagate as an unhandled
+      // rejection, which app/index.ts's global handler treats as fatal for
+      // the entire process, not just this one command.
+      interaction.reply.mockRejectedValue(new Error("Unknown interaction"));
 
-        await flush();
+      client.emit("interactionCreate", interaction);
 
-        expect(interaction.followUp).toHaveBeenCalledOnce();
-        expect(interaction.reply).not.toHaveBeenCalled();
-      },
-    );
+      await flush();
+
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: "test-command",
+          message: "Unknown interaction",
+        }),
+        "Failed to reply to a Discord interaction",
+      );
+    });
+
+    it("follows up when the interaction has already been replied to", async () => {
+      const { client } = setup();
+
+      client.commands.set("test-command", {
+        data: { name: "test-command" },
+        execute: vi.fn().mockRejectedValue(new Error("command exploded")),
+      });
+
+      const interaction = createInteraction({ replied: true });
+
+      client.emit("interactionCreate", interaction);
+
+      await flush();
+
+      expect(interaction.followUp).toHaveBeenCalledOnce();
+      expect(interaction.editReply).not.toHaveBeenCalled();
+      expect(interaction.reply).not.toHaveBeenCalled();
+    });
+
+    it("edits the deferred reply, rather than posting a disconnected follow-up, when the interaction was deferred but never actually replied to", async () => {
+      // A command that calls deferReply() as its first line (subscribe,
+      // unsubscribe, list, set-message, get-subscriptions) and then throws
+      // before reaching its own reply - e.g. a Twitch/Firestore call inside
+      // execute() rejects - leaves the interaction deferred=true,
+      // replied=false. followUp() would post a second, disconnected message
+      // while leaving the original "thinking..." placeholder stuck forever,
+      // since nothing else ever resolves it.
+      const { client } = setup();
+
+      client.commands.set("test-command", {
+        data: { name: "test-command" },
+        execute: vi.fn().mockRejectedValue(new Error("command exploded")),
+      });
+
+      const interaction = createInteraction({ deferred: true });
+
+      client.emit("interactionCreate", interaction);
+
+      await flush();
+
+      expect(interaction.editReply).toHaveBeenCalledOnce();
+      expect(interaction.followUp).not.toHaveBeenCalled();
+      expect(interaction.reply).not.toHaveBeenCalled();
+    });
 
     it("normalizes a non-Error command failure", async () => {
       const error = vi.spyOn(logger, "error").mockReturnValue();
@@ -428,6 +569,20 @@ describe("DiscordBot", () => {
         expect(client.users.fetch).toHaveBeenCalledTimes(2);
         expect(client.users.fetch).toHaveBeenCalledWith("user-1");
         expect(client.users.fetch).toHaveBeenCalledWith("user-2");
+      });
+
+      it("shares one in-flight probe across concurrent calls for the same user, instead of sending a duplicate probe DM", async () => {
+        const { bot, client } = setup();
+
+        const [first, second] = await Promise.all([
+          bot.canSendDirectMessage("user-1"),
+          bot.canSendDirectMessage("user-1"),
+        ]);
+
+        expect(first).toBe(true);
+        expect(second).toBe(true);
+        expect(client.users.fetch).toHaveBeenCalledOnce();
+        expect(client.send).toHaveBeenCalledOnce();
       });
     });
   });

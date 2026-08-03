@@ -207,6 +207,20 @@ describe("FirestorePushSubscriptionRepository", () => {
 
       expect(firestore.paths("users/user-1/pushSubscriptions")).toEqual([]);
     });
+
+    it("does not resurrect a subscription that was deleted concurrently, as a corrupt record missing its `subscription` field", async () => {
+      // Simulates the send()-in-flight race: getPushSubscriptions() already
+      // returned this id, the user deletes it mid-send (e.g. via DELETE
+      // /api/notifications/web-push/subscriptions), and only then does this
+      // call run. A set(..., {merge:true}) would recreate the doc here with
+      // only lastSeenAt - permanently occupying a MAX_PUSH_SUBSCRIPTIONS
+      // slot with a record that can never actually send a push.
+      const { firestore, repository } = setup();
+
+      await repository.markPushSubscriptionSeen("user-1", SUBSCRIPTION_ID);
+
+      expect(firestore.read(PATH)).toBeUndefined();
+    });
   });
 
   describe("deletePushSubscription", () => {

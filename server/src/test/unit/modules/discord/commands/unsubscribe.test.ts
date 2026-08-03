@@ -8,16 +8,26 @@ import { buildIdentity } from "../../../../builders/auth.js";
 import { TEST_USER_ID } from "../../../../constants.js";
 
 function createInteraction(options: Record<string, string | null> = {}) {
-  const reply = vi.fn().mockResolvedValue(undefined);
+  const state = { deferred: false };
+  const deferReply = vi.fn().mockImplementation(() => {
+    state.deferred = true;
+    return Promise.resolve();
+  });
+  const editReply = vi.fn().mockResolvedValue(undefined);
 
   return {
-    reply,
+    deferReply,
+    editReply,
     interaction: {
       user: { id: TEST_USER_ID },
       options: {
         getString: (name: string) => options[name] ?? null,
       },
-      reply,
+      get deferred() {
+        return state.deferred;
+      },
+      deferReply,
+      editReply,
     } as unknown as ChatInputCommandInteraction,
   };
 }
@@ -46,20 +56,34 @@ function createContext(
 }
 
 describe("unsubscribe command", () => {
-  it("replies ephemerally when the streamer cannot be found", async () => {
-    const { interaction, reply } = createInteraction({ username: "missing" });
+  it("defers the reply immediately, before any Twitch/Firestore call", async () => {
+    const { interaction, deferReply } = createInteraction({
+      username: "missing",
+    });
     const context = createContext();
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith({
+    expect(deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
+  });
+
+  it("replies ephemerally when the streamer cannot be found", async () => {
+    const { interaction, editReply } = createInteraction({
+      username: "missing",
+    });
+    const context = createContext();
+
+    await execute(interaction, context);
+
+    expect(editReply).toHaveBeenCalledWith({
       content: "❌ Could not find streamer `missing`.",
-      flags: MessageFlags.Ephemeral,
     });
   });
 
   it("replies ephemerally when the user cannot receive DMs", async () => {
-    const { interaction, reply } = createInteraction({ username: "streamer" });
+    const { interaction, editReply } = createInteraction({
+      username: "streamer",
+    });
     const context = createContext({
       twitch: {
         getStreamer: vi
@@ -73,14 +97,15 @@ describe("unsubscribe command", () => {
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith({
+    expect(editReply).toHaveBeenCalledWith({
       content: "❌ I can't DM you! Please check your DM settings.",
-      flags: MessageFlags.Ephemeral,
     });
   });
 
   it("unsubscribes and confirms success", async () => {
-    const { interaction, reply } = createInteraction({ username: "streamer" });
+    const { interaction, editReply } = createInteraction({
+      username: "streamer",
+    });
     const unsubscribe = vi
       .fn()
       .mockResolvedValue({ success: true, usersLeft: 0 });
@@ -96,14 +121,15 @@ describe("unsubscribe command", () => {
     await execute(interaction, context);
 
     expect(unsubscribe).toHaveBeenCalledWith(TEST_USER_ID, "streamer-1");
-    expect(reply).toHaveBeenCalledWith({
+    expect(editReply).toHaveBeenCalledWith({
       content: "✅ Unsubscribed from **Streamer**.",
-      flags: MessageFlags.Ephemeral,
     });
   });
 
   it("reports the failure reason when unsubscribing fails", async () => {
-    const { interaction, reply } = createInteraction({ username: "streamer" });
+    const { interaction, editReply } = createInteraction({
+      username: "streamer",
+    });
     const context = createContext({
       twitch: {
         getStreamer: vi
@@ -119,9 +145,17 @@ describe("unsubscribe command", () => {
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith({
+    expect(editReply).toHaveBeenCalledWith({
       content: "❌ Cannot unsubscribe from **Streamer**. I couldn't find your account. Please sign in on the website first.",
-      flags: MessageFlags.Ephemeral,
     });
+  });
+
+  it("bounds the username option to a real Twitch login's max length", async () => {
+    const { data } = await import("../../../../../commands/unsubscribe.js");
+    const username = data
+      .toJSON()
+      .options?.find((option) => option.name === "username");
+
+    expect((username as { max_length?: number } | undefined)?.max_length).toBe(25);
   });
 });

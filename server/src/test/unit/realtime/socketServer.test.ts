@@ -18,6 +18,7 @@ type FakeSocket = {
   handlers: Map<string, () => void>;
   on: (event: string, handler: () => void) => void;
   userId?: string;
+  connected: boolean;
 };
 
 function createFakeSocket(userId?: string): FakeSocket {
@@ -31,6 +32,7 @@ function createFakeSocket(userId?: string): FakeSocket {
     on: (event, handler) => {
       handlers.set(event, handler);
     },
+    connected: true,
   };
 }
 
@@ -277,6 +279,57 @@ describe("createSocketServer", () => {
 
       expect(socket.disconnect).toHaveBeenCalledWith(true);
       expect(warn).toHaveBeenCalled();
+
+      await teardown(harness);
+    });
+
+    it("does not register a socket that disconnects while identity resolution is still pending", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const identityRepository = new InMemoryIdentityRepository();
+      const identity = buildIdentity({ uid: "user-1" });
+
+      identityRepository.seed(identity);
+
+      let resolveLookup!: (value: typeof identity) => void;
+      const pending = new Promise<typeof identity>((resolve) => {
+        resolveLookup = resolve;
+      });
+
+      vi.spyOn(identityRepository, "getIdentity").mockReturnValue(pending);
+
+      const harness = setup({ identityRepository });
+      const socket = createFakeSocket("user-1");
+
+      const listeners = harness.sockets.io.sockets.listeners(
+        "connection",
+      ) as unknown as Array<(socket: Socket) => void>;
+
+      for (const listener of listeners) {
+        listener(socket as unknown as Socket);
+      }
+
+      // Give handleConnection a tick to actually call getIdentity and start
+      // awaiting the (deliberately still-pending) lookup above.
+      await new Promise((resolve) => setImmediate(resolve));
+
+      // The client disconnects (e.g. a flaky reconnect) while that lookup is
+      // still in flight - real socket.io would flip .connected to false at
+      // this point, before handleConnection ever gets to registerSocket().
+      socket.connected = false;
+
+      resolveLookup(identity);
+
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+
+      // Never registered: no disconnect listener was attached (it would
+      // never fire anyway, since the disconnect already happened) and the
+      // socket doesn't receive events as if it were a live connection.
+      expect(socket.handlers.has("disconnect")).toBe(false);
+
+      harness.sockets.notifyUser("user-1", "ping", null);
+      expect(socket.emit).not.toHaveBeenCalled();
 
       await teardown(harness);
     });

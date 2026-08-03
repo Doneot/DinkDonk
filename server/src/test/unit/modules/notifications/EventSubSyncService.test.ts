@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EventSubSyncService } from "../../../../modules/notifications/application/EventSubSyncService.js";
+import type { TwitchEventSubSubscription } from "../../../../modules/twitch/domain/Twitch.js";
 import { logger } from "../../../../shared/logger/logger.js";
 
 import { buildStreamer } from "../../../builders/streamer.js";
@@ -224,6 +225,59 @@ describe("EventSubSyncService", () => {
       await service.handleStreamerAdded("streamer-1");
 
       expect(twitch.subscriptions).toHaveLength(1);
+    });
+
+    it("does not create a duplicate subscription when two calls race for the same streamer", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const { service, twitch } = setup({ subscriptions: [] });
+      const subscribeToEvent = vi.spyOn(twitch, "subscribeToEvent");
+
+      await Promise.all([
+        service.handleStreamerAdded("streamer-9"),
+        service.handleStreamerAdded("streamer-9"),
+      ]);
+
+      expect(subscribeToEvent).toHaveBeenCalledOnce();
+    });
+
+    it("re-checks against fresh data before creating, so a stale snapshot doesn't cause a duplicate once a concurrent caller already created one", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const { service, twitch } = setup({ subscriptions: [] });
+
+      // Simulates handleStreamerAdded/syncEventSubSubscriptions each
+      // capturing their own subscriptions snapshot independently, at
+      // different times - caller A's read below resolves (stale, still
+      // empty) only after caller B has already created and released the
+      // lock on a real subscription for the same streamer.
+      let resolveStaleRead!: (subs: TwitchEventSubSubscription[]) => void;
+      const staleRead = new Promise<TwitchEventSubSubscription[]>((resolve) => {
+        resolveStaleRead = resolve;
+      });
+
+      const getEventSubSubscriptions = vi.spyOn(
+        twitch,
+        "getEventSubSubscriptions",
+      );
+
+      getEventSubSubscriptions.mockImplementationOnce(() => staleRead);
+
+      const callA = service.handleStreamerAdded("streamer-9");
+
+      await service.handleStreamerAdded("streamer-9");
+
+      expect(twitch.broadcasterIds()).toEqual(["streamer-9"]);
+
+      resolveStaleRead([]);
+
+      await callA;
+
+      // Caller A's stale snapshot said "missing", but by the time it
+      // actually acquired the lock, caller B had already created the
+      // subscription - the fresh re-check inside the lock must catch that
+      // instead of creating a second one.
+      expect(twitch.broadcasterIds()).toEqual(["streamer-9"]);
     });
 
     it("ignores a subscription of another type for the same streamer", async () => {

@@ -167,6 +167,117 @@ export function identityRepositoryBehavior(
       expect(identity.uid).toBe("discord-3");
     });
 
+    it("releases the old email link when a repeat sign-in reports a new verified email, instead of leaving it claimable forever", async () => {
+      const repository = createRepository();
+
+      const first = await repository.upsertDiscordIdentity(
+        buildDiscordCredential({ id: "discord-1" }),
+        "old@example.com",
+        true,
+      );
+
+      // Same Discord account signs in again, but the provider now reports a
+      // different verified email (e.g. the user changed it at Discord).
+      const second = await repository.upsertDiscordIdentity(
+        buildDiscordCredential({ id: "discord-1" }),
+        "new@example.com",
+        true,
+      );
+
+      expect(second.uid).toBe(first.uid);
+      expect(second.email).toBe("new@example.com");
+
+      // The old email must not still resolve onto this account - otherwise
+      // a completely different, unrelated sign-in that later reports
+      // "old@example.com" as its own verified email (e.g. the mailbox gets
+      // recycled/reassigned by its provider) would silently take over this
+      // account via the same-verified-email linking path above.
+      const unrelated = await repository.upsertGoogleIdentity(
+        buildGoogleCredential({ id: "google-unrelated" }),
+        "old@example.com",
+        true,
+      );
+
+      expect(unrelated.uid).not.toBe(first.uid);
+    });
+
+    it("keeps the email link intact when a repeat sign-in reports the same email in different letter-casing", async () => {
+      const repository = createRepository();
+
+      const first = await repository.upsertDiscordIdentity(
+        buildDiscordCredential({ id: "discord-1" }),
+        "Person@Example.com",
+        true,
+      );
+
+      // Same Discord account, same address, but the provider reports it
+      // with different letter-casing this time - not a real email change.
+      // The stale-link cleanup this exercises deliberately compares emails
+      // in a case-insensitive way for this exact reason: identityLinks/
+      // email:* keys are always lowercased, so "Person@Example.com" and
+      // "person@example.com" resolve to the SAME index doc - a raw string
+      // comparison would wrongly treat this as an email change and delete
+      // that doc with nothing left to replace it.
+      const second = await repository.upsertDiscordIdentity(
+        buildDiscordCredential({ id: "discord-1" }),
+        "person@example.com",
+        true,
+      );
+
+      expect(second.uid).toBe(first.uid);
+
+      // The email link must still resolve onto this account.
+      const linked = await repository.upsertGoogleIdentity(
+        buildGoogleCredential({ id: "google-1" }),
+        "PERSON@EXAMPLE.COM",
+        true,
+      );
+
+      expect(linked.uid).toBe(first.uid);
+    });
+
+    it("does not let a repeat sign-in claim a verified email a different account already owns", async () => {
+      const repository = createRepository();
+
+      const owner = await repository.upsertDiscordIdentity(
+        buildDiscordCredential({ id: "discord-owner" }),
+        "shared@example.com",
+        true,
+      );
+
+      const other = await repository.upsertGoogleIdentity(
+        buildGoogleCredential({ id: "google-other" }),
+        "other@example.com",
+        true,
+      );
+
+      // The Google account signs in again (a repeat sign-in - it already
+      // has a direct link, so this resolves to the SAME uid rather than
+      // auto-linking by email), but this time Google reports the email
+      // "discord-owner" already verified-and-claimed - e.g. the person
+      // changed their Google account's email to match. This must not
+      // silently overwrite this account's own stored email to a value it
+      // has no actual identityLinks claim on.
+      const conflicted = await repository.upsertGoogleIdentity(
+        buildGoogleCredential({ id: "google-other" }),
+        "shared@example.com",
+        true,
+      );
+
+      expect(conflicted.uid).toBe(other.uid);
+      expect(conflicted.email).toBe("other@example.com");
+
+      // The email link itself must still resolve to its real owner - proof
+      // the index was never touched by the conflicting claim above.
+      const thirdSignIn = await repository.upsertTwitchIdentity(
+        buildTwitchCredential({ id: "twitch-third" }),
+        "shared@example.com",
+        true,
+      );
+
+      expect(thirdSignIn.uid).toBe(owner.uid);
+    });
+
     it("creates a new identity (random uid) for a first-time Google sign-in", async () => {
       const repository = createRepository();
 
@@ -470,6 +581,47 @@ export function identityRepositoryBehavior(
       );
 
       expect(identity.discord?.username).toBe("new-name");
+    });
+
+    it("releases the old Discord account's link when re-linking to a different Discord account", async () => {
+      const repository = createRepository();
+
+      repository.seed(
+        buildIdentity({
+          uid: "existing-uid",
+          discord: buildDiscordCredential({ id: "discord-old" }),
+        }),
+      );
+
+      const newCredential = buildDiscordCredential({ id: "discord-new" });
+
+      await repository.linkDiscordIdentity(
+        "existing-uid",
+        newCredential,
+        null,
+        false,
+      );
+
+      // The new Discord account resolves to this uid...
+      await expect(
+        repository.getIdentityByDiscordUid("discord-new"),
+      ).resolves.toMatchObject({ uid: "existing-uid" });
+
+      // ...and the old one no longer does - left pointing here, a later
+      // plain sign-in via the old Discord account would silently resolve
+      // back onto this uid, reverting the user's chosen re-link.
+      await expect(
+        repository.getIdentityByDiscordUid("discord-old"),
+      ).resolves.toBeNull();
+
+      // Confirmed by actually exercising the old account through a plain
+      // sign-in: it must mint a fresh identity, not resolve onto the
+      // account it used to be linked to.
+      const oldCredential = buildDiscordCredential({ id: "discord-old" });
+
+      await expect(
+        repository.upsertDiscordIdentity(oldCredential, null, false),
+      ).resolves.toMatchObject({ uid: "discord-old" });
     });
 
     it("updates only the given Discord credential fields, preserving the rest", async () => {

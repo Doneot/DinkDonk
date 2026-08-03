@@ -1,5 +1,5 @@
 import type { ChatInputCommandInteraction } from "discord.js";
-import { SlashCommandBuilder } from "discord.js";
+import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import type { CommandContext } from "../modules/discord/domain/CommandContext.js";
 import { replyEphemeral, requireDMCapableUser } from "./shared/commandReplies.js";
 
@@ -11,6 +11,11 @@ export async function execute(
   interaction: ChatInputCommandInteraction,
   context: CommandContext,
 ): Promise<void> {
+  // Twitch/Firestore calls below can exceed Discord's ~3s initial-ack
+  // window; deferring immediately buys up to 15 minutes to actually reply
+  // via replyEphemeral (which edits this deferred reply) instead.
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
   const { twitch } = context;
 
   const resolved = await requireDMCapableUser(interaction, context);

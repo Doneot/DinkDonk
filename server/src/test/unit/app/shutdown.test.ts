@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Container } from "../../../app/container/index.js";
 import type { Server } from "../../../app/server.js";
 import type { Runtime } from "../../../app/runtime/Runtime.js";
-import type { SubscriptionCleanupScheduler } from "../../../app/SubscriptionCleanupScheduler.js";
+import type { IntervalScheduler } from "../../../app/IntervalScheduler.js";
 import { registerShutdownHooks } from "../../../app/shutdown.js";
 import type { UserChangeBroadcaster } from "../../../modules/users/application/UserChangeBroadcaster.js";
 import type { SocketServer } from "../../../realtime/socketServer.js";
@@ -60,7 +60,7 @@ function setup() {
     container,
     { httpServer, sockets } as unknown as Server,
     broadcaster as unknown as UserChangeBroadcaster,
-    scheduler as unknown as SubscriptionCleanupScheduler,
+    [scheduler] as unknown as IntervalScheduler[],
   );
 
   return {
@@ -230,7 +230,7 @@ describe("registerShutdownHooks", () => {
         container,
         { httpServer, sockets } as unknown as Server,
         { stop: vi.fn() } as unknown as UserChangeBroadcaster,
-        { stop: vi.fn() } as unknown as SubscriptionCleanupScheduler,
+        [{ stop: vi.fn() }] as unknown as IntervalScheduler[],
       );
 
       process.emit("SIGTERM", "SIGTERM");

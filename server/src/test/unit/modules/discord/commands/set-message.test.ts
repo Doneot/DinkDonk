@@ -8,16 +8,26 @@ import { buildIdentity } from "../../../../builders/auth.js";
 import { TEST_USER_ID } from "../../../../constants.js";
 
 function createInteraction(options: Record<string, string | null> = {}) {
-  const reply = vi.fn().mockResolvedValue(undefined);
+  const state = { deferred: false };
+  const deferReply = vi.fn().mockImplementation(() => {
+    state.deferred = true;
+    return Promise.resolve();
+  });
+  const editReply = vi.fn().mockResolvedValue(undefined);
 
   return {
-    reply,
+    deferReply,
+    editReply,
     interaction: {
       user: { id: TEST_USER_ID },
       options: {
         getString: (name: string) => options[name] ?? null,
       },
-      reply,
+      get deferred() {
+        return state.deferred;
+      },
+      deferReply,
+      editReply,
     } as unknown as ChatInputCommandInteraction,
   };
 }
@@ -46,8 +56,8 @@ function createContext(
 }
 
 describe("set-message command", () => {
-  it("replies ephemerally when the streamer cannot be found", async () => {
-    const { interaction, reply } = createInteraction({
+  it("defers the reply immediately, before any Twitch/Firestore call", async () => {
+    const { interaction, deferReply } = createInteraction({
       username: "missing",
       message: "hi",
     });
@@ -55,14 +65,25 @@ describe("set-message command", () => {
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith({
+    expect(deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
+  });
+
+  it("replies ephemerally when the streamer cannot be found", async () => {
+    const { interaction, editReply } = createInteraction({
+      username: "missing",
+      message: "hi",
+    });
+    const context = createContext();
+
+    await execute(interaction, context);
+
+    expect(editReply).toHaveBeenCalledWith({
       content: "❌ Could not find streamer `missing`.",
-      flags: MessageFlags.Ephemeral,
     });
   });
 
   it("replies ephemerally when the user cannot receive DMs", async () => {
-    const { interaction, reply } = createInteraction({
+    const { interaction, editReply } = createInteraction({
       username: "streamer",
       message: "hi",
     });
@@ -79,14 +100,13 @@ describe("set-message command", () => {
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith({
+    expect(editReply).toHaveBeenCalledWith({
       content: "❌ I can't DM you! Please check your DM settings.",
-      flags: MessageFlags.Ephemeral,
     });
   });
 
   it("updates the message and confirms success", async () => {
-    const { interaction, reply } = createInteraction({
+    const { interaction, editReply } = createInteraction({
       username: "streamer",
       message: "%s is live",
     });
@@ -105,14 +125,13 @@ describe("set-message command", () => {
     expect(updateSubscription).toHaveBeenCalledWith(TEST_USER_ID, "streamer-1", {
       notification_message: "%s is live",
     });
-    expect(reply).toHaveBeenCalledWith({
+    expect(editReply).toHaveBeenCalledWith({
       content: "✅ Notification message updated for **Streamer**.",
-      flags: MessageFlags.Ephemeral,
     });
   });
 
   it("reports the failure reason when the update fails", async () => {
-    const { interaction, reply } = createInteraction({
+    const { interaction, editReply } = createInteraction({
       username: "streamer",
       message: "hi",
     });
@@ -132,10 +151,18 @@ describe("set-message command", () => {
 
     await execute(interaction, context);
 
-    expect(reply).toHaveBeenCalledWith({
+    expect(editReply).toHaveBeenCalledWith({
       content:
         "❌ Cannot update message for **Streamer**. I couldn't find that subscription.",
-      flags: MessageFlags.Ephemeral,
     });
+  });
+
+  it("bounds the username option to a real Twitch login's max length", async () => {
+    const { data } = await import("../../../../../commands/set-message.js");
+    const username = data
+      .toJSON()
+      .options?.find((option) => option.name === "username");
+
+    expect((username as { max_length?: number } | undefined)?.max_length).toBe(25);
   });
 });

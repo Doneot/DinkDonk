@@ -1,5 +1,6 @@
 import type { PushSubscriptionRepository } from "../../../modules/notifications/ports/PushSubscriptionRepository.js";
 import type { PushSubscription } from "../../../modules/notifications/domain/PushSubscription.js";
+import { MAX_PUSH_SUBSCRIPTIONS } from "../../../modules/notifications/domain/PushSubscription.js";
 import type {
   SavePushSubscribeResult,
   DeletePushSubscribeResult,
@@ -37,6 +38,13 @@ export class InMemoryPushSubscriptionRepository implements PushSubscriptionRepos
     const id = this.getId(subscription.endpoint);
 
     const userMap = this.ensureUser(userId);
+
+    if (!userMap.has(id) && userMap.size >= MAX_PUSH_SUBSCRIPTIONS) {
+      return Promise.resolve({
+        success: false,
+        reason: "push_subscription_limit_reached",
+      });
+    }
 
     const pushSubscription: PushSubscription = {
       id,

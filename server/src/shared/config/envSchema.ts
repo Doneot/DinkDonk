@@ -28,7 +28,14 @@ const BaseEnvSchema = z.object({
   // in the same network) it isn't password-protected.
   REDIS_URL: z.url().min(1),
 
-  CLIENT_ORIGIN: z.string().optional(),
+  // Feeds both Express's CORS middleware and Socket.IO's CORS config (see
+  // configureMiddleware.ts/socketServer.ts), compared directly against the
+  // browser's canonicalized Origin header - z.url() (matching SERVER_URL)
+  // rather than a bare z.string() so a malformed value (trailing slash,
+  // missing scheme, stray whitespace) fails loudly at startup instead of
+  // silently rejecting every legitimate cross-origin request once the app
+  // is already serving traffic.
+  CLIENT_ORIGIN: z.url().optional(),
 
   // Accepts a comma-separated list, mirroring ENCRYPTION_KEY below, so the
   // session secret can be rotated too: express-session's `secret` option
@@ -137,6 +144,12 @@ const BaseEnvSchema = z.object({
   UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN: booleanFromEnv,
 
   EVENTSUB_GC_INTERVAL_MS: numberFromEnv(6 * 60 * 60 * 1000),
+
+  // Purges expired Firestore session documents - see
+  // FirestoreSessionRepository#purgeExpiredSessions. Far less time-sensitive
+  // than EventSub GC (a session sitting around a bit past its expiry is just
+  // storage cost, not a functional problem), so a longer default interval.
+  SESSION_GC_INTERVAL_MS: numberFromEnv(24 * 60 * 60 * 1000),
 
   GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1).optional(),
 

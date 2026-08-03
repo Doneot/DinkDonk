@@ -5,6 +5,7 @@ import { buildPushSubscription } from "../../builders/pushSubscription.js";
 
 import type { SeededRepositoryFactory } from "./SeededRepository.js";
 import type { PushSubscription } from "../../../modules/notifications/domain/PushSubscription.js";
+import { MAX_PUSH_SUBSCRIPTIONS } from "../../../modules/notifications/domain/PushSubscription.js";
 
 export function pushSubscriptionRepositoryBehavior(
   name: string,
@@ -96,6 +97,47 @@ export function pushSubscriptionRepositoryBehavior(
         success: false,
         reason: "invalid_push_subscription",
       });
+    });
+
+    it("rejects saving once the push subscription limit is reached", async () => {
+      const repository = createRepository();
+
+      for (let i = 0; i < MAX_PUSH_SUBSCRIPTIONS; i += 1) {
+        await repository.savePushSubscription("user-1", {
+          endpoint: `https://example.com/push/${i}`,
+          keys: { p256dh: "test-p256dh-key", auth: "test-auth-key" },
+        });
+      }
+
+      await expect(
+        repository.savePushSubscription("user-1", {
+          endpoint: "https://example.com/push/one-too-many",
+          keys: { p256dh: "test-p256dh-key", auth: "test-auth-key" },
+        }),
+      ).resolves.toEqual({
+        success: false,
+        reason: "push_subscription_limit_reached",
+      });
+    });
+
+    it("allows re-saving an existing subscription once the limit is reached", async () => {
+      const repository = createRepository();
+      const subscription = buildPushSubscription().subscription;
+
+      await repository.savePushSubscription("user-1", subscription);
+
+      for (let i = 1; i < MAX_PUSH_SUBSCRIPTIONS; i += 1) {
+        await repository.savePushSubscription("user-1", {
+          endpoint: `https://example.com/push/${i}`,
+          keys: subscription.keys,
+        });
+      }
+
+      await expect(
+        repository.savePushSubscription("user-1", subscription, {
+          userAgent: "Updated",
+        }),
+      ).resolves.toMatchObject({ success: true });
     });
 
     it("deletes by id", async () => {

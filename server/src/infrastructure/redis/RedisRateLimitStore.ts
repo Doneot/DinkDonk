@@ -20,6 +20,26 @@ local ttl = redis.call("PTTL", KEYS[1])
 return {totalHits, ttl}
 `;
 
+// Not just DECR: a bare DECR on a key that has already expired (or never
+// existed - e.g. this instance restarted, or decrement() races an
+// increment()'d key's natural TTL expiry) creates a brand-new key at -1
+// with no TTL at all, since only increment()'s script attaches one, and
+// only on that key's very first hit (totalHits === 1) - a count that a
+// decrement-created key started below never reaches. That key would then
+// leak forever. Deleting once the count reaches zero (the common case,
+// since increment/decrement calls are meant to pair up) avoids leaving a
+// stale zero-count key around at all; the PTTL/PEXPIRE fallback below is
+// just a safety net for the same key ending up without an expiry for any
+// other reason.
+const DECREMENT_SCRIPT = `
+local totalHits = redis.call("DECR", KEYS[1])
+if totalHits <= 0 then
+  redis.call("DEL", KEYS[1])
+elseif redis.call("PTTL", KEYS[1]) < 0 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+end
+`;
+
 /**
  * A Redis-backed express-rate-limit Store, sharing hit counters across
  * every backend instance and surviving a restart of any one of them -
@@ -60,7 +80,12 @@ export class RedisRateLimitStore implements Store {
   }
 
   async decrement(key: string): Promise<void> {
-    await this.redis.decr(this.prefix + key);
+    await this.redis.eval(
+      DECREMENT_SCRIPT,
+      1,
+      this.prefix + key,
+      this.windowMs,
+    );
   }
 
   async resetKey(key: string): Promise<void> {

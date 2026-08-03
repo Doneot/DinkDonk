@@ -5,6 +5,7 @@ import type { TwitchAuthenticator } from "../../../../modules/twitch/infrastruct
 import type { TwitchClient } from "../../../../modules/twitch/infrastructure/TwitchClient.js";
 import type { TwitchEventSubSubscription } from "../../../../modules/twitch/domain/Twitch.js";
 import { logger } from "../../../../shared/logger/logger.js";
+import { register } from "../../../../infrastructure/metrics/prometheus.js";
 
 const CALLBACK_URL = "http://localhost:3000/eventsub";
 
@@ -62,7 +63,12 @@ function createProvider({
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  register.getSingleMetric("eventsub_subscriptions_deleted_total")?.reset();
 });
+
+async function metricsText(): Promise<string> {
+  return register.metrics();
+}
 
 describe("TwitchProvider", () => {
   describe("start", () => {
@@ -222,6 +228,33 @@ describe("TwitchProvider", () => {
       await provider.stop({ unsubscribeEventSub: true });
 
       expect(unsubscribeFromEvent).not.toHaveBeenCalled();
+    });
+
+    it("counts only the deletions that actually succeeded, not one whose Twitch call failed", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const { provider, unsubscribeFromEvent } = createProvider({
+        subscriptions: [
+          subscription("sub-1", CALLBACK_URL),
+          subscription("sub-2", CALLBACK_URL),
+        ],
+      });
+
+      unsubscribeFromEvent.mockImplementation((id: string) =>
+        id === "sub-1"
+          ? Promise.reject(new Error("twitch unreachable"))
+          : Promise.resolve([]),
+      );
+
+      await expect(
+        provider.stop({ unsubscribeEventSub: true }),
+      ).rejects.toThrow("twitch unreachable");
+
+      const exposition = await metricsText();
+
+      expect(exposition).toContain(
+        "eventsub_subscriptions_deleted_total 1",
+      );
     });
   });
 });

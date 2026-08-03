@@ -1,16 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { SubscriptionCleanupScheduler } from "../../../app/SubscriptionCleanupScheduler.js";
+import { IntervalScheduler } from "../../../app/IntervalScheduler.js";
 import { logger } from "../../../shared/logger/logger.js";
 
-function setup(
-  garbageCollectSubscriptions = vi.fn().mockResolvedValue(undefined),
-) {
+function setup(run = vi.fn().mockResolvedValue(undefined)) {
   return {
-    garbageCollectSubscriptions,
-    scheduler: new SubscriptionCleanupScheduler({
+    run,
+    scheduler: new IntervalScheduler({
       intervalMs: 1_000,
-      garbageCollectSubscriptions,
+      taskName: "subscription garbage collection",
+      run,
     }),
   };
 }
@@ -20,27 +19,27 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("SubscriptionCleanupScheduler", () => {
+describe("IntervalScheduler", () => {
   it("does not run before it is started", async () => {
     vi.useFakeTimers();
 
-    const { garbageCollectSubscriptions } = setup();
+    const { run } = setup();
 
     await vi.advanceTimersByTimeAsync(5_000);
 
-    expect(garbageCollectSubscriptions).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
   });
 
-  it("runs the sweep on every interval tick", async () => {
+  it("runs the task on every interval tick", async () => {
     vi.useFakeTimers();
 
-    const { scheduler, garbageCollectSubscriptions } = setup();
+    const { scheduler, run } = setup();
 
     scheduler.start();
 
     await vi.advanceTimersByTimeAsync(3_000);
 
-    expect(garbageCollectSubscriptions).toHaveBeenCalledTimes(3);
+    expect(run).toHaveBeenCalledTimes(3);
 
     scheduler.stop();
   });
@@ -48,14 +47,14 @@ describe("SubscriptionCleanupScheduler", () => {
   it("ignores a second start while already running", async () => {
     vi.useFakeTimers();
 
-    const { scheduler, garbageCollectSubscriptions } = setup();
+    const { scheduler, run } = setup();
 
     scheduler.start();
     scheduler.start();
 
     await vi.advanceTimersByTimeAsync(1_000);
 
-    expect(garbageCollectSubscriptions).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledOnce();
 
     scheduler.stop();
   });
@@ -63,7 +62,7 @@ describe("SubscriptionCleanupScheduler", () => {
   it("stops running after stop", async () => {
     vi.useFakeTimers();
 
-    const { scheduler, garbageCollectSubscriptions } = setup();
+    const { scheduler, run } = setup();
 
     scheduler.start();
 
@@ -73,7 +72,7 @@ describe("SubscriptionCleanupScheduler", () => {
 
     await vi.advanceTimersByTimeAsync(5_000);
 
-    expect(garbageCollectSubscriptions).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledOnce();
   });
 
   it("tolerates stop being called twice", () => {
@@ -88,7 +87,7 @@ describe("SubscriptionCleanupScheduler", () => {
   it("can be restarted after being stopped", async () => {
     vi.useFakeTimers();
 
-    const { scheduler, garbageCollectSubscriptions } = setup();
+    const { scheduler, run } = setup();
 
     scheduler.start();
     scheduler.stop();
@@ -96,16 +95,16 @@ describe("SubscriptionCleanupScheduler", () => {
 
     await vi.advanceTimersByTimeAsync(1_000);
 
-    expect(garbageCollectSubscriptions).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledOnce();
 
     scheduler.stop();
   });
 
-  it("logs a failing sweep and keeps the schedule alive", async () => {
+  it("logs a failing run and keeps the schedule alive", async () => {
     vi.useFakeTimers();
 
     const error = vi.spyOn(logger, "error").mockReturnValue();
-    const { scheduler, garbageCollectSubscriptions } = setup(
+    const { scheduler, run } = setup(
       vi.fn().mockRejectedValue(new Error("twitch unavailable")),
     );
 
@@ -113,7 +112,7 @@ describe("SubscriptionCleanupScheduler", () => {
 
     await vi.advanceTimersByTimeAsync(2_000);
 
-    expect(garbageCollectSubscriptions).toHaveBeenCalledTimes(2);
+    expect(run).toHaveBeenCalledTimes(2);
     expect(error).toHaveBeenCalledTimes(2);
     expect(error.mock.calls[0]?.[1]).toBe(
       "Failed to execute subscription garbage collection",

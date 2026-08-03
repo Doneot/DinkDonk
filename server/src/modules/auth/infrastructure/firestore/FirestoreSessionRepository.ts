@@ -172,4 +172,53 @@ export class FirestoreSessionRepository extends session.Store {
       callback(error as Error);
     }
   }
+
+  // The cleanup sweep get()'s own inline deletion was written to anticipate:
+  // get() only ever purges the one document a request happens to look up
+  // again, which in practice is nearly never once a client's cookie is gone
+  // (the entire point of maxAge) - without this, the sessions collection
+  // grows without bound as users log in over time, since a session-fixation-
+  // safe login always writes a brand new document (see authRoutes.ts's
+  // handleProviderCallback comment) rather than reusing one.
+  //
+  // Accepted, deliberately-not-covered gap: the `<` query below can't match
+  // a doc whose expiresAt field is absent or null (Firestore inequality
+  // filters exclude those), which resolveExpiresAt() returns for a session
+  // with no cookie.expires. In practice that's unreachable - the session
+  // cookie's maxAge is always set (see configureMiddleware.ts), so
+  // expiresAt is always a real number - so this is theoretical debt, not a
+  // real growth vector, and not worth a second query to cover.
+  async purgeExpiredSessions(): Promise<number> {
+    const BATCH_SIZE = 500;
+    let deleted = 0;
+
+    for (;;) {
+      const { docs } = await this.collection
+        .where("expiresAt", "<", Date.now())
+        .limit(BATCH_SIZE)
+        .get();
+
+      if (docs.length === 0) {
+        break;
+      }
+
+      const batch = this.collection.firestore.batch();
+
+      for (const doc of docs) {
+        batch.delete(this.collection.doc(doc.id));
+      }
+
+      await batch.commit();
+
+      deleted += docs.length;
+
+      // A partial page means there's nothing left to purge this pass;
+      // avoids an extra round-trip that would just come back empty.
+      if (docs.length < BATCH_SIZE) {
+        break;
+      }
+    }
+
+    return deleted;
+  }
 }

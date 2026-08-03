@@ -10,12 +10,22 @@ import type { CommandContext } from "../../modules/discord/domain/CommandContext
  * Every reply here is ephemeral, error or success: subscriptions and their
  * custom messages are personal, so nothing about them should be broadcast to
  * the channel a slash command happened to be run in.
+ *
+ * Every command that reaches this (via a Firestore/Twitch call somewhere in
+ * this chain) has already called interaction.deferReply() as its first line
+ * - Discord requires an initial ack within ~3s, well inside what any of
+ * those calls can take - so this edits that deferred reply rather than
+ * calling reply() again (which would throw: an interaction can only be
+ * acked once). Still falls back to a direct ephemeral reply() for a command
+ * that has no I/O and genuinely never defers.
  */
 export function replyEphemeral(
   interaction: ChatInputCommandInteraction,
   content: string,
 ): Promise<unknown> {
-  return interaction.reply({ content, flags: MessageFlags.Ephemeral });
+  return interaction.deferred || interaction.replied
+    ? interaction.editReply({ content })
+    : interaction.reply({ content, flags: MessageFlags.Ephemeral });
 }
 
 /**

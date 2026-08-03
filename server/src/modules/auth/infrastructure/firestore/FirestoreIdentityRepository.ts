@@ -159,12 +159,72 @@ export class FirestoreIdentityRepository implements IdentityRepository {
       // stored email/verified pair is kept as-is (falling back to the new
       // email only if the account doesn't have one yet at all).
       const emailIsVerified = emailVerified === true;
-      const mergedEmail = emailIsVerified
+
+      // Also required: the target identityLinks/email:* slot must actually
+      // be available to THIS uid - either unclaimed, or already claimed by
+      // this same account. This only differs from emailIsVerified alone in
+      // case 1 (an existing direct provider link): case 2's uid is itself
+      // resolved FROM emailLinkDoc, so it's always already this account's
+      // own slot there, and case 3 has no emailLinkDoc to conflict with.
+      // Without this, a repeat sign-in whose provider reports a verified
+      // email that a genuinely different account already owns (two
+      // different people, or the same person's two separate accounts, each
+      // independently verified that address with a different provider)
+      // would overwrite THIS account's own stored email to a value it has
+      // no actual claim on - the identityLinks index itself stays correctly
+      // pointed at the real owner (untouched below), but this account would
+      // display an email it doesn't control.
+      const emailLinkAvailableToThisUid =
+        !emailLinkDoc?.exists ||
+        (emailLinkDoc.data() as { uid: string }).uid === uid;
+      const emailIsClaimable = emailIsVerified && emailLinkAvailableToThisUid;
+
+      const mergedEmail = emailIsClaimable
         ? (email ?? existing?.email ?? null)
         : (existing?.email ?? email ?? null);
-      const mergedEmailVerified = emailIsVerified
+      const mergedEmailVerified = emailIsClaimable
         ? true
         : (existing?.emailVerified ?? false);
+
+      // On a repeat sign-in (case 1 above) whose newly-verified email
+      // differs from what's already stored, the OLD
+      // identityLinks/email:{oldEmail} doc - if it still points to this uid
+      // - must stop pointing here in the same transaction the new one is
+      // claimed in below. Left alone, it becomes a permanent, stale claim on
+      // an email this account no longer owns: a future sign-in via ANY
+      // provider reporting that same email as verified again - plausible
+      // once the mailbox is recycled/reassigned by its provider - would
+      // resolve straight onto this account via case 2 above, a silent
+      // account takeover.
+      let staleEmail: string | null = null;
+
+      if (
+        linkDoc.exists &&
+        emailIsVerified &&
+        existing?.email &&
+        mergedEmail &&
+        // Compares via emailLinkId (which lowercases), not the raw strings -
+        // the old and new email can differ only by letter-casing (a
+        // provider reporting "Old@Example.com" then "old@example.com" for
+        // the exact same address) while still resolving to the SAME
+        // identityLinks/email:* doc. A raw string comparison here would
+        // treat that as a real email change, but emailLinkRef (built by the
+        // caller from the new email) and staleEmailLinkRef would then be
+        // the identical doc reference - the "create if absent" write below
+        // gets skipped (it already exists), and this doc would get deleted
+        // with nothing left pointing at this account's own, still-valid
+        // email claim.
+        emailLinkId(existing.email) !== emailLinkId(mergedEmail)
+      ) {
+        staleEmail = existing.email;
+      }
+
+      const staleEmailLinkRef = staleEmail
+        ? this.identityLinks.doc(emailLinkId(staleEmail))
+        : null;
+      const staleEmailLinkDoc = staleEmailLinkRef
+        ? await tx.get(staleEmailLinkRef)
+        : null;
 
       // Validates the FULL record this write results in, not just the new
       // provider credential - a corrupt merge fails loudly here rather than
@@ -188,6 +248,17 @@ export class FirestoreIdentityRepository implements IdentityRepository {
 
       if (emailLinkRef && !emailLinkDoc?.exists) {
         tx.set(emailLinkRef, { uid });
+      }
+
+      // Only deletes if it still points to this exact uid - guards against
+      // deleting a link doc some other, unrelated concurrent write already
+      // repointed elsewhere.
+      if (
+        staleEmailLinkRef &&
+        staleEmailLinkDoc?.exists &&
+        (staleEmailLinkDoc.data() as { uid: string }).uid === uid
+      ) {
+        tx.delete(staleEmailLinkRef);
       }
 
       return toIdentity(uid, merged);
@@ -262,6 +333,26 @@ export class FirestoreIdentityRepository implements IdentityRepository {
 
       const existing = IdentityRecordSchema.parse(existingDoc.data());
 
+      // Re-linking to a DIFFERENT Discord account than the one already on
+      // file (e.g. /discord/link authorized against a different Discord
+      // profile than at signup) must repoint identityLinks/discord:{oldId}
+      // away from this uid in the same transaction the new one is claimed
+      // in below. Left alone, it stays a live pointer to this account - a
+      // later plain Discord sign-in via that old account (upsertDiscordIdentity)
+      // would resolve straight back onto this uid, silently reverting the
+      // user's chosen re-link with no error or warning.
+      const staleDiscordId =
+        existing.discord && existing.discord.id !== profile.id
+          ? existing.discord.id
+          : null;
+
+      const staleDiscordLinkRef = staleDiscordId
+        ? this.identityLinks.doc(discordLinkId(staleDiscordId))
+        : null;
+      const staleDiscordLinkDoc = staleDiscordLinkRef
+        ? await tx.get(staleDiscordLinkRef)
+        : null;
+
       // Only backfills the account's own email when it doesn't already have
       // one - an established email is left alone rather than overwritten by
       // whatever this newly-linked Discord profile reports (deliberately not
@@ -285,6 +376,17 @@ export class FirestoreIdentityRepository implements IdentityRepository {
 
       if (!discordLinkDoc.exists) {
         tx.set(discordLinkRef, { uid });
+      }
+
+      // Only deletes if it still points to this exact uid - guards against
+      // deleting a link doc some other, unrelated concurrent write already
+      // repointed elsewhere.
+      if (
+        staleDiscordLinkRef &&
+        staleDiscordLinkDoc?.exists &&
+        (staleDiscordLinkDoc.data() as { uid: string }).uid === uid
+      ) {
+        tx.delete(staleDiscordLinkRef);
       }
 
       return toIdentity(uid, merged);

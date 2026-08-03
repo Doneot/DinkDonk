@@ -16,6 +16,7 @@ export function createNotificationManager(
     new DiscordNotificationChannel({
       discord,
       userRepository: repositories.users,
+      identityRepository: repositories.identities,
     }),
 
     // WEB_PUSH_PUBLIC_KEY/PRIVATE_KEY/SUBJECT are all required, non-optional

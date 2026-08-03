@@ -12,11 +12,13 @@ export function createServices(
   repositories: Repositories,
   notificationManager: NotificationManager,
 ) {
+  const eventSubSync = new EventSubSyncService(
+    twitch.client,
+    repositories.streamers,
+  );
+
   return {
-    eventSubSync: new EventSubSyncService(
-      twitch.client,
-      repositories.streamers,
-    ),
+    eventSubSync,
 
     streamNotification: new StreamNotificationService(
       twitch.client,
@@ -25,9 +27,12 @@ export function createServices(
       notificationManager,
     ),
 
+    // Shares eventSubSync's lock/exists-check for the recreate case - see
+    // SubscriptionCleanupService's constructor comment.
     subscriptionCleanup: new SubscriptionCleanupService(
       twitch.client,
       repositories.streamers,
+      eventSubSync,
     ),
   };
 }

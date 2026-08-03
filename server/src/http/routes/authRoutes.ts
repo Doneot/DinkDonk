@@ -1,8 +1,10 @@
 import express from "express";
 import passport from "passport";
-import type { RequestHandler, Router } from "express";
+import type { ErrorRequestHandler, RequestHandler, Router } from "express";
 import { env } from "../../shared/config/env.js";
+import { logger } from "../../shared/logger/logger.js";
 import { requireAuthenticated, requireUser } from "../middleware/auth.js";
+import { AppError } from "../errors/AppError.js";
 import {
   isGoogleSignInEnabled,
   isTwitchSignInEnabled,
@@ -83,8 +85,16 @@ export function createAuthRouter({
     const user = await repository.getUser(authUser.id);
     const identity = await identities.getIdentity(authUser.id);
 
+    // `||`, not `??`: canReceiveDM defaults to and persists as `false` (see
+    // UserRecordSchema), never null/undefined, once a user record exists -
+    // so `??` would never re-probe a user who signed up via a non-Discord
+    // provider (canReceiveDM=false persisted with no linked Discord yet)
+    // once they later link Discord via /discord/link, permanently stranding
+    // them at canReceiveDM=false. `||` re-probes whenever it isn't already
+    // confirmed true, while still short-circuiting (no probe call at all)
+    // when there's no linked Discord identity to probe.
     const canReceiveDM =
-      user?.canReceiveDM ??
+      user?.canReceiveDM ||
       (identity?.discord
         ? await discord.canSendDirectMessage(identity.discord.id)
         : false);
@@ -96,6 +106,40 @@ export function createAuthRouter({
     req.session.canReceiveDM = canReceiveDM;
 
     res.redirect(loginRedirect());
+  };
+
+  // A failed token exchange or bad credentials already redirects to
+  // /login-failed via failureRedirect below - but that option is only
+  // consulted when a strategy explicitly reports authentication failure
+  // (done(null, false)). Any exception during the flow instead - a verify
+  // callback's Firestore write failing, a profile fetch erroring after a
+  // successful token exchange, handleProviderCallback's own read/write
+  // failing - calls done(error)/next(error), bypassing failureRedirect
+  // entirely. Without this, that lands on the generic JSON error handler,
+  // which a real browser renders as a dead-end blob of JSON mid-navigation
+  // (this route is only ever reached via a top-level redirect back from the
+  // provider), with no way back into the app. Passed as the last argument
+  // to each */callback route below so it only catches errors from that
+  // route's own handlers, ahead of the app's generic error handler.
+  const handleAuthCallbackError: ErrorRequestHandler = (error, req, res, next) => {
+    // An AppError (e.g. requireUser's UnauthorizedError for a callback
+    // reached with no session at all - defensive, since passport's own
+    // authenticate() middleware already gates this in practice) already
+    // carries its own correct status code and a message meant to be shown
+    // as-is - handled by the app's generic error handler exactly like every
+    // other route, not redirected.
+    if (error instanceof AppError) {
+      next(error);
+
+      return;
+    }
+
+    logger.error(
+      { error, path: req.path },
+      "OAuth callback failed; redirecting to login-failed",
+    );
+
+    res.redirect("/login-failed");
   };
 
   router.get("/providers", (_req, res) => {
@@ -135,18 +179,33 @@ export function createAuthRouter({
     discordAuth,
   );
 
-  router.get("/discord/callback", discordAuthCallback, handleProviderCallback);
+  router.get(
+    "/discord/callback",
+    discordAuthCallback,
+    handleProviderCallback,
+    handleAuthCallbackError,
+  );
 
   if (isGoogleSignInEnabled) {
     router.get("/google", googleAuth);
 
-    router.get("/google/callback", googleAuthCallback, handleProviderCallback);
+    router.get(
+      "/google/callback",
+      googleAuthCallback,
+      handleProviderCallback,
+      handleAuthCallbackError,
+    );
   }
 
   if (isTwitchSignInEnabled) {
     router.get("/twitch", twitchAuth);
 
-    router.get("/twitch/callback", twitchAuthCallback, handleProviderCallback);
+    router.get(
+      "/twitch/callback",
+      twitchAuthCallback,
+      handleProviderCallback,
+      handleAuthCallbackError,
+    );
   }
 
   router.get(

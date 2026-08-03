@@ -30,20 +30,25 @@ function buildContext(
   };
 }
 
-function createInteraction() {
+function createInteraction(overrides: { deferred?: boolean; replied?: boolean } = {}) {
   const reply = vi.fn().mockResolvedValue(undefined);
+  const editReply = vi.fn().mockResolvedValue(undefined);
 
   return {
     reply,
+    editReply,
     interaction: {
       user: { id: TEST_USER_ID },
+      deferred: overrides.deferred ?? false,
+      replied: overrides.replied ?? false,
       reply,
+      editReply,
     } as unknown as ChatInputCommandInteraction,
   };
 }
 
 describe("replyEphemeral", () => {
-  it("replies with the ephemeral flag set", async () => {
+  it("replies with the ephemeral flag set when the interaction hasn't been deferred or replied to yet", async () => {
     const { interaction, reply } = createInteraction();
 
     await replyEphemeral(interaction, "hello");
@@ -52,6 +57,28 @@ describe("replyEphemeral", () => {
       content: "hello",
       flags: MessageFlags.Ephemeral,
     });
+  });
+
+  it("edits the deferred reply instead of calling reply() again when the interaction was already deferred", async () => {
+    const { interaction, reply, editReply } = createInteraction({
+      deferred: true,
+    });
+
+    await replyEphemeral(interaction, "hello");
+
+    expect(editReply).toHaveBeenCalledWith({ content: "hello" });
+    expect(reply).not.toHaveBeenCalled();
+  });
+
+  it("edits the reply instead of calling reply() again when the interaction was already replied to", async () => {
+    const { interaction, reply, editReply } = createInteraction({
+      replied: true,
+    });
+
+    await replyEphemeral(interaction, "hello");
+
+    expect(editReply).toHaveBeenCalledWith({ content: "hello" });
+    expect(reply).not.toHaveBeenCalled();
   });
 });
 

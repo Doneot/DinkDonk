@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { errorResponseSchema } from "../../../http/schemas/responses.js";
 import { userResponseSchema } from "../../../http/schemas/responses.js";
 import { env } from "../../../shared/config/env.js";
+import { logger } from "../../../shared/logger/logger.js";
 
 import { buildUser } from "../../builders/user.js";
 import { buildIdentity } from "../../builders/auth.js";
@@ -87,16 +88,27 @@ describe("GET /api/auth/discord/callback", () => {
     });
   });
 
-  it("keeps a stored negative DM capability without re-checking Discord", async () => {
-    const { app, discord } = await createAuthTestApp({
+  it("re-checks Discord DM capability when a stored negative predates linking Discord", async () => {
+    // A stored `false` doesn't distinguish "we checked and it's false" from
+    // "canReceiveDM defaulted to false because Discord wasn't linked yet" -
+    // e.g. a user who originally signed up via Google/Twitch, then later
+    // used /discord/link. The default identity here (like the other tests
+    // in this describe block) has Discord linked, so this must re-check
+    // rather than trust the stale `false`.
+    const { app, repositories, discord } = await createAuthTestApp({
       state: { users: [buildUser({ id: "user-1", canReceiveDM: false })] },
     });
 
-    const canSend = vi.spyOn(discord, "canSendDirectMessage");
+    const canSend = vi
+      .spyOn(discord, "canSendDirectMessage")
+      .mockResolvedValue(true);
 
     await request(app).get("/api/auth/discord/callback").expect(302);
 
-    expect(canSend).not.toHaveBeenCalled();
+    expect(canSend).toHaveBeenCalledWith("user-1");
+    await expect(repositories.users.getUser("user-1")).resolves.toMatchObject({
+      canReceiveDM: true,
+    });
   });
 
   it("asks Discord about DM capability for a first-time user", async () => {
@@ -142,14 +154,22 @@ describe("GET /api/auth/discord/callback", () => {
     await request(app).get("/api/auth/discord/callback").expect(401);
   });
 
-  it("surfaces a repository failure as a 500", async () => {
+  it("redirects to login-failed instead of a dead-end JSON error page when a repository failure interrupts the callback", async () => {
+    const error = vi.spyOn(logger, "error").mockReturnValue();
     const { app, repositories } = await createAuthTestApp();
 
     vi.spyOn(repositories.users, "getUser").mockRejectedValue(
       new Error("firestore unavailable"),
     );
 
-    await request(app).get("/api/auth/discord/callback").expect(500);
+    const response = await request(app)
+      .get("/api/auth/discord/callback")
+      .expect(302);
+
+    expect(response.headers.location).toBe("/login-failed");
+    expect(error.mock.calls[0]?.[0]).toMatchObject({
+      path: "/discord/callback",
+    });
   });
 });
 

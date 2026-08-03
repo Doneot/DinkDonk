@@ -2,7 +2,7 @@ export type SavePushSubscribeResult =
   | { success: true; id: string }
   | {
       success: false;
-      reason: "invalid_push_subscription";
+      reason: "invalid_push_subscription" | "push_subscription_limit_reached";
     };
 
 export type DeletePushSubscribeResult =

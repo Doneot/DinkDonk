@@ -40,7 +40,12 @@ export async function dispatchEventSubNotification(
     return { status: 204 };
   }
 
-  const handler = handlers[notification.subscription.type];
+  // Object.hasOwn (rather than a bare `handlers[type]` lookup) avoids
+  // resolving an inherited Object.prototype member - e.g. `type`
+  // "constructor" or "__proto__" - as a false-positive handler.
+  const handler = Object.hasOwn(handlers, notification.subscription.type)
+    ? handlers[notification.subscription.type]
+    : undefined;
 
   if (!handler) {
     return { status: 204 };

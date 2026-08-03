@@ -7,6 +7,7 @@ import { buildSubscription } from "../../builders/subscription.js";
 import type { SeededRepositoryFactory } from "./SeededRepository.js";
 import type { User } from "../../../modules/users/domain/User.js";
 import { MAX_SUBSCRIPTIONS } from "../../../modules/users/domain/Subscription.js";
+import type { Subscription } from "../../../modules/users/domain/Subscription.js";
 
 export function userRepositoryBehavior(
   name: string,
@@ -107,6 +108,21 @@ export function userRepositoryBehavior(
       await expect(repository.updateUser("", {})).rejects.toThrow(
         "Invalid user id",
       );
+    });
+
+    it("rejects updating a user with more subscriptions than the schema allows", async () => {
+      const repository = createRepository();
+
+      repository.seed(buildUser({ id: "user-1" }));
+
+      const subscriptions = Array.from(
+        { length: MAX_SUBSCRIPTIONS + 1 },
+        (_, i) => buildSubscription({ id: `streamer-${i}` }),
+      );
+
+      await expect(
+        repository.updateUser("user-1", { subscriptions }),
+      ).rejects.toThrow();
     });
 
     it("clear removes every user", async () => {
@@ -222,6 +238,35 @@ export function userRepositoryBehavior(
           id: "streamer-1",
           notification_message: "updated",
         });
+      });
+
+      it("ignores a smuggled id in the update patch, rather than letting it desync the subscription from its subscriber records", async () => {
+        const repository = createRepository();
+
+        repository.seed(
+          buildUser({
+            id: "user-1",
+            subscriptions: [buildSubscription({ id: "streamer-1" })],
+          }),
+        );
+
+        await expect(
+          repository.updateSubscription("user-1", "streamer-1", {
+            notification_message: "updated",
+            id: "streamer-2",
+          } as Partial<Omit<Subscription, "id">>),
+        ).resolves.toEqual({ success: true });
+
+        await expect(
+          repository.getSubscription("user-1", "streamer-1"),
+        ).resolves.toEqual({
+          id: "streamer-1",
+          notification_message: "updated",
+        });
+
+        await expect(
+          repository.getSubscription("user-1", "streamer-2"),
+        ).resolves.toBeNull();
       });
 
       it("returns subscription_not_found when updating a missing subscription", async () => {

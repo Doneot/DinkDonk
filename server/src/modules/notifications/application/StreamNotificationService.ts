@@ -78,9 +78,32 @@ export class StreamNotificationService {
       return;
     }
 
+    // Claimed synchronously, immediately after the duplicate check above
+    // with no `await` in between - two concurrent stream.online deliveries
+    // for the same session (distinct Twitch message ids, so ReplayStore
+    // doesn't dedup them - a real "brief drop/reconnect" scenario, exactly
+    // what this map exists to guard against) would otherwise both pass the
+    // check above before either claimed it. Rolled back below only if
+    // getSubscriberIds itself fails, so a genuine Firestore hiccup doesn't
+    // permanently poison the map against a legitimate retry (Twitch retries
+    // with a new message id, but the same started_at) - see the error
+    // handler.
     this.lastNotifiedStartedAt.set(streamer.id, event.started_at);
 
-    const userIds = await this.streamers.getSubscriberIds(streamer.id);
+    let userIds: string[];
+
+    try {
+      userIds = await this.streamers.getSubscriberIds(streamer.id);
+    } catch (error) {
+      // Only roll back if nothing has since superseded this entry - a
+      // genuinely new stream session for the same streamer could have
+      // already overwritten it while this fetch was in flight.
+      if (this.lastNotifiedStartedAt.get(streamer.id) === event.started_at) {
+        this.lastNotifiedStartedAt.delete(streamer.id);
+      }
+
+      throw error;
+    }
 
     for (let i = 0; i < userIds.length; i += NOTIFY_BATCH_SIZE) {
       const batch = userIds.slice(i, i + NOTIFY_BATCH_SIZE);

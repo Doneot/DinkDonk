@@ -95,6 +95,19 @@ describe("dispatchEventSubNotification", () => {
       expect(onNotification).not.toHaveBeenCalled();
     });
 
+    it("does not resolve an inherited Object.prototype member as a handler", async () => {
+      const { handlers, onNotification } = setup();
+      const payload = {
+        ...buildStreamOnlineEvent(),
+        subscription: { type: "constructor", version: "1" },
+      };
+
+      const result = await dispatch(payload, "notification", handlers);
+
+      expect(result).toEqual({ status: 204 });
+      expect(onNotification).not.toHaveBeenCalled();
+    });
+
     it("rejects an event payload that fails the stream.online schema", async () => {
       const { handlers, onNotification } = setup();
       const payload = {

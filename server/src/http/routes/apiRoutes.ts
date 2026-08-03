@@ -104,15 +104,23 @@ type PushFailureReason =
   | Extract<SavePushSubscribeResult, { success: false }>["reason"]
   | Extract<DeletePushSubscribeResult, { success: false }>["reason"];
 
-// Both reasons describe a malformed request rather than a missing resource
-// or a conflict, so they always map to 400 - unlike throwForSubscribeFailure
-// above, there's no reason here that needs a different status code.
+const PUSH_REASON_MESSAGES: Record<PushFailureReason, string> = {
+  invalid_user: "We couldn't identify your account.",
+  invalid_push_subscription: "That push subscription isn't valid.",
+  push_subscription_limit_reached:
+    "You've reached the maximum number of push subscriptions.",
+};
+
 function throwForPushFailure(reason: PushFailureReason): never {
-  throw new BadRequestError(
-    reason === "invalid_user"
-      ? "We couldn't identify your account."
-      : "That push subscription isn't valid.",
-  );
+  const message = PUSH_REASON_MESSAGES[reason];
+
+  switch (reason) {
+    case "push_subscription_limit_reached":
+      throw new ConflictError(message);
+    case "invalid_user":
+    case "invalid_push_subscription":
+      throw new BadRequestError(message);
+  }
 }
 
 export function createApiRouter({

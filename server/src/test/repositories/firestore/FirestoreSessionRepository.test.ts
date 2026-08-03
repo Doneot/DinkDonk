@@ -206,6 +206,83 @@ describe("FirestoreSessionRepository", () => {
     expect(firestore.read("custom-sessions/session-1")).toBeDefined();
   });
 
+  describe("purgeExpiredSessions", () => {
+    it("deletes only sessions past their expiry", async () => {
+      const { firestore, store } = setup();
+
+      await call((callback) =>
+        store.set(
+          "expired-1",
+          {
+            cookie: {
+              originalMaxAge: 3_600_000,
+              expires: new Date(Date.now() - 60_000),
+            },
+          },
+          callback,
+        ),
+      );
+      await call((callback) =>
+        store.set(
+          "expired-2",
+          {
+            cookie: {
+              originalMaxAge: 3_600_000,
+              expires: new Date(Date.now() - 1_000),
+            },
+          },
+          callback,
+        ),
+      );
+      await call((callback) =>
+        store.set(
+          "fresh-1",
+          {
+            cookie: {
+              originalMaxAge: 3_600_000,
+              expires: new Date(Date.now() + 3_600_000),
+            },
+          },
+          callback,
+        ),
+      );
+
+      await expect(store.purgeExpiredSessions()).resolves.toBe(2);
+
+      expect(firestore.read("sessions/expired-1")).toBeUndefined();
+      expect(firestore.read("sessions/expired-2")).toBeUndefined();
+      expect(firestore.read("sessions/fresh-1")).toBeDefined();
+    });
+
+    it("returns 0 when nothing is expired", async () => {
+      const { store } = setup();
+
+      await call((callback) =>
+        store.set(
+          "fresh-1",
+          {
+            cookie: {
+              originalMaxAge: 3_600_000,
+              expires: new Date(Date.now() + 3_600_000),
+            },
+          },
+          callback,
+        ),
+      );
+
+      await expect(store.purgeExpiredSessions()).resolves.toBe(0);
+    });
+
+    it("ignores a session document with no expiresAt field", async () => {
+      const { firestore, store } = setup();
+
+      firestore.write("sessions/no-expiry", { updatedAt: 1 });
+
+      await expect(store.purgeExpiredSessions()).resolves.toBe(0);
+      expect(firestore.read("sessions/no-expiry")).toBeDefined();
+    });
+  });
+
   describe("touch", () => {
     it("refreshes updatedAt/expiresAt via merge without disturbing the stored session blob", async () => {
       const { firestore, store } = setup();

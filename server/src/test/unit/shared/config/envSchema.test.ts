@@ -148,6 +148,26 @@ describe("EnvSchema", () => {
     );
   });
 
+  it("leaves CLIENT_ORIGIN undefined when unset", () => {
+    const parsed = EnvSchema.parse(baseEnv());
+
+    expect(parsed.CLIENT_ORIGIN).toBeUndefined();
+  });
+
+  it("accepts a valid CLIENT_ORIGIN", () => {
+    const parsed = EnvSchema.parse(
+      baseEnv({ CLIENT_ORIGIN: "https://app.example.com" }),
+    );
+
+    expect(parsed.CLIENT_ORIGIN).toBe("https://app.example.com");
+  });
+
+  it("rejects an invalid CLIENT_ORIGIN instead of silently accepting a value CORS/socket.io can never match against a real Origin header", () => {
+    expect(
+      messagesFor(baseEnv({ CLIENT_ORIGIN: "not-a-url" })),
+    ).not.toHaveLength(0);
+  });
+
   it.each([
     "SESSION_SECRET",
     "ENCRYPTION_KEY",

@@ -19,10 +19,26 @@ export class FakeFirestore {
     return new FakeCollectionReference(this, path);
   }
 
+  // Invokes the callback exactly once, with no read-set tracking or
+  // conflict-driven retry - unlike real Firestore, which retries a
+  // transaction whose reads were invalidated by a concurrently-committed
+  // write. Tests built on this fake can prove a transaction reads before it
+  // writes (the property real Firestore's optimistic-concurrency retry
+  // depends on), but they cannot exercise the retry itself or prove
+  // exactly-once-under-real-concurrency guarantees (e.g.
+  // FirestoreUserRepository#subscribe's createdStreamer flag staying
+  // correct when two users race to create the same streamer) - that
+  // correctness rests on Firestore's own documented OCC contract, not on
+  // anything this fake models.
   runTransaction<T>(
     updateFunction: (transaction: FakeTransaction) => Promise<T>,
   ): Promise<T> {
     return updateFunction(new FakeTransaction());
+  }
+
+  /** Mirrors Firestore#batch(): queues deletes/writes, applied on commit(). */
+  batch(): FakeWriteBatch {
+    return new FakeWriteBatch();
   }
 
   /** Mirrors Firestore#getAll(...refs): batched reads, snapshots in order. */
@@ -57,6 +73,69 @@ export class FakeFirestore {
 
   asFirestore(): Firestore {
     return this as unknown as Firestore;
+  }
+}
+
+type WhereOperator = "==" | "<" | "<=" | ">" | ">=";
+
+function matchesOperator(
+  operator: WhereOperator,
+  actual: unknown,
+  expected: unknown,
+): boolean {
+  switch (operator) {
+    case "==":
+      return actual === expected;
+    case "<":
+      return (
+        typeof actual === "number" &&
+        typeof expected === "number" &&
+        actual < expected
+      );
+    case "<=":
+      return (
+        typeof actual === "number" &&
+        typeof expected === "number" &&
+        actual <= expected
+      );
+    case ">":
+      return (
+        typeof actual === "number" &&
+        typeof expected === "number" &&
+        actual > expected
+      );
+    case ">=":
+      return (
+        typeof actual === "number" &&
+        typeof expected === "number" &&
+        actual >= expected
+      );
+  }
+}
+
+export class FakeWriteBatch {
+  private readonly operations: Array<() => void> = [];
+
+  delete(reference: FakeDocumentReference): void {
+    this.operations.push(() => reference.firestore.remove(reference.path));
+  }
+
+  set(
+    reference: FakeDocumentReference,
+    data: DocumentData,
+    options: SetOptions = {},
+  ): void {
+    this.operations.push(() =>
+      reference.firestore.write(reference.path, data, options),
+    );
+  }
+
+  commit(): Promise<void> {
+    for (const operation of this.operations) {
+      operation();
+    }
+
+    return Promise.resolve();
   }
 }
 
@@ -147,9 +226,9 @@ export class FakeCollectionReference {
     return Promise.resolve({ docs });
   }
 
-  where(field: string, operator: "==", value: unknown): FakeQuery {
+  where(field: string, operator: WhereOperator, value: unknown): FakeQuery {
     return new FakeQuery(this.firestore, this.path, [
-      (data) => data?.[field] === value,
+      (data) => matchesOperator(operator, data?.[field], value),
     ]);
   }
 
@@ -167,11 +246,23 @@ export class FakeQuery {
     >,
   ) {}
 
-  where(field: string, operator: "==", value: unknown): FakeQuery {
+  where(field: string, operator: WhereOperator, value: unknown): FakeQuery {
     return new FakeQuery(this.firestore, this.path, [
       ...this.predicates,
-      (data) => data?.[field] === value,
+      (data) => matchesOperator(operator, data?.[field], value),
     ]);
+  }
+
+  limit(count: number): {
+    get: () => Promise<{ docs: FakeDocumentSnapshot[] }>;
+  } {
+    return {
+      get: async () => {
+        const { docs } = await this.get();
+
+        return { docs: docs.slice(0, count) };
+      },
+    };
   }
 
   get(): Promise<{ docs: FakeDocumentSnapshot[] }> {

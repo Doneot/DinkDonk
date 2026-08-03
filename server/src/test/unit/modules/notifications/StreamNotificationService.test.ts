@@ -85,6 +85,7 @@ function setup({
   return {
     notify,
     userRepository,
+    streamerRepository,
     service: new StreamNotificationService(
       twitch,
       userRepository,
@@ -269,6 +270,58 @@ describe("StreamNotificationService", () => {
       }),
       "Failed to load a batch of subscribers to notify of stream going live",
     );
+  });
+
+  it("notifies only once when two deliveries for the same stream session race concurrently", async () => {
+    vi.spyOn(logger, "info").mockReturnValue();
+
+    const { service, notify } = setup({
+      streamers: [buildStreamer({ id: "streamer-1", users: ["user-1"] })],
+      users: [buildUser({ id: "user-1" })],
+    });
+
+    // Two genuinely concurrent deliveries of the same stream session -
+    // distinct Twitch message ids (not modeled here; ReplayStore's dedup is
+    // by message id and wouldn't catch this), started well within the flap
+    // window. Without claiming the dedup map synchronously before the
+    // subscriber-list fetch, both calls could pass isDuplicateStreamSession
+    // before either claims it.
+    await Promise.all([
+      service.handleStreamOnline(event),
+      service.handleStreamOnline(event),
+    ]);
+
+    expect(notify).toHaveBeenCalledOnce();
+  });
+
+  it("still notifies on a retry after getSubscriberIds itself fails, instead of treating the retry as a duplicate", async () => {
+    const { service, notify, streamerRepository } = setup({
+      streamers: [buildStreamer({ id: "streamer-1", users: ["user-1"] })],
+      users: [buildUser({ id: "user-1" })],
+    });
+
+    vi.spyOn(streamerRepository, "getSubscriberIds").mockRejectedValueOnce(
+      new Error("firestore unavailable"),
+    );
+
+    // The first delivery attempt fails outright while fetching the
+    // subscriber list itself (as opposed to a per-batch user-lookup failure,
+    // which is already isolated) - this is what propagates up to
+    // eventSubRoutes.ts's catch block in production, which releases the
+    // replay-store's message-id reservation so Twitch's retry is reprocessed
+    // rather than treated as an already-handled duplicate.
+    await expect(service.handleStreamOnline(event)).rejects.toThrow(
+      "firestore unavailable",
+    );
+
+    expect(notify).not.toHaveBeenCalled();
+
+    // Twitch's retry redelivers the same stream session (same started_at).
+    // It must actually be attempted, not silently skipped as a flap dedup -
+    // the failed first attempt never got far enough to have sent anything.
+    await service.handleStreamOnline(event);
+
+    expect(notify).toHaveBeenCalledOnce();
   });
 
   describe("flapping stream dedup", () => {

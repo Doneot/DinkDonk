@@ -86,9 +86,25 @@ export function configureMiddleware({
 }: ConfigureMiddlewareOptions) {
   const configuredPassport = configurePassport(identityRepository);
 
+  // eventSubRoutes.ts claims a message-id reservation *before* dispatching
+  // to subscribers, and only releases it (replayStore.forget()) if dispatch
+  // throws - a mid-flight process exit (a deploy's SIGTERM outrunning a slow
+  // fan-out to many subscribers, or any of the app's process.exit(1) crash
+  // paths) leaves an orphaned reservation that outlives the process. With
+  // RedisReplayStore, that reservation survives the restart too, so Twitch's
+  // retried delivery of the same event is wrongly treated as an
+  // already-handled duplicate and silently dropped for the rest of the TTL.
+  // Twitch's own retry behavior gives up after "a couple minutes" (not
+  // formally documented) - keeping the TTL only slightly above that bounds
+  // how long an orphaned reservation can block a legitimate retry, without
+  // meaningfully weakening the actual dedup purpose (rejecting the
+  // near-simultaneous duplicate deliveries Twitch's at-least-once guarantee
+  // can produce), which happens on a much shorter timescale than 10 minutes.
+  const replayStoreTtlMs = 3 * 60_000;
+
   const replayStore = redis
-    ? new RedisReplayStore(redis, 10 * 60_000)
-    : new InMemoryReplayStore({ ttlMs: 10 * 60_000 });
+    ? new RedisReplayStore(redis, replayStoreTtlMs)
+    : new InMemoryReplayStore({ ttlMs: replayStoreTtlMs });
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
