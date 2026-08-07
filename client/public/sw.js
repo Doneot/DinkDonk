@@ -2,7 +2,7 @@ self.addEventListener('push', (event) => {
   let payload = {};
   try {
     payload = event.data ? event.data.json() : {};
-  } catch (_error) {
+  } catch {
     payload = { title: 'DinkDonk', body: event.data?.text() || 'A streamer is live!' };
   }
 

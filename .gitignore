@@ -35,6 +35,7 @@ pnpm-debug.log*
 .stylelintcache
 .npm/
 .vite/
+*.tsbuildinfo
 
 # Coverage
 coverage/

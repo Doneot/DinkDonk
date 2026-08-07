@@ -239,60 +239,96 @@ server/src/test/repositories/   in-memory port implementations used in tests, pl
 Frontend entrypoint:
 
 ```txt
-client/src/App.jsx
+client/src/main.tsx
 ```
 
-The frontend remains intentionally lightweight.
+The frontend is TypeScript (React 19 + Vite). It's organized into bounded modules under `modules/<name>/` that mirror the backend's `modules/<name>/` concept - each owns its own components, an `api.ts` (a typed wrapper around the shared HTTP client), and, where the component would otherwise mix business logic with rendering, one or more custom hooks that hold that logic. Components call their module's `api.ts`, never the shared HTTP client directly - the same discipline the backend's `http/routes/` observes toward Firestore (routes never touch it directly; they go through an injected repository).
 
 Responsibilities:
 - authentication flow
 - subscription management
 - realtime UI updates
-- future notification preferences
+- browser push notification preferences
+
+---
+
+## modules/
+
+Bounded modules, one per domain concept: `auth`, `dashboard`, `notifications`, `subscriptions`. Not every module has every layer, but where a layer appears it means the same thing every time:
+
+```txt
+modules/<name>/components/   presentation-focused React components
+modules/<name>/hooks/        business logic / state orchestration extracted out of components
+                              (the backend's application/ role - depends only on the module's
+                              own api.ts and shared/ context, never touches axios or a URL string)
+modules/<name>/api.ts        typed functions wrapping the shared HTTP client - the only place
+                              in the module allowed to know an endpoint's URL or request/response
+                              shape
+modules/<name>/types.ts      client-only view-model types layered on top of shared/types/api.ts
+                              (present only where a module actually has one, e.g. subscriptions)
+modules/<name>/__tests__/    colocated tests for the module
+```
+
+Examples:
+
+```txt
+client/src/modules/subscriptions/api.ts                     searchStreamers, subscribeToStreamer, ...
+client/src/modules/subscriptions/hooks/useSubscriptions.ts  hydration cache, subscribe/unsubscribe,
+                                                              debounced autosave - everything
+                                                              SubscriptionsManager used to do inline
+client/src/modules/subscriptions/hooks/useStreamerSearch.ts debounced, race-condition-guarded search
+client/src/modules/dashboard/api.ts                          fetchStatus, fetchUserCount, checkCanReceiveDM
+client/src/modules/notifications/api.ts                      Web Push subscribe/unsubscribe (browser
+                                                              Push API + the save/delete HTTP calls)
+```
+
+**Deliberate deviations from the backend's module layering** (not oversights - see the backend's own `modules/` section above for what's being deviated from):
+
+- **No `ports/`+`infrastructure/` interface/implementation split.** The backend's split earns its keep because it genuinely swaps implementations (Firestore vs. in-memory in tests, real Twitch vs. fake). The frontend only ever has one real implementation of anything (HTTP via axios), and the test suite already fakes that boundary correctly by mocking each module's `api.ts` directly. A named interface with exactly one implementer forever would be ceremony with no payoff - instead, every exported `api.ts` function has an explicit return type, so the contract is still compiler-enforced.
+- **No frontend domain-event-bus.** `SocketContext` broadcasting `user_data_updated` into `AuthContext`'s `setUser` already fills that role at this scale.
+- **No Zod `schemas/`.** `shared/types/api.ts` is hand-written TypeScript interfaces mirroring the backend's response shapes, with no runtime validation at the boundary. Accepted debt: the two packages aren't wired into a shared workspace, so nothing currently keeps them in sync automatically if the backend's contract changes shape.
 
 ---
 
 ## pages/
 
-Route-level screens.
-
-Pages should compose UI components and call application services, but should avoid embedding backend transport logic directly.
+Route-level screens, one per route in `router/AppRoutes.tsx`. Pages compose components from one or more `modules/` (and occasionally call a module's `api.ts` directly, e.g. `Dashboard.tsx` sourcing `checkCanReceiveDM` to hand to `CheckDMButton` as a prop) but hold no business logic of their own.
 
 ---
 
-## components/
+## shared/
 
-Reusable UI components.
+Cross-cutting code with no ownership by a single module - the frontend's equivalent of the backend's `shared/`.
 
-Components should stay presentation-focused when possible.
-
----
-
-## services/
-
-API and Socket.IO communication.
-
-Examples:
-- HTTP API wrapper
-- Socket.IO client initialization
-- auth probing
-- subscription API calls
+```txt
+shared/api/client.ts       the axios instance + the global 401 (session-expired) response interceptor
+shared/api/errorToast.ts   turns a caught API error into a user-facing toast message
+shared/socket.ts           Socket.IO client factory + the app's realtime event type map
+shared/types/api.ts        types mirroring the backend's response shapes - imported across module
+                            boundaries (User, Subscription, Provider, ...), same as how the backend's
+                            User domain type is imported by ports/application code in other modules
+shared/hooks/useClickOutside.ts
+shared/components/         generic, module-agnostic UI: Navbar, Footer, HomeButton, ScrollToTop,
+                            ErrorBoundary
+```
 
 ---
 
 ## context/
 
-React providers and shared state.
-
-Context files may be split to avoid React Fast Refresh issues when exporting both providers and hooks.
+React providers and shared state: `AuthContext`/`SocketContext`, each split into a provider component and a `*ContextValue.ts` file exporting the context object and its `useX()` hook (keeps React Fast Refresh working when a file exports both a component and a hook). Stays a top-level peer of `modules/`/`shared/`/`pages/` rather than nested under `shared/` - it's already correctly scoped, and isn't part of the "raw API calls scattered in components" problem `modules/`'s `api.ts` convention exists to fix.
 
 ---
 
 ## router/
 
-Application routing.
+Application routing (`AppRoutes.tsx`). Defines the public/login area and the authenticated dashboard area, and lazy-loads every route except the landing page via `React.lazy`.
 
-The router defines the public/login area and authenticated dashboard area.
+---
+
+## test/
+
+`test/setup.ts` - Vitest + Testing Library setup, referenced from `vite.config.ts`. Actual tests live colocated in each module's own `__tests__/` (e.g. `modules/subscriptions/__tests__/`) rather than in a separate top-level tree mirroring `src/` the way the backend's `test/` does - colocated tests are the dominant, tool-supported convention in the Vite/Vitest/React ecosystem, and the backend's separate tree also exists to house in-memory port fakes and cross-implementation contract tests that have no frontend equivalent (see the `ports/`+`infrastructure/` deviation above).
 
 ---
 
