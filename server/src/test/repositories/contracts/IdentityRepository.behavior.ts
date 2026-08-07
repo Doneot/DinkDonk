@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { IdentityRepository } from "../../../modules/auth/ports/IdentityRepository.js";
 import type { Identity } from "../../../modules/auth/domain/Identity.js";
+import { IdentityNotFoundError } from "../../../modules/auth/domain/IdentityNotFoundError.js";
 import {
   buildDiscordCredential,
   buildGoogleCredential,
@@ -560,7 +561,7 @@ export function identityRepositoryBehavior(
           null,
           false,
         ),
-      ).rejects.toThrow();
+      ).rejects.toThrow(IdentityNotFoundError);
     });
 
     it("allows re-linking the same Discord account onto the same uid", async () => {
@@ -659,7 +660,7 @@ export function identityRepositoryBehavior(
         repository.updateDiscordCredential("missing", {
           accessToken: "token",
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(IdentityNotFoundError);
     });
 
     it("rejects updating the Discord credential for an identity with none linked", async () => {
@@ -673,7 +674,7 @@ export function identityRepositoryBehavior(
         repository.updateDiscordCredential("user-1", {
           accessToken: "token",
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(IdentityNotFoundError);
     });
 
     it("rejects an invalid uid", async () => {

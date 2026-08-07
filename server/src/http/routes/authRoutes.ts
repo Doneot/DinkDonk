@@ -1,8 +1,9 @@
 import express from "express";
 import passport from "passport";
 import type { ErrorRequestHandler, RequestHandler, Router } from "express";
-import { env } from "../../shared/config/env.js";
 import { logger } from "../../shared/logger/logger.js";
+import { SESSION_COOKIE_NAME } from "../configureMiddleware.js";
+import { dashboardUrl } from "../../shared/utils/urls.js";
 import { requireAuthenticated, requireUser } from "../middleware/auth.js";
 import { AppError } from "../errors/AppError.js";
 import {
@@ -55,12 +56,6 @@ type CreateAuthRouterOptions = {
   disconnectUser?: (userId: string) => void;
 };
 
-function loginRedirect(): string {
-  return env.isProduction
-    ? `${env.serverUrl}/dashboard`
-    : "http://localhost:5000/dashboard";
-}
-
 export function createAuthRouter({
   repository,
   identities,
@@ -105,7 +100,7 @@ export function createAuthRouter({
 
     req.session.canReceiveDM = canReceiveDM;
 
-    res.redirect(loginRedirect());
+    res.redirect(dashboardUrl());
   };
 
   // A failed token exchange or bad credentials already redirects to
@@ -277,7 +272,7 @@ export function createAuthRouter({
         }
 
         req.session.destroy(() => {
-          res.clearCookie("connect.sid");
+          res.clearCookie(SESSION_COOKIE_NAME);
 
           // Drop any already-established realtime connections for this
           // user: destroying the Firestore session doc above doesn't by

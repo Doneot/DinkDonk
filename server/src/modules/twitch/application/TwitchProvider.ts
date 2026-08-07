@@ -15,7 +15,15 @@ export type TwitchProviderOptions = {
   refreshIntervalMs?: number;
 };
 
-export class TwitchProvider extends EventEmitter {
+// Node's EventEmitter accepts a generic event map (tuple-per-event
+// arguments) that type-checks .emit()/.on() call sites - a typo'd event
+// name here would otherwise silently never connect, with no error anywhere.
+type TwitchProviderEvents = {
+  ready: [];
+  tokenRefreshed: [];
+};
+
+export class TwitchProvider extends EventEmitter<TwitchProviderEvents> {
   readonly client: TwitchClient;
 
   private readonly authenticator: TwitchAuthenticator;

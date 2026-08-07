@@ -13,6 +13,7 @@ import {
 
 import { isNonEmptyString } from "../../../shared/utils/validators.js";
 import { IdentityConflictError } from "../../../modules/auth/domain/IdentityConflictError.js";
+import { IdentityNotFoundError } from "../../../modules/auth/domain/IdentityNotFoundError.js";
 
 export class InMemoryIdentityRepository implements IdentityRepository {
   private readonly identities = new Map<string, Identity>();
@@ -215,7 +216,9 @@ export class InMemoryIdentityRepository implements IdentityRepository {
     const existing = this.identities.get(uid);
 
     if (!existing) {
-      return Promise.reject(new Error(`No identity found for uid ${uid}`));
+      return Promise.reject(
+        new IdentityNotFoundError(`No identity found for uid ${uid}`),
+      );
     }
 
     // Mirrors FirestoreIdentityRepository: only backfills the account's own
@@ -261,11 +264,11 @@ export class InMemoryIdentityRepository implements IdentityRepository {
       const existing = this.identities.get(uid);
 
       if (!existing) {
-        throw new Error(`No identity found for uid ${uid}`);
+        throw new IdentityNotFoundError(`No identity found for uid ${uid}`);
       }
 
       if (!existing.discord) {
-        throw new Error(
+        throw new IdentityNotFoundError(
           `Identity ${uid} has no linked Discord credential to update`,
         );
       }

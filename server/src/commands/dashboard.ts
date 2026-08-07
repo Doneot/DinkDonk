@@ -1,6 +1,6 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import { env } from "../shared/config/env.js";
+import { dashboardUrl } from "../shared/utils/urls.js";
 
 export const data = new SlashCommandBuilder()
   .setName("dashboard")
@@ -9,7 +9,7 @@ export const data = new SlashCommandBuilder()
 export async function execute(
   interaction: ChatInputCommandInteraction,
 ): Promise<void> {
-  const url = `${env.isProduction ? env.serverUrl : "http://localhost:5000"}/dashboard`;
+  const url = dashboardUrl();
   await interaction.reply({
     content: `🔧 Your dashboard: ${url}`,
     flags: MessageFlags.Ephemeral,

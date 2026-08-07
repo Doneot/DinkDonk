@@ -30,7 +30,20 @@ describe("IntervalScheduler", () => {
     expect(run).not.toHaveBeenCalled();
   });
 
-  it("runs the task on every interval tick", async () => {
+  it("runs the task immediately on start, before any interval elapses", async () => {
+    vi.useFakeTimers();
+
+    const { scheduler, run } = setup();
+
+    scheduler.start();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(run).toHaveBeenCalledOnce();
+
+    scheduler.stop();
+  });
+
+  it("runs the task on every interval tick, in addition to the immediate run", async () => {
     vi.useFakeTimers();
 
     const { scheduler, run } = setup();
@@ -39,7 +52,8 @@ describe("IntervalScheduler", () => {
 
     await vi.advanceTimersByTimeAsync(3_000);
 
-    expect(run).toHaveBeenCalledTimes(3);
+    // 1 immediate run on start() + 3 interval ticks.
+    expect(run).toHaveBeenCalledTimes(4);
 
     scheduler.stop();
   });
@@ -54,7 +68,9 @@ describe("IntervalScheduler", () => {
 
     await vi.advanceTimersByTimeAsync(1_000);
 
-    expect(run).toHaveBeenCalledOnce();
+    // 1 immediate run from the first start() (the second is a no-op) + 1
+    // interval tick.
+    expect(run).toHaveBeenCalledTimes(2);
 
     scheduler.stop();
   });
@@ -72,7 +88,8 @@ describe("IntervalScheduler", () => {
 
     await vi.advanceTimersByTimeAsync(5_000);
 
-    expect(run).toHaveBeenCalledOnce();
+    // 1 immediate run + 1 interval tick before stop() took effect.
+    expect(run).toHaveBeenCalledTimes(2);
   });
 
   it("tolerates stop being called twice", () => {
@@ -95,7 +112,11 @@ describe("IntervalScheduler", () => {
 
     await vi.advanceTimersByTimeAsync(1_000);
 
-    expect(run).toHaveBeenCalledOnce();
+    // The first start()'s immediate run is still "running" (no microtask
+    // tick has elapsed between these synchronous calls), so the restart's
+    // own immediate run is skipped by the overlap guard: 1 immediate run +
+    // 1 interval tick.
+    expect(run).toHaveBeenCalledTimes(2);
 
     scheduler.stop();
   });
@@ -112,8 +133,9 @@ describe("IntervalScheduler", () => {
 
     await vi.advanceTimersByTimeAsync(2_000);
 
-    expect(run).toHaveBeenCalledTimes(2);
-    expect(error).toHaveBeenCalledTimes(2);
+    // 1 immediate run + 2 interval ticks, each failing and logging.
+    expect(run).toHaveBeenCalledTimes(3);
+    expect(error).toHaveBeenCalledTimes(3);
     expect(error.mock.calls[0]?.[1]).toBe(
       "Failed to execute subscription garbage collection",
     );

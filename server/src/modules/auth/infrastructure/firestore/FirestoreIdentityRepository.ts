@@ -24,6 +24,7 @@ import { encryptSecret } from "../../../../shared/utils/crypto.js";
 import { getExistingDoc } from "../../../../shared/utils/firestore.js";
 import { toIdentity } from "./mappers/identityMapper.js";
 import { IdentityConflictError } from "../../domain/IdentityConflictError.js";
+import { IdentityNotFoundError } from "../../domain/IdentityNotFoundError.js";
 
 function discordLinkId(discordId: string): string {
   return `discord:${discordId}`;
@@ -328,7 +329,7 @@ export class FirestoreIdentityRepository implements IdentityRepository {
       }
 
       if (!existingDoc.exists) {
-        throw new Error(`No identity found for uid ${uid}`);
+        throw new IdentityNotFoundError(`No identity found for uid ${uid}`);
       }
 
       const existing = IdentityRecordSchema.parse(existingDoc.data());
@@ -413,13 +414,13 @@ export class FirestoreIdentityRepository implements IdentityRepository {
       const doc = await tx.get(identityRef);
 
       if (!doc.exists) {
-        throw new Error(`No identity found for uid ${uid}`);
+        throw new IdentityNotFoundError(`No identity found for uid ${uid}`);
       }
 
       const existing = IdentityRecordSchema.parse(doc.data());
 
       if (!existing.discord) {
-        throw new Error(
+        throw new IdentityNotFoundError(
           `Identity ${uid} has no linked Discord credential to update`,
         );
       }

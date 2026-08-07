@@ -6,6 +6,8 @@ import {
 
 import { z } from "zod";
 
+import { SESSION_COOKIE_NAME } from "../http/configureMiddleware.js";
+
 import { PushSubscriptionSchema } from "../modules/notifications/schemas/PushSubscriptionSchema.js";
 import { SubscriptionSchema } from "../modules/users/schemas/SubscriptionSchema.js";
 import { StreamerSchema } from "../modules/streamers/schemas/StreamerSchema.js";
@@ -111,13 +113,7 @@ export const openApiDocument = {
       cookieAuth: {
         type: "apiKey",
         in: "cookie",
-        // "connect.sid" is express-session's built-in default cookie name.
-        // configureMiddleware.ts's session({ ... }) call never overrides it
-        // via a `name` option, so there's no shared constant to import here
-        // - this literal must be kept in sync by hand with that call (and
-        // with authRoutes.ts's res.clearCookie("connect.sid") on logout) if
-        // that ever changes.
-        name: "connect.sid",
+        name: SESSION_COOKIE_NAME,
       },
     },
   },

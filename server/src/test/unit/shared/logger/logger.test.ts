@@ -102,5 +102,33 @@ describe("logger", () => {
 
       expect(parsed.tokens.discord.accessToken).toBe("[REDACTED]");
     });
+
+    /**
+     * SENSITIVE_FIELDS only generates wildcard paths two levels deep (see
+     * its comment in logger.ts), so a field nested a third level down is
+     * currently logged in the clear. This test doesn't guard a bug - it
+     * pins that documented limitation down as an executable fact: if a real
+     * log call is ever shaped like this, it silently leaks a secret, and
+     * whoever extends SENSITIVE_FIELDS' wildcard depth to fix that will
+     * find this assertion and know to update it alongside the fix.
+     */
+    it("does not redact a sensitive field nested three levels deep (documents the current limit)", async () => {
+      const { logger, lastLine } = await loggerWithCapturedOutput();
+
+      logger.info(
+        {
+          session: { user: { tokens: { accessToken: "unredacted-secret" } } },
+        },
+        "session loaded",
+      );
+
+      const parsed = lastLine() as {
+        session: { user: { tokens: { accessToken: string } } };
+      };
+
+      expect(parsed.session.user.tokens.accessToken).toBe(
+        "unredacted-secret",
+      );
+    });
   });
 });

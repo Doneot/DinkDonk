@@ -50,8 +50,16 @@ type ConfigureMiddlewareOptions = {
   redis?: Redis;
 };
 
+// express-session defaults to this name if none is given; naming it
+// explicitly here (rather than relying on that default) lets authRoutes.ts's
+// logout and openapi.ts's cookieAuth scheme import a single source of truth
+// instead of hand-duplicating the literal.
+export const SESSION_COOKIE_NAME = "connect.sid";
+
 export function createSessionMiddleware(firestore: Firestore): RequestHandler {
   return session({
+    name: SESSION_COOKIE_NAME,
+
     store: new FirestoreSessionRepository(firestore),
 
     secret: assertDefined(env.sessionSecret, "Session Secret"),
@@ -162,12 +170,10 @@ export function configureMiddleware({
 
   app.use(httpMetrics);
 
-  app.use(sessionMiddleware);
-
-  app.use(configuredPassport.initialize());
-
-  app.use(configuredPassport.session());
-
+  // Mounted before sessionMiddleware/passport: Twitch's EventSub calls carry
+  // no session cookie, so running the Firestore-backed session lookup and
+  // passport's deserialize step on this path would be pure overhead on
+  // what's meant to be a lean, high-volume public webhook endpoint.
   app.use(
     "/eventsub",
 
@@ -187,6 +193,12 @@ export function configureMiddleware({
       },
     }),
   );
+
+  app.use(sessionMiddleware);
+
+  app.use(configuredPassport.initialize());
+
+  app.use(configuredPassport.session());
 
   app.use(limiter);
 }
