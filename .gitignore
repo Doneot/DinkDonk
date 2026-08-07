@@ -40,6 +40,9 @@ pnpm-debug.log*
 coverage/
 .nyc_output/
 
+# Audit
+audit/
+
 # Runtime
 pids/
 *.pid
