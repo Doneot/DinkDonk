@@ -98,11 +98,25 @@ describe("env", () => {
     const env = await loadEnv();
 
     expect(env.clientOrigin).toBe(env.serverUrl);
+    expect(env.clientOrigins).toEqual([env.serverUrl]);
   });
 
   it("prefers an explicit client origin", async () => {
     const env = await loadEnv({ CLIENT_ORIGIN: "https://app.example.com" });
 
+    expect(env.clientOrigin).toBe("https://app.example.com");
+    expect(env.clientOrigins).toEqual(["https://app.example.com"]);
+  });
+
+  it("splits a comma-separated CLIENT_ORIGIN into every allowed origin, using the first as the singular clientOrigin", async () => {
+    const env = await loadEnv({
+      CLIENT_ORIGIN: "https://app.example.com, https://www.example.com",
+    });
+
+    expect(env.clientOrigins).toEqual([
+      "https://app.example.com",
+      "https://www.example.com",
+    ]);
     expect(env.clientOrigin).toBe("https://app.example.com");
   });
 

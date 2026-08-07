@@ -11,8 +11,16 @@ dotenv.config({ path: path.resolve(process.cwd(), envFile) });
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 import { EnvSchema } from "./envSchema.js";
+import { assertDefined } from "../utils/assert.js";
 
 const parsedEnv = EnvSchema.parse(process.env);
+
+// Every allowed client origin, falling back to a single-element list of
+// SERVER_URL when CLIENT_ORIGIN is unset - same fallback env.clientOrigin
+// used before this became a list. Non-empty by construction: envSchema
+// either yields undefined (nothing configured) or a list with at least one
+// validated entry, never an empty array.
+const clientOrigins = parsedEnv.CLIENT_ORIGIN ?? [parsedEnv.SERVER_URL];
 
 export const env = {
   nodeEnv: parsedEnv.NODE_ENV,
@@ -27,7 +35,16 @@ export const env = {
 
   redisUrl: parsedEnv.REDIS_URL,
 
-  clientOrigin: parsedEnv.CLIENT_ORIGIN || parsedEnv.SERVER_URL,
+  // Every origin CORS (configureMiddleware.ts/socketServer.ts) should accept
+  // credentialed cross-origin requests from.
+  clientOrigins,
+
+  // The single canonical origin to use where only one makes sense - e.g.
+  // configureRoutes.ts's /login-failed redirect, which needs one concrete
+  // Location to send the browser to, not a list. Always clientOrigins' first
+  // entry, matching CLIENT_ORIGIN's documented "first origin is primary"
+  // convention (see envSchema.ts).
+  clientOrigin: assertDefined(clientOrigins[0], "CLIENT_ORIGIN"),
 
   sessionSecret: parsedEnv.SESSION_SECRET,
 

@@ -153,17 +153,40 @@ describe("EnvSchema", () => {
     expect(parsed.CLIENT_ORIGIN).toBeUndefined();
   });
 
-  it("accepts a valid CLIENT_ORIGIN", () => {
+  it("keeps a single CLIENT_ORIGIN as a one-element list", () => {
     const parsed = EnvSchema.parse(
       baseEnv({ CLIENT_ORIGIN: "https://app.example.com" }),
     );
 
-    expect(parsed.CLIENT_ORIGIN).toBe("https://app.example.com");
+    expect(parsed.CLIENT_ORIGIN).toEqual(["https://app.example.com"]);
+  });
+
+  it("splits a comma-separated CLIENT_ORIGIN for multiple allowed origins", () => {
+    const parsed = EnvSchema.parse(
+      baseEnv({
+        CLIENT_ORIGIN: "https://app.example.com, https://www.example.com",
+      }),
+    );
+
+    expect(parsed.CLIENT_ORIGIN).toEqual([
+      "https://app.example.com",
+      "https://www.example.com",
+    ]);
   });
 
   it("rejects an invalid CLIENT_ORIGIN instead of silently accepting a value CORS/socket.io can never match against a real Origin header", () => {
     expect(
       messagesFor(baseEnv({ CLIENT_ORIGIN: "not-a-url" })),
+    ).not.toHaveLength(0);
+  });
+
+  it("rejects a comma-separated CLIENT_ORIGIN with one invalid entry", () => {
+    expect(
+      messagesFor(
+        baseEnv({
+          CLIENT_ORIGIN: "https://app.example.com, not-a-url",
+        }),
+      ),
     ).not.toHaveLength(0);
   });
 

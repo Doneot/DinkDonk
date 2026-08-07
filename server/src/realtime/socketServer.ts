@@ -7,6 +7,7 @@ import { env } from "../shared/config/env.js";
 import { logger } from "../shared/logger/logger.js";
 import type { IdentityRepository } from "../modules/auth/ports/IdentityRepository.js";
 import { resolveIdentity } from "../modules/auth/application/resolveIdentity.js";
+import type { Redis } from "../infrastructure/redis/redisClient.js";
 
 type AuthenticatedSocket = Socket & {
   userId: string;
@@ -24,11 +25,21 @@ export type SocketServer = {
    * on logout, once the Firestore session doc has been destroyed) so a
    * revoked session can't keep receiving realtime events through a
    * connection that was already established before the logout happened.
+   * Fans out across every backend instance when `redis` is supplied (see
+   * CreateSocketServerOptions.redis below) - without that, this only
+   * reaches sockets connected to the instance that called it.
    */
   disconnectUser(userId: string): void;
 
   close(): Promise<void>;
 };
+
+// Redis pub/sub channel disconnectUser() publishes to, and every instance's
+// dedicated subscriber connection listens on, so a logout handled by one
+// instance can force-close a socket connected to a different one. Distinct
+// prefix from the app's other Redis-backed features (rl:, eventsub:) so it's
+// unambiguous in a `redis-cli monitor` trace.
+const SOCKET_DISCONNECT_CHANNEL = "dinkdonk:socket:disconnect";
 
 type CreateSocketServerOptions = {
   sessionMiddleware: RequestHandler;
@@ -42,6 +53,18 @@ type CreateSocketServerOptions = {
   // blob. Without it, a session whose backing identity was deleted/corrupted
   // would still get full realtime access.
   identityRepository?: IdentityRepository;
+
+  /**
+   * Backs cross-instance disconnectUser() fanout via Redis pub/sub - see
+   * SOCKET_DISCONNECT_CHANNEL. Optional, same as everywhere else this app
+   * accepts an optional `redis` (rate limiting, EventSub replay dedup, the
+   * Discord token-refresh lock): without it, disconnectUser() still forcibly
+   * closes sockets connected to *this* instance (already correct for a
+   * single-instance deployment, and for every test in this codebase), it
+   * just can't reach a socket connected to a different instance. See
+   * ARCHITECTURE.md's realtime/ section, "Multi-instance behavior".
+   */
+  redis?: Redis;
 };
 
 type SessionRequest = IncomingMessage & {
@@ -57,11 +80,13 @@ const MAX_SOCKETS_PER_USER = 8;
 
 export function createSocketServer(
   httpServer: HttpServer,
-  { sessionMiddleware, identityRepository }: CreateSocketServerOptions,
+  { sessionMiddleware, identityRepository, redis }: CreateSocketServerOptions,
 ): SocketServer {
   const io = new Server(httpServer, {
     cors: {
-      origin: env.clientOrigin,
+      // An array, not a single string - see configureMiddleware.ts's
+      // identical CORS config for why.
+      origin: env.clientOrigins,
 
       methods: ["GET", "POST"],
 
@@ -70,6 +95,53 @@ export function createSocketServer(
   });
 
   const clientsByUserId = new Map<string, Set<AuthenticatedSocket>>();
+
+  // A client subscribed to a Pub/Sub channel can't issue any other Redis
+  // command on that same connection - a dedicated duplicate() connection is
+  // required, same as ioredis's own docs recommend. Only created when redis
+  // is supplied; undefined (rather than lazily connecting) is the correct
+  // degraded state for a single-instance deployment or a test harness that
+  // never passes redis at all.
+  const subscriber = redis?.duplicate();
+
+  function disconnectLocalUser(userId: string): void {
+    const sockets = clientsByUserId.get(userId);
+
+    if (!sockets) {
+      return;
+    }
+
+    clientsByUserId.delete(userId);
+
+    sockets.forEach((socket): void => {
+      socket.disconnect(true);
+    });
+  }
+
+  if (subscriber) {
+    // Mirrors redisClient.ts's own error listener: without one, ioredis's
+    // default behavior for an unhandled 'error' event throws and crashes the
+    // process over what should just be a degraded-but-recoverable state (this
+    // instance temporarily can't hear about other instances' disconnects).
+    subscriber.on("error", (error: unknown) => {
+      logger.error({ error }, "Socket disconnect subscriber error");
+    });
+
+    subscriber.on("message", (channel: string, userId: string): void => {
+      if (channel !== SOCKET_DISCONNECT_CHANNEL) {
+        return;
+      }
+
+      disconnectLocalUser(userId);
+    });
+
+    subscriber.subscribe(SOCKET_DISCONNECT_CHANNEL).catch((error: unknown) => {
+      logger.error(
+        { error },
+        "Failed to subscribe to the socket disconnect channel; cross-instance disconnectUser() will run degraded until this recovers",
+      );
+    });
+  }
 
   io.engine.use(
     (req: IncomingMessage, res: ServerResponse, next: (err?: Error) => void) => {
@@ -204,24 +276,32 @@ export function createSocketServer(
     },
 
     disconnectUser(userId: string): void {
-      const sockets = clientsByUserId.get(userId);
+      disconnectLocalUser(userId);
 
-      if (!sockets) {
-        return;
-      }
-
-      clientsByUserId.delete(userId);
-
-      sockets.forEach((socket): void => {
-        socket.disconnect(true);
+      // Best-effort: a publish failure just leaves other instances unaware
+      // of this logout, which degrades to this call's pre-fanout behavior
+      // (this instance's own sockets are still closed above) rather than
+      // failing the logout request itself over a Redis blip.
+      redis?.publish(SOCKET_DISCONNECT_CHANNEL, userId).catch((error: unknown) => {
+        logger.error(
+          { error, userId },
+          "Failed to publish a socket disconnect event to other instances",
+        );
       });
     },
 
-    close(): Promise<void> {
-      return new Promise((resolve): void => {
+    async close(): Promise<void> {
+      await new Promise<void>((resolve): void => {
         void io.close(() => {
           resolve();
         });
+      });
+
+      await subscriber?.quit().catch((error: unknown) => {
+        logger.error(
+          { error },
+          "Failed to cleanly close the socket disconnect subscriber",
+        );
       });
     },
   };

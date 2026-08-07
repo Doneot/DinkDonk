@@ -191,6 +191,8 @@ Responsibilities:
 
 Socket.IO should be treated as a realtime UI channel, not the primary persistence layer.
 
+**Multi-instance behavior.** Each backend instance holds its own in-process map of `userId -> live sockets`, so `notifyUser()` only needs to reach sockets connected to *this* instance - that's still correct under horizontal scaling, because the realtime push paths that call it (e.g. `UserChangeBroadcaster`) are themselves driven by a Firestore `onSnapshot` listener that every instance runs independently, so every instance learns of the change and notifies its own locally-connected sockets. `disconnectUser()` (forcibly closing a user's sockets on logout) is different: it's an imperative, one-off call triggered by a single HTTP request landing on a single instance, with nothing else prompting the other instances to act on it. To reach a socket connected to a *different* instance, it publishes on a Redis pub/sub channel (`SOCKET_DISCONNECT_CHANNEL` in `realtime/socketServer.ts`) that every instance's dedicated subscriber connection listens on. When `redis` isn't configured (a bare `npm run dev`, or a test harness), this degrades to disconnecting only this instance's own sockets - correct for a single-instance deployment, and the same behavior this file had before the pub/sub fanout existed.
+
 ---
 
 ## infrastructure/

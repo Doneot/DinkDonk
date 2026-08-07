@@ -152,7 +152,11 @@ export function configureMiddleware({
 
   app.use(
     cors({
-      origin: env.clientOrigin,
+      // An array, not a single string: the `cors` package matches the
+      // request's Origin header against every entry, so a deployment
+      // fronting more than one origin (see envSchema.ts's CLIENT_ORIGIN
+      // comment) is allowed without a code change.
+      origin: env.clientOrigins,
 
       credentials: true,
     }),

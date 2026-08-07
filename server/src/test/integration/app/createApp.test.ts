@@ -55,11 +55,14 @@ function postEventSub(
     .send(body);
 }
 
+const ORIGINAL_CLIENT_ORIGINS = env.clientOrigins;
+
 afterEach(() => {
   env.prometheus.enabled = false;
   env.prometheus.metricsToken = undefined;
   env.requestLogging.enabled = false;
   env.isProduction = false;
+  env.clientOrigins = ORIGINAL_CLIENT_ORIGINS;
   vi.restoreAllMocks();
 });
 
@@ -110,6 +113,37 @@ describe("createApp", () => {
         env.clientOrigin,
       );
       expect(response.headers["access-control-allow-credentials"]).toBe("true");
+    });
+
+    it("allows credentialed requests from any configured client origin, not just the first", async () => {
+      const secondOrigin = "https://www.example.com";
+
+      env.clientOrigins = [env.clientOrigin, secondOrigin];
+
+      const { app } = setup();
+
+      const response = await request(app)
+        .get("/health/live")
+        .set("Origin", secondOrigin)
+        .expect(200);
+
+      expect(response.headers["access-control-allow-origin"]).toBe(
+        secondOrigin,
+      );
+      expect(response.headers["access-control-allow-credentials"]).toBe("true");
+    });
+
+    it("rejects a credentialed request from an origin outside the configured list", async () => {
+      const { app } = setup();
+
+      const response = await request(app)
+        .get("/health/live")
+        .set("Origin", "https://not-allowed.example.com")
+        .expect(200);
+
+      expect(
+        response.headers["access-control-allow-origin"],
+      ).toBeUndefined();
     });
   });
 

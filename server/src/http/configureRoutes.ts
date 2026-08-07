@@ -127,6 +127,10 @@ export function configureRoutes({
     "/login-failed",
 
     (_req, res): void => {
+      // Deliberately the singular env.clientOrigin (the first configured
+      // origin), not the full env.clientOrigins list used for CORS matching
+      // above - a redirect's Location header needs exactly one concrete URL
+      // to send the browser to, not a set of allowed origins.
       res.redirect(env.clientOrigin);
     },
   );

@@ -51,6 +51,7 @@ export function createServer(container: Container): Server {
   const sockets = createSocketServer(httpServer, {
     sessionMiddleware,
     identityRepository: container.repositories.identities,
+    ...(redis ? { redis } : {}),
   });
 
   disconnectUser = (userId) => sockets.disconnectUser(userId);

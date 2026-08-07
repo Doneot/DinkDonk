@@ -1,5 +1,6 @@
 import http from "node:http";
 import type { RequestHandler } from "express";
+import type { Redis } from "ioredis";
 import type { Socket } from "socket.io";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +11,37 @@ import { logger } from "../../../shared/logger/logger.js";
 import { TokenDecryptionError } from "../../../shared/utils/crypto.js";
 import { InMemoryIdentityRepository } from "../../repositories/inMemory/InMemoryIdentityRepository.js";
 import { buildIdentity } from "../../builders/auth.js";
+
+type FakeRedis = {
+  duplicate: ReturnType<typeof vi.fn>;
+  publish: ReturnType<typeof vi.fn>;
+  subscribe: ReturnType<typeof vi.fn>;
+  quit: ReturnType<typeof vi.fn>;
+  on: ReturnType<typeof vi.fn>;
+  handlers: Map<string, (...args: unknown[]) => void>;
+};
+
+// Models the real ioredis contract this module depends on: a client used to
+// publish can't also subscribe on the same connection, so duplicate() must
+// return a second, independent fake with its own handler registry - a single
+// shared fake would let a test pass even if the implementation wrongly
+// subscribed on the publisher connection itself.
+function fakeRedis(): FakeRedis {
+  const handlers = new Map<string, (...args: unknown[]) => void>();
+
+  const redis: FakeRedis = {
+    duplicate: vi.fn(() => fakeRedis()),
+    publish: vi.fn().mockResolvedValue(1),
+    subscribe: vi.fn().mockResolvedValue(undefined),
+    quit: vi.fn().mockResolvedValue("OK"),
+    handlers,
+    on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+      handlers.set(event, handler);
+    }),
+  };
+
+  return redis;
+}
 
 type FakeSocket = {
   request: { session?: { passport?: { user?: { id?: string } } } };
@@ -44,7 +76,10 @@ type Harness = {
 };
 
 function setup(
-  options: { identityRepository?: InMemoryIdentityRepository } = {},
+  options: {
+    identityRepository?: InMemoryIdentityRepository;
+    redis?: FakeRedis;
+  } = {},
 ): Harness {
   const httpServer = http.createServer();
   const sessionMiddleware = vi.fn<RequestHandler>((_req, _res, next) => {
@@ -56,6 +91,7 @@ function setup(
     ...(options.identityRepository
       ? { identityRepository: options.identityRepository }
       : {}),
+    ...(options.redis ? { redis: options.redis as unknown as Redis } : {}),
   });
 
   return {
@@ -383,6 +419,131 @@ describe("createSocketServer", () => {
       expect(() => harness.sockets.disconnectUser("nobody")).not.toThrow();
 
       await teardown(harness);
+    });
+  });
+
+  describe("cross-instance disconnect fanout", () => {
+    it("publishes to the disconnect channel when redis is configured", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const redis = fakeRedis();
+      const harness = setup({ redis });
+      const socket = createFakeSocket("user-1");
+
+      await harness.connect(socket);
+      harness.sockets.disconnectUser("user-1");
+
+      expect(socket.disconnect).toHaveBeenCalledWith(true);
+      expect(redis.publish).toHaveBeenCalledWith(
+        "dinkdonk:socket:disconnect",
+        "user-1",
+      );
+
+      await teardown(harness);
+    });
+
+    it("subscribes on a dedicated duplicate connection, not the publisher connection", async () => {
+      const redis = fakeRedis();
+      const harness = setup({ redis });
+
+      expect(redis.duplicate).toHaveBeenCalledOnce();
+      // The publisher connection itself never subscribes - only the
+      // duplicate() result does (asserted via the message-delivery test
+      // below, which would fail if the wiring were swapped).
+      expect(redis.subscribe).not.toHaveBeenCalled();
+
+      await teardown(harness);
+    });
+
+    it("disconnects a locally-connected socket when another instance publishes a disconnect", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const redis = fakeRedis();
+      const harness = setup({ redis });
+      const socket = createFakeSocket("user-1");
+
+      await harness.connect(socket);
+
+      const subscriber = redis.duplicate.mock.results[0]?.value as FakeRedis;
+      const onMessage = subscriber.handlers.get("message");
+
+      // Simulates a different instance's disconnectUser() publishing this
+      // event - this instance never called disconnectUser() itself, only
+      // received the fanout. ioredis's 'message' event passes (channel,
+      // message) as two separate arguments, not an array.
+      onMessage?.("dinkdonk:socket:disconnect", "user-1");
+
+      expect(socket.disconnect).toHaveBeenCalledWith(true);
+
+      await teardown(harness);
+    });
+
+    it("ignores a message on an unrelated channel", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const redis = fakeRedis();
+      const harness = setup({ redis });
+      const socket = createFakeSocket("user-1");
+
+      await harness.connect(socket);
+
+      const subscriber = redis.duplicate.mock.results[0]?.value as FakeRedis;
+      const onMessage = subscriber.handlers.get("message");
+
+      onMessage?.("some-other-channel", "user-1");
+
+      expect(socket.disconnect).not.toHaveBeenCalled();
+
+      await teardown(harness);
+    });
+
+    it("still disconnects local sockets and does not throw when redis is not configured", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const harness = setup();
+      const socket = createFakeSocket("user-1");
+
+      await harness.connect(socket);
+
+      expect(() => harness.sockets.disconnectUser("user-1")).not.toThrow();
+      expect(socket.disconnect).toHaveBeenCalledWith(true);
+
+      await teardown(harness);
+    });
+
+    it("logs and does not throw when the publish fails", async () => {
+      vi.spyOn(logger, "info").mockReturnValue();
+      const error = vi.spyOn(logger, "error").mockReturnValue();
+      const redis = fakeRedis();
+
+      redis.publish.mockRejectedValue(new Error("connection lost"));
+
+      const harness = setup({ redis });
+      const socket = createFakeSocket("user-1");
+
+      await harness.connect(socket);
+
+      expect(() => harness.sockets.disconnectUser("user-1")).not.toThrow();
+      expect(socket.disconnect).toHaveBeenCalledWith(true);
+
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user-1" }),
+        "Failed to publish a socket disconnect event to other instances",
+      );
+
+      await teardown(harness);
+    });
+
+    it("closes the subscriber connection on close()", async () => {
+      const redis = fakeRedis();
+      const harness = setup({ redis });
+      const subscriber = redis.duplicate.mock.results[0]?.value as FakeRedis;
+
+      await teardown(harness);
+
+      expect(subscriber.quit).toHaveBeenCalledOnce();
     });
   });
 

@@ -37,12 +37,49 @@ const BaseEnvSchema = z.object({
 
   // Feeds both Express's CORS middleware and Socket.IO's CORS config (see
   // configureMiddleware.ts/socketServer.ts), compared directly against the
-  // browser's canonicalized Origin header - z.url() (matching SERVER_URL)
-  // rather than a bare z.string() so a malformed value (trailing slash,
-  // missing scheme, stray whitespace) fails loudly at startup instead of
-  // silently rejecting every legitimate cross-origin request once the app
-  // is already serving traffic.
-  CLIENT_ORIGIN: z.url().optional(),
+  // browser's canonicalized Origin header. Accepts a comma-separated list,
+  // mirroring SESSION_SECRET/ENCRYPTION_KEY above, so a deployment fronting
+  // more than one origin (an apex + www domain, or a staging environment
+  // sharing the same backend) doesn't need a code change to allow it - env.ts
+  // exposes the full list as `clientOrigins` for CORS matching, and the first
+  // entry alone as `clientOrigin` for the one place a single canonical origin
+  // is needed (the /login-failed redirect target).
+  CLIENT_ORIGIN: z
+    .string()
+    .optional()
+    .transform((value, ctx) => {
+      if (value === undefined) {
+        return undefined;
+      }
+
+      const origins = value
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter((origin) => origin.length > 0);
+
+      if (origins.length === 0) {
+        return undefined;
+      }
+
+      // Validated per-entry (rather than via z.url() on the whole field, as
+      // before the comma-separated list) so each origin fails loudly at
+      // startup on a malformed value (trailing slash, missing scheme, stray
+      // whitespace) - matching this field's previous behavior, just applied
+      // once per origin instead of once for the whole value.
+      const invalid = origins.find(
+        (origin) => !z.url().safeParse(origin).success,
+      );
+
+      if (invalid) {
+        ctx.addIssue({
+          code: "custom",
+          message: `Invalid CLIENT_ORIGIN entry: "${invalid}"`,
+        });
+        return z.NEVER;
+      }
+
+      return origins;
+    }),
 
   // Accepts a comma-separated list, mirroring ENCRYPTION_KEY below, so the
   // session secret can be rotated too: express-session's `secret` option
