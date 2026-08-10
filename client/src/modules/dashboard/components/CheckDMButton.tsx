@@ -1,68 +1,68 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { notifyActionError } from "../../../shared/api/errorToast";
 
-type Status = "idle" | "loading" | "canDM" | "cannotDM" | "error";
+type Status = "idle" | "loading" | "canDM" | "cannotDM";
 
 interface CheckDMButtonProps {
   checkDMFunction: () => Promise<boolean>;
 }
 
+const RESULT_DISPLAY_MS = 4000;
+
+const LABELS: Record<Status, string> = {
+  idle: "Not receiving notifications?",
+  loading: "Checking…",
+  canDM: "✓ DinkDonk can DM you",
+  cannotDM: "✗ Can't DM you yet",
+};
+
+// Deliberately a quiet text link, not a colored button: the cell it lives in
+// already shows the persistent On/Blocked status via the tally + toggle
+// above, so this is just a self-serve "double check right now" prompt. The
+// result still needs to be felt right where the click happened, though - a
+// toast alone is easy to miss - so it flashes in place (color-coded, same
+// online/live tokens the rest of the app uses for state) before reverting.
 const CheckDMButton = ({ checkDMFunction }: CheckDMButtonProps) => {
   const [status, setStatus] = useState<Status>("idle");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const revertTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+
+  useEffect(() => () => clearTimeout(revertTimeout.current), []);
 
   const handleCheck = async () => {
+    clearTimeout(revertTimeout.current);
     setStatus("loading");
-    setErrorMessage(null);
+
     try {
       const canDM = await checkDMFunction();
+
       setStatus(canDM ? "canDM" : "cannotDM");
+      revertTimeout.current = setTimeout(
+        () => setStatus("idle"),
+        RESULT_DISPLAY_MS,
+      );
     } catch (error) {
-      setStatus("error");
-      setErrorMessage(error instanceof Error ? error.message : "Unknown error");
+      setStatus("idle");
+      notifyActionError(error, "Failed to check DM ability.");
     }
   };
 
-  let buttonText: string;
-  switch (status) {
-    case "idle":
-      buttonText = "Check DM Ability";
-      break;
-    case "loading":
-      buttonText = "Checking...";
-      break;
-    case "canDM":
-      buttonText = "User can receive DMs ✅";
-      break;
-    case "cannotDM":
-      buttonText = "User cannot receive DMs ❌";
-      break;
-    case "error":
-      buttonText = `Error: ${errorMessage}`;
-      break;
-    default:
-      buttonText = "Check DM Ability";
-  }
-
-  const baseClasses =
-    "px-5 py-2 rounded-md font-bold text-white text-base transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2";
-  let statusClasses = "bg-[#5865F2] hover:bg-[#4752C4] focus:ring-[#5865F2]";
-
-  if (status === "canDM") {
-    statusClasses = "bg-green-600 hover:bg-green-500 focus:ring-green-600";
-  } else if (status === "cannotDM" || status === "error") {
-    statusClasses = "bg-red-600 hover:bg-red-500 focus:ring-red-600";
-  }
-
-  const disabledClasses =
-    status === "loading" ? "opacity-60 cursor-not-allowed" : "cursor-pointer";
+  const colorClass =
+    status === "canDM"
+      ? "text-online"
+      : status === "cannotDM"
+        ? "text-live"
+        : "text-ink-faint hover:text-ink";
 
   return (
     <button
+      type="button"
       onClick={handleCheck}
       disabled={status === "loading"}
-      className={`${baseClasses} ${statusClasses} ${disabledClasses}`}
+      className={`font-mono text-[0.7rem] underline decoration-dotted underline-offset-2 transition disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed ${colorClass}`}
     >
-      {buttonText}
+      {LABELS[status]}
     </button>
   );
 };

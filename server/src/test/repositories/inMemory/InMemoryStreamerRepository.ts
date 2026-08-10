@@ -32,7 +32,7 @@ export class InMemoryStreamerRepository implements StreamerRepository {
   createStreamer(id: string): Promise<void> {
     const created = !this.streamers.has(id);
 
-    this.streamers.set(id, { id });
+    this.streamers.set(id, { id, isLive: false, liveSince: null });
     this.subscribers.ensure(id);
 
     if (created) {
@@ -76,15 +76,39 @@ export class InMemoryStreamerRepository implements StreamerRepository {
     return Promise.resolve(true);
   }
 
+  setLiveState(
+    id: string,
+    isLive: boolean,
+    liveSince: string | null,
+  ): Promise<boolean> {
+    if (!isNonEmptyString(id)) {
+      return Promise.resolve(false);
+    }
+
+    const streamer = this.streamers.get(id);
+
+    if (!streamer) {
+      return Promise.resolve(false);
+    }
+
+    this.streamers.set(id, { ...streamer, isLive, liveSince });
+
+    return Promise.resolve(true);
+  }
+
   /**
    * `users` is a test-only convenience for seeding which users are already
    * subscribed to this streamer (mirroring the `subscribers` subcollection
    * Firestore uses); it isn't part of the `Streamer` domain type.
    */
-  seed(streamer: Streamer & { users?: string[] }): void {
+  seed(streamer: Partial<Streamer> & { id: string; users?: string[] }): void {
     const { users, ...rest } = streamer;
 
-    this.streamers.set(rest.id, structuredClone(rest));
+    this.streamers.set(rest.id, {
+      isLive: false,
+      liveSince: null,
+      ...structuredClone(rest),
+    });
     this.subscribers.seed(rest.id, users ?? []);
   }
 

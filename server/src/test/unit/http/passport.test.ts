@@ -45,12 +45,6 @@ const registered: {
 } = { strategies: [], refreshStrategies: [] };
 
 class MockDiscordStrategy {
-  /**
-   * Assigned onto the prototype by configurePassport. Declared (not defined)
-   * so the class field does not shadow that prototype assignment.
-   */
-  declare authorizationParams?: () => { prompt: string };
-
   constructor(
     readonly options: StrategyOptions,
     readonly verify: VerifyCallback,
@@ -441,12 +435,6 @@ describe("configurePassport", () => {
       expect(strategy.options.callbackURL).toBe(
         `${env.serverUrl}/api/auth/discord/callback`,
       );
-    });
-
-    it("suppresses the Discord consent prompt", () => {
-      const { strategy } = setup();
-
-      expect(strategy.authorizationParams?.()).toEqual({ prompt: "none" });
     });
 
     it("persists the tokens to the repository but keeps them off req.user", async () => {

@@ -7,6 +7,7 @@ export function buildUser(overrides: Partial<User> = {}): User {
     id: TEST_USER_ID,
     canReceiveDM: true,
     subscriptions: [],
+    notificationPreferences: {},
     ...overrides,
   };
 }

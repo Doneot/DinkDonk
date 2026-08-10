@@ -59,16 +59,18 @@ const StreamerSearch = ({ subscribedIds, onSubscribe, disabled }: StreamerSearch
   return (
     <div
       ref={wrapperRef}
-      className="p-4 sm:p-6 bg-white rounded-xl shadow-lg mt-6 w-full max-w-full sm:max-w-xl mx-auto relative"
+      className="p-4 sm:p-6 bg-panel rounded-lg border border-seam-soft mt-6 w-full relative"
     >
-      <h2 className="text-lg sm:text-xl font-semibold mb-4 text-gray-700">
-        Search Streamers
+      <h2 className="font-mono text-[0.7rem] uppercase tracking-widest text-ink-faint mb-3">
+        Search streamers
       </h2>
 
       {/* Input */}
       <input
-        className={`border border-gray-300 rounded-lg p-3 w-full focus:ring-indigo-500 focus:border-indigo-500 transition text-black ${
-          disabled ? "bg-gray-200 cursor-not-allowed text-gray-500" : "bg-white"
+        className={`border rounded-md p-3 w-full focus:outline-none focus:ring-2 focus:ring-accent transition text-ink placeholder:text-ink-faint ${
+          disabled
+            ? "bg-panel-2 border-seam-soft cursor-not-allowed text-ink-faint"
+            : "bg-tile border-seam"
         }`}
         value={search}
         onChange={(e) => {
@@ -84,15 +86,15 @@ const StreamerSearch = ({ subscribedIds, onSubscribe, disabled }: StreamerSearch
 
       {/* Suggestions */}
       {isFocused && suggestions.length > 0 && (
-        <ul className="absolute z-50 left-0 mt-2 bg-white border rounded-lg shadow-md max-h-60 overflow-y-auto w-full">
+        <ul className="absolute z-50 left-0 mt-2 bg-panel-2 border border-seam rounded-md shadow-lg max-h-60 overflow-y-auto w-full">
           {suggestions.map((s, index) => {
             const isSubscribed = subscribedIds.includes(s.id);
 
             return (
               <li
                 key={s.id}
-                className={`flex items-center justify-between gap-3 transition ${
-                  highlightIndex === index ? "bg-indigo-100" : "hover:bg-gray-100"
+                className={`flex items-center justify-between gap-3 transition border-t border-seam-soft first:border-t-0 ${
+                  highlightIndex === index ? "bg-accent/10" : "hover:bg-tile"
                 }`}
                 onMouseEnter={() => setHighlightIndex(index)}
               >
@@ -112,17 +114,17 @@ const StreamerSearch = ({ subscribedIds, onSubscribe, disabled }: StreamerSearch
                     loading="lazy"
                     className="w-8 h-8 rounded-full"
                   />
-                  <span className="text-gray-700 truncate">{s.name}</span>
+                  <span className="text-ink truncate">{s.name}</span>
                 </button>
 
                 {/* Action */}
                 {isSubscribed ? (
-                  <span className="text-sm text-green-600 font-medium pr-3">
+                  <span className="font-mono text-[0.68rem] uppercase tracking-wider text-online pr-3">
                     Subscribed
                   </span>
                 ) : (
                   <button
-                    className="text-sm bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-400 transition cursor-pointer mr-3"
+                    className="font-mono text-[0.68rem] uppercase tracking-wider bg-accent/10 text-accent px-3 py-1 rounded-full hover:bg-accent/20 transition cursor-pointer mr-3"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleSubscribe(s);

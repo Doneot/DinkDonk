@@ -57,8 +57,8 @@ describe("GET /api/notifications/channels", () => {
       .expect(200);
 
     expect(notificationChannelsResponseSchema.parse(response.body)).toEqual({
-      discord: { enabled: false },
-      webPush: { enabled: false, subscriptions: 0 },
+      discord: { enabled: false, optedIn: true },
+      webPush: { enabled: false, subscriptions: 0, optedIn: true },
     });
   });
 
@@ -104,6 +104,60 @@ describe("GET /api/notifications/channels", () => {
     ).mockRejectedValue(new Error("firestore unavailable"));
 
     await client.get("/api/notifications/channels").expect(500);
+  });
+});
+
+describe("POST /api/notifications/channels", () => {
+  it("opts a user out of a channel, reflected on the next GET", async () => {
+    const { client } = await createClient({
+      state: { users: [buildUser({ id: "user-1", canReceiveDM: true })] },
+    });
+
+    await client
+      .post("/api/notifications/channels")
+      .send({ channel: "discord", enabled: false })
+      .expect(200);
+
+    const response = await client
+      .get("/api/notifications/channels")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      discord: { enabled: true, optedIn: false },
+    });
+  });
+
+  it("leaves other channels' preferences untouched", async () => {
+    const { client } = await createClient({
+      state: { users: [buildUser({ id: "user-1", canReceiveDM: true })] },
+    });
+
+    await client
+      .post("/api/notifications/channels")
+      .send({ channel: "discord", enabled: false })
+      .expect(200);
+    await client
+      .post("/api/notifications/channels")
+      .send({ channel: "webPush", enabled: false })
+      .expect(200);
+
+    const response = await client
+      .get("/api/notifications/channels")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      discord: { optedIn: false },
+      webPush: { optedIn: false },
+    });
+  });
+
+  it("rejects an unknown channel id", async () => {
+    const { client } = await createClient();
+
+    await client
+      .post("/api/notifications/channels")
+      .send({ channel: "carrier-pigeon", enabled: false })
+      .expect(400);
   });
 });
 

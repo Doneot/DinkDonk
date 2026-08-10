@@ -1,8 +1,8 @@
 import api from "../../shared/api/client";
-import type { AuthProvidersResponse, Provider } from "../../shared/types/api";
+import type { AuthProvidersResponse } from "../../shared/types/api";
 
-export function fetchAuthProviders(): Promise<Provider[]> {
+export function fetchAuthProviders(): Promise<AuthProvidersResponse> {
   return api
     .get<AuthProvidersResponse>("/auth/providers")
-    .then((res) => res.data.providers);
+    .then((res) => res.data);
 }

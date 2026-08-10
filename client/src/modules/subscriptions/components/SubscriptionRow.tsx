@@ -14,42 +14,72 @@ const SubscriptionRow = ({
   handleMessageChange,
   disabled,
 }: SubscriptionRowProps) => {
+  const hasCustomMessage = Boolean(subscription.notification_message);
+
   return (
-    <li className="flex flex-col sm:flex-row sm:items-center sm:justify-between border p-4 rounded-lg shadow-sm bg-gray-50 gap-3">
-      {/* Avatar + Name */}
+    <li
+      className={`border rounded-lg p-4 ${
+        subscription.isLive
+          ? "live-glow border-live/40"
+          : "bg-tile border-seam-soft"
+      }`}
+    >
+      {/* Avatar + name */}
       <div className="flex items-center gap-3 min-w-0">
         {subscription.avatar ? (
           <img
             src={subscription.avatar}
             alt=""
             loading="lazy"
-            className="w-10 h-10 rounded-full"
+            className="w-9 h-9 rounded-full flex-none"
           />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-gray-200" />
+          <div className="w-9 h-9 rounded-full bg-panel-2 flex-none" />
         )}
-
-        <span className="text-gray-800 font-medium truncate">
-          {subscription.name}
-        </span>
+        <div className="min-w-0">
+          <span className="text-ink font-medium truncate block">
+            {subscription.name}
+          </span>
+          <span
+            className={`font-mono text-[0.62rem] uppercase tracking-wider flex items-center gap-1.5 ${
+              subscription.isLive ? "text-live" : "text-ink-faint"
+            }`}
+          >
+            <span
+              className={`tally ${subscription.isLive ? "is-live" : "is-tracked"}`}
+              aria-hidden="true"
+            />
+            {subscription.isLive ? "Live now" : "Subscribed"}
+          </span>
+        </div>
       </div>
 
-      {/* Message input */}
-      <input
-        type="text"
-        value={subscription.notification_message || ""}
-        onChange={(e) => handleMessageChange(subscription.id, e.target.value)}
-        placeholder="Custom notification message"
-        aria-label={`Notification message for ${subscription.name || "this streamer"}`}
-        className={`w-full sm:flex-1 mx-0 sm:mx-4 p-2 border rounded-md text-sm text-black ${
-          disabled ? "bg-gray-200 text-gray-500 cursor-not-allowed" : "bg-white"
-        }`}
-        disabled={disabled}
-      />
+      {/* Message config, tucked behind a disclosure */}
+      <details className="mt-3 pt-3 border-t border-seam-soft">
+        <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer flex items-center justify-between font-mono text-[0.68rem] uppercase tracking-wider text-ink-dim">
+          <span>Message</span>
+          <span className="text-ink-faint">
+            {hasCustomMessage ? "custom" : "default"}
+          </span>
+        </summary>
+        <input
+          type="text"
+          value={subscription.notification_message || ""}
+          onChange={(e) => handleMessageChange(subscription.id, e.target.value)}
+          placeholder="Custom notification message"
+          aria-label={`Notification message for ${subscription.name || "this streamer"}`}
+          className={`mt-2 w-full p-2 border rounded-md text-sm text-ink ${
+            disabled
+              ? "bg-panel-2 border-seam-soft text-ink-faint cursor-not-allowed"
+              : "bg-panel border-seam"
+          }`}
+          disabled={disabled}
+        />
+      </details>
 
       {/* Unsubscribe */}
       <button
-        className="w-full sm:w-auto px-4 py-2 rounded-md text-sm font-medium bg-red-500 hover:bg-red-600 text-white disabled:opacity-50 cursor-pointer"
+        className="mt-3 w-full text-right font-mono text-[0.66rem] uppercase tracking-wider text-ink-faint hover:text-live transition disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
         onClick={() => handleUnsubscribe(subscription.id)}
         disabled={disabled}
       >

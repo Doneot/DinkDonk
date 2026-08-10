@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   eventSubEnvelopeSchema,
-  streamOnlineEventSchema,
+  eventSubEventSchemasByType,
 } from "../../../http/schemas/eventSub.js";
 import { EventSubValidationError } from "./EventSubValidationError.js";
 import type { EventSubHandlerRegistry } from "./EventSubHandlerRegistry.js";
@@ -51,7 +51,15 @@ export async function dispatchEventSubNotification(
     return { status: 204 };
   }
 
-  const eventResult = streamOnlineEventSchema.safeParse(notification.event);
+  // handlers and eventSubEventSchemasByType are both keyed by the same fixed
+  // set of Twitch subscription.type strings, so a schema is guaranteed to
+  // exist here once a handler was found above for the same type.
+  const schema =
+    eventSubEventSchemasByType[
+      notification.subscription.type as keyof typeof eventSubEventSchemasByType
+    ];
+
+  const eventResult = schema.safeParse(notification.event);
 
   if (!eventResult.success) {
     throw new EventSubValidationError("Invalid EventSub event payload", {

@@ -14,6 +14,7 @@ import type {
   UnsubscribeResult,
   UpdateSubscriptionResult,
 } from "../../domain/SubscribeResult.js";
+import type { UpdateNotificationPreferenceResult } from "../../domain/NotificationPreferenceResult.js";
 import type { DomainEventBus } from "../../../../shared/events/DomainEventBus.js";
 import { UserRecordSchema, UserUpdateSchema } from "./records/UserRecord.js";
 import { toUser } from "./mappers/userMapper.js";
@@ -373,6 +374,47 @@ export class FirestoreUserRepository implements UserRepository {
       );
 
       tx.update(userRef, { subscriptions: nextSubscriptions });
+
+      return { success: true } as const;
+    });
+  }
+
+  async updateNotificationPreference(
+    userId: string,
+    channel: string,
+    enabled: boolean,
+  ): Promise<UpdateNotificationPreferenceResult> {
+    if (!isNonEmptyString(userId) || !isNonEmptyString(channel)) {
+      return { success: false, reason: "invalid_input" };
+    }
+
+    const userRef = this.users.doc(userId);
+
+    return this.db.runTransaction(async (tx) => {
+      const doc = await tx.get(userRef);
+
+      if (!doc.exists) {
+        return { success: false, reason: "user_not_found" } as const;
+      }
+
+      const user = toUser(userId, UserRecordSchema.parse(doc.data()));
+
+      // The whole map is read here and written back below rather than
+      // relying on Firestore's set({merge:true}) to merge *inside* a nested
+      // object field - that behavior isn't something to lean on for
+      // correctness, so the merge happens explicitly in JS first and the
+      // write only ever replaces this one top-level field with an already-
+      // complete value.
+      const nextPreferences = {
+        ...(user.notificationPreferences ?? {}),
+        [channel]: enabled,
+      };
+
+      tx.set(
+        userRef,
+        { notificationPreferences: nextPreferences },
+        { merge: true },
+      );
 
       return { success: true } as const;
     });

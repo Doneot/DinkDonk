@@ -1,34 +1,26 @@
 import StatusCard from "../modules/dashboard/components/StatusCard";
 import BotUsersCard from "../modules/dashboard/components/BotUsersCard";
 import SubscriptionsManager from "../modules/subscriptions/components/SubscriptionsManager";
-import DiscordInviteButton from "../modules/dashboard/components/DiscordInviteButton";
-import CheckDMButton from "../modules/dashboard/components/CheckDMButton";
-import WebPushCard from "../modules/notifications/components/WebPushCard";
-import { checkCanReceiveDM } from "../modules/dashboard/api";
+import NotificationChannels from "../modules/notifications/components/NotificationChannels";
 import { useAuth } from "../context/authContextValue";
-import { env } from "../config/env";
 
 const Dashboard = () => {
   const { user } = useAuth();
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 bg-gray-100 min-h-screen">
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-        {/* Left column */}
-        <div className="space-y-6 my-6 lg:my-10">
-          <StatusCard />
-          <BotUsersCard />
-          <WebPushCard />
-          {!user?.canReceiveDM && env.inviteUrl && (
-            <DiscordInviteButton inviteLink={env.inviteUrl} />
-          )}
-          <CheckDMButton checkDMFunction={checkCanReceiveDM} />
+    <div className="p-4 sm:p-6 lg:p-8 bg-bg min-h-screen">
+      <div className="max-w-4xl mx-auto space-y-6 my-6 lg:my-10">
+        <div className="rounded-lg border border-seam-soft bg-tile overflow-hidden">
+          <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-seam-soft">
+            <StatusCard />
+            <BotUsersCard />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-seam-soft border-t border-seam-soft">
+            <NotificationChannels />
+          </div>
         </div>
 
-        {/* Right column */}
-        <div className="space-y-6 lg:col-span-2">
-          <SubscriptionsManager canReceiveDM={user?.canReceiveDM} />
-        </div>
+        <SubscriptionsManager canReceiveDM={user?.canReceiveDM} />
       </div>
     </div>
   );

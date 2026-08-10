@@ -13,6 +13,8 @@ import type { NotificationManager } from "../../modules/notifications/applicatio
 import type { EventSubSyncService } from "../../modules/notifications/application/EventSubSyncService.js";
 import type { StreamNotificationService } from "../../modules/notifications/application/StreamNotificationService.js";
 import type { SubscriptionCleanupService } from "../../modules/notifications/application/SubscriptionCleanupService.js";
+import type { StreamerLiveStateService } from "../../modules/streamers/application/StreamerLiveStateService.js";
+import type { SocketNotifier } from "../../modules/streamers/application/StreamerLiveStateService.js";
 import type { Runtime } from "../runtime/Runtime.js";
 
 export interface Container {
@@ -27,9 +29,19 @@ export interface Container {
     eventSubSync: EventSubSyncService;
     streamNotification: StreamNotificationService;
     subscriptionCleanup: SubscriptionCleanupService;
+    streamerLiveState: StreamerLiveStateService;
   };
 
   notificationManager: NotificationManager;
+
+  /**
+   * The container is built before the HTTP/Socket.IO server exists (see
+   * server.ts), so StreamerLiveStateService is constructed with a no-op
+   * notifier below. server.ts calls this once `sockets` exists, pointing it
+   * at the real implementation - the same ordering problem server.ts's own
+   * `disconnectUser` indirection already solves, applied here too.
+   */
+  bindSocketNotifier(notify: SocketNotifier): void;
 }
 
 export function createContainer(runtime: Runtime): Container {
@@ -43,7 +55,14 @@ export function createContainer(runtime: Runtime): Container {
 
   const notificationManager = createNotificationManager(discord, repositories);
 
-  const services = createServices(twitch, repositories, notificationManager);
+  let notifySocketUser: SocketNotifier = () => {};
+
+  const services = createServices(
+    twitch,
+    repositories,
+    notificationManager,
+    (userId, event, payload) => notifySocketUser(userId, event, payload),
+  );
 
   return {
     firestore,
@@ -53,5 +72,9 @@ export function createContainer(runtime: Runtime): Container {
     repositories,
     services,
     notificationManager,
+
+    bindSocketNotifier(notify) {
+      notifySocketUser = notify;
+    },
   };
 }

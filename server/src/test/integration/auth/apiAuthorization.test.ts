@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { errorResponseSchema } from "../../../http/schemas/responses.js";
 import { createApiRouter } from "../../../http/routes/apiRoutes.js";
+import { StreamerLiveStateService } from "../../../modules/streamers/application/StreamerLiveStateService.js";
 
 import { createTestApp } from "../../helpers/createTestApp.js";
 import { createTestContainer } from "../../helpers/createTestContainer.js";
@@ -31,6 +32,12 @@ function protectedRoutes(): [string, string][] {
     discord: container.discord,
     ensureFreshToken: (_req, _res, next) => next(),
     webPushPublicKey: TEST_WEB_PUSH_PUBLIC_KEY,
+    services: {
+      streamerLiveState: new StreamerLiveStateService(
+        container.repositories.streamers,
+        () => {},
+      ),
+    },
   }) as unknown as RouterStack;
 
   return router.stack

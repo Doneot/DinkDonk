@@ -36,6 +36,19 @@ export class NotificationManager {
   ): Promise<PromiseSettledResult<NotificationResult>[]> {
     return Promise.allSettled(
       this.channels.map(async (channel): Promise<NotificationResult> => {
+        if (user.notificationPreferences?.[channel.name] === false) {
+          notificationsSentTotal.inc({
+            channel: channel.name,
+            result: "skipped",
+          });
+
+          return {
+            sent: false,
+            skipped: true,
+            reason: "opted_out",
+          };
+        }
+
         try {
           const result = await channel.send(user, notification);
 

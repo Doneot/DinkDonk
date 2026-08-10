@@ -22,6 +22,7 @@ function setup() {
         handleStreamOnline: vi.fn(),
       } as unknown as StreamNotificationService,
     },
+    bindSocketNotifier: vi.fn(),
   } as unknown as Container;
 
   return createServer(container);

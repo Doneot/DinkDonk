@@ -37,7 +37,11 @@ describe("GET /api/auth/providers", () => {
 
     const response = await request(app).get("/api/auth/providers").expect(200);
 
-    expect(response.body).toEqual({ providers: ["discord", "google", "twitch"] });
+    expect(response.body).toEqual({
+      providers: ["discord", "google", "twitch"],
+      discordInviteUrl:
+        "https://discord.com/oauth2/authorize?client_id=discord-client-id&scope=bot+applications.commands&permissions=0",
+    });
   });
 });
 

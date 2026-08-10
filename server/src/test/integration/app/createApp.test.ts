@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../../http/createApp.js";
 import { createSessionMiddleware } from "../../../http/configureMiddleware.js";
 import type { StreamNotificationService } from "../../../modules/notifications/application/StreamNotificationService.js";
+import type { StreamerLiveStateService } from "../../../modules/streamers/application/StreamerLiveStateService.js";
 import { env } from "../../../shared/config/env.js";
 import { logger } from "../../../shared/logger/logger.js";
 
@@ -30,6 +31,10 @@ function setup() {
       streamNotification: {
         handleStreamOnline,
       } as unknown as StreamNotificationService,
+      streamerLiveState: {
+        handleStreamOnline: vi.fn().mockResolvedValue(undefined),
+        handleStreamOffline: vi.fn().mockResolvedValue(undefined),
+      } as unknown as StreamerLiveStateService,
     },
   });
 

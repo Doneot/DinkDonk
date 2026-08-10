@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   errorResponseSchema,
   streamerSummaryResponseSchema,
+  trackedStreamerSummaryResponseSchema,
 } from "../../../http/schemas/responses.js";
 
 import { createTestApp } from "../../helpers/createTestApp.js";
@@ -100,6 +101,84 @@ describe("POST /api/streamers/info", () => {
         id: "streamer_1",
         name: "Streamer",
         avatar: "https://example.com/avatar.png",
+      },
+    ]);
+  });
+
+  it("returns Twitch's own live status for a streamer that's currently live", async () => {
+    const { ctx, client } = await createClient();
+
+    vi.spyOn(ctx.twitch, "fetchStreamers").mockResolvedValue([TWITCH_RESULT]);
+    vi.spyOn(ctx.twitch, "getLiveStreams").mockResolvedValue([
+      { user_id: "streamer_1", started_at: "2024-01-01T12:00:00.000Z" },
+    ]);
+
+    const response = await client
+      .post("/api/streamers/info")
+      .send({ ids: ["streamer_1"] })
+      .expect(200);
+
+    expect(
+      trackedStreamerSummaryResponseSchema.array().parse(response.body),
+    ).toEqual([
+      {
+        id: "streamer_1",
+        name: "Streamer",
+        avatar: "https://example.com/avatar.png",
+        isLive: true,
+        liveSince: "2024-01-01T12:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("reconciles a stale cached live status against Twitch's ground truth", async () => {
+    // Reproduces a real gap: a streamer already live before this app ever
+    // subscribed to their EventSub events (e.g. their first subscriber just
+    // signed up) has no stream.online webhook to learn from - our own cache
+    // stays "offline" until something asks Twitch directly, which this
+    // route now does.
+    const { ctx, client } = await createClient();
+
+    await ctx.repositories.streamers.createStreamer("streamer_1");
+
+    vi.spyOn(ctx.twitch, "fetchStreamers").mockResolvedValue([TWITCH_RESULT]);
+    vi.spyOn(ctx.twitch, "getLiveStreams").mockResolvedValue([
+      { user_id: "streamer_1", started_at: "2024-01-01T12:00:00.000Z" },
+    ]);
+
+    await client
+      .post("/api/streamers/info")
+      .send({ ids: ["streamer_1"] })
+      .expect(200);
+
+    await expect(
+      ctx.repositories.streamers.getStreamer("streamer_1"),
+    ).resolves.toEqual({
+      id: "streamer_1",
+      isLive: true,
+      liveSince: "2024-01-01T12:00:00.000Z",
+    });
+  });
+
+  it("defaults to offline for a streamer this app has no record of yet", async () => {
+    const { ctx, client } = await createClient();
+
+    vi.spyOn(ctx.twitch, "fetchStreamers").mockResolvedValue([TWITCH_RESULT]);
+
+    const response = await client
+      .post("/api/streamers/info")
+      .send({ ids: ["streamer_1"] })
+      .expect(200);
+
+    expect(
+      trackedStreamerSummaryResponseSchema.array().parse(response.body),
+    ).toEqual([
+      {
+        id: "streamer_1",
+        name: "Streamer",
+        avatar: "https://example.com/avatar.png",
+        isLive: false,
+        liveSince: null,
       },
     ]);
   });

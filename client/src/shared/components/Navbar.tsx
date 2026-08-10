@@ -14,11 +14,11 @@ const Navbar = () => {
       {user && (
         <div className="flex items-center gap-3">
           <span
-            className="flex items-center gap-1.5 text-xs text-gray-500"
+            className="flex items-center gap-1.5 font-mono text-[0.7rem] uppercase tracking-wider text-ink-faint"
             title={connected ? "Live updates connected" : "Live updates unavailable"}
           >
             <span
-              className={`w-2 h-2 rounded-full ${connected ? "bg-green-500" : "bg-gray-400"}`}
+              className={`tally ${connected ? "is-on" : ""}`}
               aria-hidden="true"
             />
             <span className="sr-only">

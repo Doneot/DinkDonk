@@ -1,5 +1,6 @@
 import type {
   TwitchEventSubSubscription,
+  TwitchLiveStream,
   TwitchStreamer,
 } from "../../modules/twitch/domain/Twitch.js";
 import type {
@@ -77,11 +78,19 @@ export class FakeTwitchSubscriptions implements TwitchSubscriptionProvider {
 }
 
 export class FakeTwitchStreamers implements TwitchStreamerProvider {
+  liveStreams: TwitchLiveStream[] = [];
+
   constructor(private readonly streamers: TwitchStreamer[] = []) {}
 
   getStreamer(login: string): Promise<TwitchStreamer | null> {
     return Promise.resolve(
       this.streamers.find((streamer) => streamer.login === login) ?? null,
+    );
+  }
+
+  getLiveStreams(userIds: string[]): Promise<TwitchLiveStream[]> {
+    return Promise.resolve(
+      this.liveStreams.filter((stream) => userIds.includes(stream.user_id)),
     );
   }
 

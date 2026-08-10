@@ -1,5 +1,5 @@
 import api from "../../shared/api/client";
-import type { StreamerSummary } from "../../shared/types/api";
+import type { StreamerSummary, TrackedStreamerSummary } from "../../shared/types/api";
 
 export function searchStreamers(
   query: string,
@@ -10,9 +10,11 @@ export function searchStreamers(
     .then((res) => res.data);
 }
 
-export function fetchStreamerProfiles(ids: string[]): Promise<StreamerSummary[]> {
+export function fetchStreamerProfiles(
+  ids: string[],
+): Promise<TrackedStreamerSummary[]> {
   return api
-    .post<StreamerSummary[]>("/streamers/info", { ids })
+    .post<TrackedStreamerSummary[]>("/streamers/info", { ids })
     .then((res) => res.data);
 }
 

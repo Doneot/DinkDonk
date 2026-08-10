@@ -21,6 +21,12 @@ const DEAD_SUBSCRIPTION_STATUSES = new Set([
   "failed_to_connect",
 ]);
 
+// Every streamer needs both: stream.online drives the live-notification
+// fan-out, stream.offline is what lets the app ever clear the live-status
+// glow it sets when a stream.online notification arrives.
+export const TRACKED_EVENT_TYPES = ["stream.online", "stream.offline"] as const;
+type TrackedEventType = (typeof TRACKED_EVENT_TYPES)[number];
+
 // Mirrors SubscriptionCleanupService's batching: bounds how many
 // ensureSubscription calls run concurrently so a cold start or a bulk
 // EventSub revocation needing many new subscriptions at once doesn't fire
@@ -33,7 +39,12 @@ export class EventSubSyncService {
   // handlers) can both observe "no subscription exists yet for this
   // streamer" concurrently and both attempt to create one - same race
   // SubscriptionCleanupService.streamersBeingCollected guards against for
-  // deletes, mirrored here for creates.
+  // deletes, mirrored here for creates. Keyed by streamerId only (not
+  // streamerId+type): the two tracked types for one streamer are ensured
+  // together under a single lock acquisition rather than racing each other
+  // independently, which is a strictly simpler guarantee than is needed but
+  // costs nothing in practice (each ensure is already a handful of API
+  // calls).
   private readonly streamersBeingSubscribed = new Set<string>();
 
   constructor(
@@ -45,7 +56,7 @@ export class EventSubSyncService {
     const [streamers, subscriptions] = await Promise.all([
       this.streamers.getStreamers(),
 
-      this.getStreamOnlineSubscriptions(),
+      this.getTrackedSubscriptions(),
     ]);
 
     for (let i = 0; i < streamers.length; i += SYNC_BATCH_SIZE) {
@@ -54,7 +65,7 @@ export class EventSubSyncService {
       await Promise.all(
         batch.map(async (streamer) => {
           try {
-            await this.ensureSubscription(streamer.id, subscriptions);
+            await this.ensureSubscriptions(streamer.id, subscriptions);
           } catch (error) {
             logger.error(
               { error, streamerId: streamer.id },
@@ -74,6 +85,14 @@ export class EventSubSyncService {
     );
   }
 
+  async getTrackedSubscriptions(): Promise<TwitchEventSubSubscription[]> {
+    const subscriptions = await this.twitch.getEventSubSubscriptions();
+
+    return subscriptions.filter((subscription) =>
+      TRACKED_EVENT_TYPES.includes(subscription.type as TrackedEventType),
+    );
+  }
+
   // Accepted, bounded debt: if the streamer this creates a subscription for
   // becomes empty again (its one subscriber immediately unsubscribes) before
   // this call's Twitch API round trip completes, the create can land against
@@ -86,28 +105,34 @@ export class EventSubSyncService {
   // its own within one EVENTSUB_GC_INTERVAL_MS window - no notifications are
   // lost, just a temporarily wasted subscription slot.
   async handleStreamerAdded(streamerId: string): Promise<void> {
-    const subscriptions = await this.getStreamOnlineSubscriptions();
+    const subscriptions = await this.getTrackedSubscriptions();
 
-    await this.ensureSubscription(streamerId, subscriptions);
+    await this.ensureSubscriptions(streamerId, subscriptions);
   }
 
   private hasActiveSubscription(
     streamerId: string,
+    type: TrackedEventType,
     subscriptions: TwitchEventSubSubscription[],
   ): boolean {
     return subscriptions.some(
       (sub) =>
+        sub.type === type &&
         sub.condition?.broadcaster_user_id === streamerId &&
         !DEAD_SUBSCRIPTION_STATUSES.has(sub.status),
     );
   }
 
-  private async ensureSubscription(
+  private async ensureSubscriptions(
     streamerId: string,
     subscriptions: TwitchEventSubSubscription[],
   ): Promise<void> {
+    const allActivePerCallerSnapshot = TRACKED_EVENT_TYPES.every((type) =>
+      this.hasActiveSubscription(streamerId, type, subscriptions),
+    );
+
     if (
-      this.hasActiveSubscription(streamerId, subscriptions) ||
+      allActivePerCallerSnapshot ||
       this.streamersBeingSubscribed.has(streamerId)
     ) {
       return;
@@ -126,22 +151,27 @@ export class EventSubSyncService {
       // create for that same streamer. Re-checking against a fresh read,
       // now that this call exclusively holds the lock for this streamerId,
       // closes that gap - any such create would already be reflected here.
-      const fresh = await this.getStreamOnlineSubscriptions();
+      const fresh = await this.getTrackedSubscriptions();
 
-      if (this.hasActiveSubscription(streamerId, fresh)) {
-        return;
+      for (const type of TRACKED_EVENT_TYPES) {
+        if (this.hasActiveSubscription(streamerId, type, fresh)) {
+          continue;
+        }
+
+        logger.info(
+          { streamerId, type },
+          "Creating Twitch EventSub subscription",
+        );
+
+        await this.twitch.subscribeToEvent(type, {
+          broadcaster_user_id: streamerId,
+        });
+
+        // Only counted once the create actually succeeded - incrementing
+        // beforehand would count a failed/duplicate-rejected attempt as a
+        // real creation.
+        eventSubSubscriptionsCreatedTotal.inc();
       }
-
-      logger.info({ streamerId }, "Creating Twitch EventSub subscription");
-
-      await this.twitch.subscribeToEvent("stream.online", {
-        broadcaster_user_id: streamerId,
-      });
-
-      // Only counted once the create actually succeeded - incrementing
-      // beforehand would count a failed/duplicate-rejected attempt as a
-      // real creation.
-      eventSubSubscriptionsCreatedTotal.inc();
     } finally {
       this.streamersBeingSubscribed.delete(streamerId);
     }

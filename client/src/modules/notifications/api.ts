@@ -1,5 +1,9 @@
 import api from "../../shared/api/client";
-import type { PublicKeyResponse } from "../../shared/types/api";
+import type {
+  NotificationChannelId,
+  NotificationChannelsResponse,
+  PublicKeyResponse,
+} from "../../shared/types/api";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -56,4 +60,19 @@ export async function disableWebPushNotifications(): Promise<boolean> {
   });
   await subscription.unsubscribe();
   return true;
+}
+
+export function fetchNotificationChannels(): Promise<NotificationChannelsResponse> {
+  return api
+    .get<NotificationChannelsResponse>("/notifications/channels")
+    .then((res) => res.data);
+}
+
+export function setNotificationChannelPreference(
+  channel: NotificationChannelId,
+  enabled: boolean,
+): Promise<void> {
+  return api
+    .post("/notifications/channels", { channel, enabled })
+    .then(() => undefined);
 }

@@ -26,17 +26,18 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-screen text-center px-4 bg-gray-100">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">
+        <div className="flex flex-col items-center justify-center min-h-screen text-center px-4 bg-bg text-ink">
+          <span className="tally is-live mb-4" aria-hidden="true" />
+          <h1 className="font-display uppercase [font-stretch:condensed] text-2xl font-bold mb-2">
             Something went wrong
           </h1>
-          <p className="text-gray-600 mb-6 max-w-md">
+          <p className="text-ink-dim mb-6 max-w-md">
             An unexpected error occurred. Try reloading the page.
           </p>
           <button
             type="button"
             onClick={this.handleReload}
-            className="bg-indigo-600 text-white font-semibold px-6 py-3 rounded-xl shadow-md hover:bg-indigo-500 transition cursor-pointer"
+            className="bg-accent text-bg font-semibold px-6 py-3 rounded-md shadow-md hover:bg-accent-2 transition cursor-pointer"
           >
             Reload DinkDonk
           </button>

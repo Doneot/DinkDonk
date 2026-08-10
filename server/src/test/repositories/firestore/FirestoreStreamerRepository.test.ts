@@ -63,8 +63,8 @@ describe("FirestoreStreamerRepository", () => {
       firestore.write("streamers/streamer-2", { id: "streamer-2" });
 
       await expect(repository.getStreamers()).resolves.toEqual([
-        { id: "streamer-1" },
-        { id: "streamer-2" },
+        { id: "streamer-1", isLive: false, liveSince: null },
+        { id: "streamer-2", isLive: false, liveSince: null },
       ]);
     });
   });
@@ -77,6 +77,8 @@ describe("FirestoreStreamerRepository", () => {
 
       await expect(repository.getStreamer("streamer-1")).resolves.toEqual({
         id: "streamer-1",
+        isLive: false,
+        liveSince: null,
       });
     });
 

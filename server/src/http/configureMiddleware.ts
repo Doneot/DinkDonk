@@ -22,6 +22,9 @@ import { configurePassport } from "./passport.js";
 import type { Redis } from "../infrastructure/redis/redisClient.js";
 import type { IdentityRepository } from "../modules/auth/ports/IdentityRepository.js";
 import type { StreamNotificationService } from "../modules/notifications/application/StreamNotificationService.js";
+import type { StreamerLiveStateService } from "../modules/streamers/application/StreamerLiveStateService.js";
+import type { TwitchEventSubEvent } from "../modules/twitch/eventsub/EventSubHandlerRegistry.js";
+import type { TwitchEventSubStreamOnlineEvent } from "../modules/twitch/domain/Twitch.js";
 
 import { assertDefined } from "../shared/utils/assert.js";
 import { requestId } from "./middleware/requestId.js";
@@ -35,6 +38,7 @@ type ConfigureMiddlewareOptions = {
   identityRepository: IdentityRepository;
   services: {
     streamNotification: StreamNotificationService;
+    streamerLiveState: StreamerLiveStateService;
   };
   /**
    * Backs the rate limiters and the EventSub replay store with Redis, so
@@ -188,9 +192,25 @@ export function configureMiddleware({
 
       replayStore,
 
-      onNotification: (type, event) => {
+      onNotification: (type: string, event: TwitchEventSubEvent) => {
         if (type === "stream.online") {
-          return services.streamNotification.handleStreamOnline(event);
+          const onlineEvent = event as TwitchEventSubStreamOnlineEvent;
+
+          // Independent concerns notified in parallel: one fans the "you're
+          // live" message out to subscribers, the other just updates the
+          // persisted live-status flag those subscribers' dashboards read.
+          // Neither depends on the other's outcome.
+          return Promise.all([
+            services.streamNotification.handleStreamOnline(onlineEvent),
+            services.streamerLiveState.handleStreamOnline(onlineEvent),
+          ]).then(() => undefined);
+        }
+
+        if (type === "stream.offline") {
+          // No cast needed here (unlike the stream.online branch above):
+          // every member of the TwitchEventSubEvent union already carries
+          // the three fields TwitchEventSubStreamOfflineEvent requires.
+          return services.streamerLiveState.handleStreamOffline(event);
         }
 
         return Promise.resolve();

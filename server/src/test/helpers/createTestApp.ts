@@ -5,6 +5,7 @@ import session from "express-session";
 import type { Express, NextFunction, Request, Response } from "express";
 
 import { createApiRouter } from "../../http/routes/apiRoutes.js";
+import { StreamerLiveStateService } from "../../modules/streamers/application/StreamerLiveStateService.js";
 import { requireAuthenticated } from "../../http/middleware/auth.js";
 import { errorHandler } from "../../http/middleware/errorHandler.js";
 import { requestId } from "../../http/middleware/requestId.js";
@@ -97,6 +98,11 @@ export async function createTestApp(
     app.use(mockAuthenticatedUser(options.authUser));
   }
 
+  const streamerLiveState = new StreamerLiveStateService(
+    container.repositories.streamers,
+    () => {},
+  );
+
   app.use(
     "/api",
     requireAuthenticated,
@@ -106,6 +112,7 @@ export async function createTestApp(
       discord: container.discord,
       ensureFreshToken: (_req, _res, next) => next(),
       webPushPublicKey: options.webPushPublicKey ?? TEST_WEB_PUSH_PUBLIC_KEY,
+      services: { streamerLiveState },
     }),
   );
 

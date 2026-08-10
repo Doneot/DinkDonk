@@ -28,4 +28,17 @@ export interface StreamerRepository {
    * silently wiped out by it.
    */
   deleteStreamerIfEmpty(id: string): Promise<boolean>;
+
+  /**
+   * Records a stream.online/stream.offline transition. Returns false
+   * without writing anything when the streamer doc doesn't exist (e.g. a
+   * late-arriving event for a streamer whose last subscriber already left
+   * and was garbage-collected) - the caller uses this to decide whether
+   * there's anyone to fan the change out to over Socket.IO.
+   */
+  setLiveState(
+    id: string,
+    isLive: boolean,
+    liveSince: string | null,
+  ): Promise<boolean>;
 }

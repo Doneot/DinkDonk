@@ -5,10 +5,14 @@ import type { Subscription } from "../../shared/types/api";
 export interface StreamerProfile {
   name: string;
   avatar: string;
+  isLive: boolean;
+  liveSince: string | null;
 }
 
 export interface EnrichedSubscription extends Subscription {
   name: string;
   avatar: string;
   isHydrated: boolean;
+  isLive: boolean;
+  liveSince: string | null;
 }

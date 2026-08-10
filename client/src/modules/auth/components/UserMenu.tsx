@@ -1,7 +1,5 @@
 // src/modules/auth/components/UserMenu.tsx
 import { useCallback, useRef, useState, type KeyboardEvent } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/authContextValue";
 import { useNavigate } from "react-router-dom";
@@ -44,12 +42,19 @@ const UserMenu = () => {
           aria-haspopup="menu"
           aria-expanded={open}
           aria-label="Open account menu"
-          className="rounded-full cursor-pointer border border-gray-300 hover:shadow transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="rounded-full cursor-pointer border border-seam hover:border-accent transition focus:outline-none focus:ring-2 focus:ring-accent"
         >
           <img
             src={user?.avatarUrl || "/default-avatar.svg"}
             alt=""
             loading="lazy"
+            // Google's avatar CDN (lh3.googleusercontent.com) intermittently
+            // rejects the request based on the Referer header a plain <img>
+            // sends - most visible right after a brand-new Google sign-in,
+            // before the browser has ever fetched that URL. Dropping the
+            // referrer avoids that rejection instead of relying on a reload
+            // to eventually get a request the CDN accepts.
+            referrerPolicy="no-referrer"
             className="w-10 h-10 rounded-full"
           />
         </button>
@@ -57,26 +62,13 @@ const UserMenu = () => {
           <div
             role="menu"
             aria-label="Account menu"
-            className="absolute right-0 top-full mt-1 w-48 bg-white shadow-lg rounded-lg"
+            className="absolute right-0 top-full mt-1 w-48 bg-panel-2 border border-seam shadow-lg rounded-md overflow-hidden"
           >
-            {!user?.providers?.includes("discord") && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  window.location.href = "/api/auth/discord/link";
-                }}
-                className="w-full text-left px-4 py-2 !bg-white hover:bg-gray-100 text-sm text-gray-700 cursor-pointer inline-flex items-center gap-2"
-              >
-                <FontAwesomeIcon icon={faDiscord} className="text-[#5865F2]" />
-                Connect Discord
-              </button>
-            )}
             <button
               type="button"
               role="menuitem"
               onClick={handleLogout}
-              className="w-full text-left px-4 py-2 !bg-white hover:bg-gray-100 text-sm text-red-600 cursor-pointer"
+              className="w-full text-left px-4 py-2 !bg-transparent hover:!bg-tile text-sm text-live cursor-pointer"
             >
               Log out
             </button>

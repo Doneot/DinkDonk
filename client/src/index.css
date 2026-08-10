@@ -1,70 +1,153 @@
 @import "tailwindcss";
 
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color-scheme: light dark;
-  color: #242424;
-  background-color: #f3f4f6; /* Tailwind bg-gray-100 */
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@theme {
+  --color-bg: #0a0c11;
+  --color-panel: #12151c;
+  --color-panel-2: #181c27;
+  --color-tile: #151822;
+  --color-tile-hover: #191d29;
+  --color-seam: #262b38;
+  --color-seam-soft: #1c202b;
+  --color-ink: #e9eaf0;
+  --color-ink-dim: #9498ab;
+  --color-ink-faint: #5a5f72;
+  --color-accent: #a15fff;
+  --color-accent-2: #7c4fd1;
+  --color-live: #ff3b4e;
+  --color-online: #39e6c2;
+  --color-amber: #ffb454;
+
+  --font-display: "Bahnschrift", "Arial Narrow", "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Roboto Mono", monospace;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+/* Custom rules live in Tailwind's own layers (not left "unlayered") so the
+   cascade-layer order Tailwind establishes actually applies: an unlayered
+   rule beats every layered rule regardless of specificity, which previously
+   made the plain `a { color }` below always win over any `text-*` utility
+   applied to an <a> (e.g. the CTA links rendering invisible text). */
+@layer base {
+  :root {
+    font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+    color-scheme: dark;
+    color: var(--color-ink);
+    background-color: var(--color-bg);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  a {
+    font-weight: 500;
+    color: var(--color-accent);
+    text-decoration: inherit;
+  }
+  a:hover {
+    color: var(--color-accent-2);
+  }
+
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+    width: 100%;
+  }
+
+  body {
+    min-width: 320px;
+    display: flex;
+    flex-direction: column; /* Allows for proper stacking of elements */
+    background-color: var(--color-bg);
+  }
+
+  #root {
+    display: flex;
+    flex-grow: 1; /* Ensures root takes the full available space */
+    flex-direction: column; /* Stack the children vertically */
+    width: 100%;
+  }
+
+  h1 {
+    font-size: 3.2em;
+    line-height: 1.1;
+  }
+
+  :root button,
+  body > button {
+    border-radius: 6px;
+    border: 1px solid transparent;
+    padding: 0.6em 1.2em;
+    font-size: 1em;
+    font-weight: 500;
+    font-family: inherit;
+    transition: border-color 0.25s;
+  }
+  :root button:hover,
+  body > button:hover {
+    border-color: var(--color-accent);
+  }
+  :root button:focus,
+  body > button:focus,
+  :root button:focus-visible,
+  body > button:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
 }
 
-html,
-body {
-  margin: 0;
-  height: 100%;
-  width: 100%;
+@layer components {
+  /* Tally light: the one element in the app allowed to pulse - real state
+     only (bot online, socket connected, push enabled). */
+  .tally {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-ink-faint);
+    flex: none;
+  }
+  .tally.is-on {
+    background: var(--color-online);
+    box-shadow: 0 0 6px 1.5px var(--color-online);
+  }
+  .tally.is-live {
+    background: var(--color-live);
+    box-shadow: 0 0 6px 1.5px var(--color-live);
+  }
+  /* Static marker for "being tracked" - no live/offline data exists per
+     streamer yet, so this deliberately never pulses and never uses the
+     live/online semantic colors. */
+  .tally.is-tracked {
+    background: var(--color-accent);
+  }
+
+  /* Live-tile treatment: a gradient fade from the tally-red wash down into
+     the tile's own background, rather than a flat tint - matches the
+     Control Room mockup's .tile.is-live. */
+  .live-glow {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 59, 78, 0.16),
+      var(--color-tile) 55%
+    );
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .tally.is-on,
+    .tally.is-live {
+      animation: tally-pulse 1.8s ease-in-out infinite;
+    }
+  }
 }
 
-
-body {
-  min-width: 320px;
-  display: flex;
-  flex-direction: column; /* Allows for proper stacking of elements */
-}
-
-#root {
-  display: flex;
-  flex-grow: 1; /* Ensures root takes the full available space */
-  flex-direction: column; /* Stack the children vertically */
-  width: 100%;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-:root button,
-body > button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  transition: border-color 0.25s;
-}
-:root button:hover,
-body > button:hover {
-  border-color: #646cff;
-}
-:root button:focus,
-body > button:focus,
-:root button:focus-visible,
-body > button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+@keyframes tally-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }

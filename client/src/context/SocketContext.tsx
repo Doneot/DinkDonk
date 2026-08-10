@@ -6,7 +6,7 @@ import {
   type ClientToServerEvents,
 } from "../shared/socket";
 import { useAuth } from "./authContextValue";
-import { SocketContext } from "./socketContextValue";
+import { SocketContext, type LiveState } from "./socketContextValue";
 
 type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -16,6 +16,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [socket, setSocket] = useState<AppSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
+  const [liveStreamers, setLiveStreamers] = useState<Record<string, LiveState>>({});
 
   useEffect(() => {
     if (!user?.id || socketRef.current) return undefined;
@@ -34,6 +35,12 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       );
       setSyncMessage("Your account data was updated.");
     });
+    newSocket.on("streamer_live_changed", ({ streamerId, isLive, liveSince }) => {
+      setLiveStreamers((prev) => ({
+        ...prev,
+        [streamerId]: { isLive, liveSince },
+      }));
+    });
 
     return () => {
       newSocket.disconnect();
@@ -42,7 +49,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     };
   }, [setUser, user?.id]);
 
-  const value = useMemo(() => ({ socket, connected }), [socket, connected]);
+  const value = useMemo(
+    () => ({ socket, connected, liveStreamers }),
+    [socket, connected, liveStreamers],
+  );
 
   return (
     <SocketContext.Provider value={value}>

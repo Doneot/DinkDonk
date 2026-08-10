@@ -9,6 +9,7 @@ extendZodWithOpenApi(z);
 export const UserRecordSchema = z.object({
   subscriptions: z.array(SubscriptionSchema).max(MAX_SUBSCRIPTIONS).default([]),
   canReceiveDM: z.boolean().default(false),
+  notificationPreferences: z.record(z.string(), z.boolean()).default({}),
 });
 
 export type UserRecord = z.infer<typeof UserRecordSchema>;
@@ -20,4 +21,5 @@ export type UserRecord = z.infer<typeof UserRecordSchema>;
 export const UserUpdateSchema = z.object({
   subscriptions: z.array(SubscriptionSchema).max(MAX_SUBSCRIPTIONS).optional(),
   canReceiveDM: z.boolean().optional(),
+  notificationPreferences: z.record(z.string(), z.boolean()).optional(),
 });

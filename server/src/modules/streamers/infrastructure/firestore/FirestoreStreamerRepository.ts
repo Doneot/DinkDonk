@@ -26,13 +26,23 @@ export class FirestoreStreamerRepository implements StreamerRepository {
     const query = limit === undefined ? this.streamers : this.streamers.limit(limit);
     const snapshot = await query.get();
 
-    return snapshot.docs.map((doc) => ({ id: doc.id }));
+    return snapshot.docs.map((doc) => this.toStreamer(doc.id, doc.data()));
   }
 
   async getStreamer(id: string): Promise<Streamer | null> {
     const doc = await getExistingDoc(this.streamers, id);
 
-    return doc ? { id: doc.id } : null;
+    return doc ? this.toStreamer(doc.id, doc.data() ?? {}) : null;
+  }
+
+  private toStreamer(id: string, data: DocumentData): Streamer {
+    const record = StreamerSchema.parse({ ...data, id });
+
+    return {
+      id,
+      isLive: record.isLive,
+      liveSince: record.liveSince,
+    };
   }
 
   async createStreamer(id: string): Promise<void> {
@@ -120,6 +130,28 @@ export class FirestoreStreamerRepository implements StreamerRepository {
       }
 
       tx.delete(streamerRef);
+
+      return true;
+    });
+  }
+
+  async setLiveState(
+    id: string,
+    isLive: boolean,
+    liveSince: string | null,
+  ): Promise<boolean> {
+    if (!isNonEmptyString(id)) return false;
+
+    const streamerRef = this.streamers.doc(id);
+
+    return this.streamers.firestore.runTransaction(async (tx) => {
+      const doc = await tx.get(streamerRef);
+
+      if (!doc.exists) {
+        return false;
+      }
+
+      tx.set(streamerRef, { isLive, liveSince }, { merge: true });
 
       return true;
     });

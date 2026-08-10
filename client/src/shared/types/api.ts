@@ -27,6 +27,15 @@ export interface StreamerSummary {
   avatar?: string;
 }
 
+// /streamers/info's response shape: unlike /streamers/search's arbitrary
+// Twitch results, every id it's called with is one the caller already
+// tracks (a user's subscriptions), so the backend can meaningfully attach
+// its own live-status record.
+export interface TrackedStreamerSummary extends StreamerSummary {
+  isLive: boolean;
+  liveSince: string | null;
+}
+
 export interface StatusResponse {
   online: boolean;
 }
@@ -45,4 +54,19 @@ export interface PublicKeyResponse {
 
 export interface AuthProvidersResponse {
   providers: Provider[];
+  discordInviteUrl: string;
+}
+
+export type NotificationChannelId = "discord" | "webPush";
+
+export interface NotificationChannelsResponse {
+  discord: {
+    enabled: boolean;
+    optedIn: boolean;
+  };
+  webPush: {
+    enabled: boolean;
+    subscriptions: number;
+    optedIn: boolean;
+  };
 }

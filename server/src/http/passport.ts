@@ -36,6 +36,24 @@ export const isGoogleSignInEnabled = Boolean(
 // their Twitch app.
 export const isTwitchSignInEnabled = env.twitch.loginEnabled;
 
+// Computed from DISCORD_CLIENT_ID (already required for the Discord OAuth
+// strategy above, and not sensitive - it's meant to appear in a public
+// authorize URL) rather than requiring a separately configured frontend env
+// var: every DM this app ever sends depends on the bot sharing a server with
+// the user, so the invite link is too load-bearing to leave to something
+// that's easy to forget to set. `permissions=0`: every command reply in
+// commands/ goes through interaction.reply()/editReply() (see
+// commands/shared/commandReplies.ts), which needs no guild permissions at
+// all - the bot only needs to be *present* in a shared server, not granted
+// anything within it.
+export const discordInviteUrl = `https://discord.com/oauth2/authorize?${new URLSearchParams(
+  {
+    client_id: env.discord.clientId,
+    scope: "bot applications.commands",
+    permissions: "0",
+  },
+).toString()}`;
+
 // How long a "Connect Discord" round trip has to complete before its stashed
 // req.session.linkDiscordUid is treated as stale rather than honored. Without
 // this, abandoning the flow after being redirected to Discord (closing the
@@ -258,15 +276,6 @@ export function configurePassport(
       }
     },
   );
-
-  // Set on this strategy instance rather than DiscordStrategy.prototype so it
-  // doesn't leak as a global side effect onto every DiscordStrategy in the
-  // process.
-  strategy.authorizationParams = (): {
-    prompt: string;
-  } => ({
-    prompt: "none",
-  });
 
   passport.use(strategy);
 

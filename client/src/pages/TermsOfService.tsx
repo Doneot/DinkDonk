@@ -1,13 +1,15 @@
 const TermsOfService = () => {
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12 bg-gray-100 text-gray-800">
-      <h1 className="text-4xl font-bold mb-6">Terms of Service</h1>
-      <p className="text-sm text-gray-500 mb-8">
+    <div className="max-w-4xl mx-auto px-6 py-12 bg-bg text-ink-dim">
+      <h1 className="font-display uppercase [font-stretch:condensed] text-4xl font-bold mb-6 text-ink">
+        Terms of Service
+      </h1>
+      <p className="font-mono text-xs uppercase tracking-wider text-ink-faint mb-8">
         Effective Date: July 21, 2025
       </p>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">
+        <h2 className="text-2xl font-semibold mb-2 text-ink">
           1. Description of Service
         </h2>
         <p>
@@ -19,7 +21,7 @@ const TermsOfService = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">2. Eligibility</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">2. Eligibility</h2>
         <p>
           You must be at least 13 years old to use this Service. By using
           DinkDonk, you confirm that you are legally eligible and have the
@@ -28,7 +30,7 @@ const TermsOfService = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">3. Account and Data</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">3. Account and Data</h2>
         <p>
           You may log in with your Discord account. We store your Discord user
           ID, Twitch follow preferences, and notification settings. We do not
@@ -38,10 +40,10 @@ const TermsOfService = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">
+        <h2 className="text-2xl font-semibold mb-2 text-ink">
           4. User Responsibilities
         </h2>
-        <ul className="list-disc pl-5">
+        <ul className="list-disc pl-5 marker:text-accent">
           <li>Do not misuse the platform or attempt to disrupt it.</li>
           <li>Do not use the Service for illegal or abusive behavior.</li>
           <li>Do not resell or exploit the Service without permission.</li>
@@ -49,7 +51,7 @@ const TermsOfService = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">
+        <h2 className="text-2xl font-semibold mb-2 text-ink">
           5. Notifications via Discord
         </h2>
         <p>
@@ -60,7 +62,7 @@ const TermsOfService = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">
+        <h2 className="text-2xl font-semibold mb-2 text-ink">
           6. Intellectual Property
         </h2>
         <p>
@@ -71,7 +73,7 @@ const TermsOfService = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">7. Termination</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">7. Termination</h2>
         <p>
           We may suspend or remove your access to DinkDonk at our discretion,
           particularly if you violate these Terms. You may request account or
@@ -80,7 +82,7 @@ const TermsOfService = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">8. Disclaimer</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">8. Disclaimer</h2>
         <p>
           The Service is provided "as is" with no guarantees. We are not liable
           for missed notifications, bot downtime, or changes in external APIs
@@ -89,7 +91,7 @@ const TermsOfService = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">9. Changes to Terms</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">9. Changes to Terms</h2>
         <p>
           These Terms may be updated from time to time. Significant changes will
           be communicated via the dashboard or Discord.
@@ -97,12 +99,12 @@ const TermsOfService = () => {
       </section>
 
       <section>
-        <h2 className="text-2xl font-semibold mb-2">10. Contact</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">10. Contact</h2>
         <p>
           If you have any questions or requests, you can reach us at:{" "}
           <a
             href="mailto:contact@dinkdonk.donuts.ovh"
-            className="text-blue-600 underline"
+            className="text-accent underline hover:text-accent-2"
           >
             contact@dinkdonk.donuts.ovh
           </a>

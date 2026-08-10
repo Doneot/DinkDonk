@@ -27,6 +27,8 @@ export function streamerRepositoryBehavior(
 
       await expect(repository.getStreamer(streamer.id)).resolves.toEqual({
         id: streamer.id,
+        isLive: false,
+        liveSince: null,
       });
     });
 
@@ -60,6 +62,8 @@ export function streamerRepositoryBehavior(
 
       await expect(repository.getStreamer("streamer-1")).resolves.toEqual({
         id: "streamer-1",
+        isLive: false,
+        liveSince: null,
       });
       await expect(
         repository.getSubscriberIds("streamer-1"),
@@ -155,6 +159,66 @@ export function streamerRepositoryBehavior(
       ).resolves.toBe(false);
 
       await expect(repository.getStreamer("streamer-1")).resolves.not.toBeNull();
+    });
+
+    describe("setLiveState", () => {
+      it("marks a streamer live and returns true", async () => {
+        const repository = createRepository();
+
+        repository.seed(buildStreamer({ id: "streamer-1" }));
+
+        await expect(
+          repository.setLiveState(
+            "streamer-1",
+            true,
+            "2024-01-01T12:00:00.000Z",
+          ),
+        ).resolves.toBe(true);
+
+        await expect(repository.getStreamer("streamer-1")).resolves.toEqual({
+          id: "streamer-1",
+          isLive: true,
+          liveSince: "2024-01-01T12:00:00.000Z",
+        });
+      });
+
+      it("clears live state when the stream ends", async () => {
+        const repository = createRepository();
+
+        repository.seed(
+          buildStreamer({
+            id: "streamer-1",
+            isLive: true,
+            liveSince: "2024-01-01T12:00:00.000Z",
+          }),
+        );
+
+        await expect(
+          repository.setLiveState("streamer-1", false, null),
+        ).resolves.toBe(true);
+
+        await expect(repository.getStreamer("streamer-1")).resolves.toEqual({
+          id: "streamer-1",
+          isLive: false,
+          liveSince: null,
+        });
+      });
+
+      it("returns false for a streamer that doesn't exist", async () => {
+        const repository = createRepository();
+
+        await expect(
+          repository.setLiveState("missing", true, "2024-01-01T12:00:00.000Z"),
+        ).resolves.toBe(false);
+      });
+
+      it("returns false for the blank id", async () => {
+        const repository = createRepository();
+
+        await expect(
+          repository.setLiveState("", true, "2024-01-01T12:00:00.000Z"),
+        ).resolves.toBe(false);
+      });
     });
   });
 }

@@ -7,5 +7,6 @@ export function toUser(id: string, record: UserRecord): User {
     id,
     subscriptions: record.subscriptions,
     canReceiveDM: record.canReceiveDM,
+    notificationPreferences: record.notificationPreferences,
   };
 }

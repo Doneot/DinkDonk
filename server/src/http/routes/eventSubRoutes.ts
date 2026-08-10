@@ -2,7 +2,7 @@ import express from "express";
 import type { Router } from "express";
 import { z } from "zod";
 import { createEventSubHandlerRegistry } from "../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
-import type { TwitchEventSubStreamOnlineEvent } from "../../modules/twitch/domain/Twitch.js";
+import type { TwitchEventSubEvent } from "../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
 import { eventSubHeadersSchema } from "../schemas/eventSub.js";
 import { verifyEventSubSignature } from "../../modules/twitch/eventsub/EventSubSignatureVerifier.js";
 import { dispatchEventSubNotification } from "../../modules/twitch/eventsub/EventSubDispatcher.js";
@@ -21,10 +21,7 @@ type CreateEventSubRouterOptions = {
 
   replayStore: ReplayStore;
 
-  onNotification: (
-    type: string,
-    event: TwitchEventSubStreamOnlineEvent,
-  ) => Promise<void>;
+  onNotification: (type: string, event: TwitchEventSubEvent) => Promise<void>;
 };
 
 export function createEventSubRouter({

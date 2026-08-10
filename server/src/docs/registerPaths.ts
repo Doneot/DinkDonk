@@ -7,6 +7,7 @@ import { z } from "zod";
 import {
   deletePushSubscriptionQuerySchema,
   savePushSubscriptionSchema,
+  setChannelPreferenceSchema,
 } from "../http/schemas/notifications.js";
 import {
   searchStreamersQuerySchema,
@@ -24,8 +25,10 @@ import {
   notificationChannelsResponseSchema,
   publicKeyResponseSchema,
   savePushResponseSchema,
+  setChannelPreferenceResponseSchema,
   statusResponseSchema,
   streamerSummaryResponseSchema,
+  trackedStreamerSummaryResponseSchema,
   subscribeResponseSchema,
   unsubscribeResponseSchema,
   updateSubscriptionResponseSchema,
@@ -235,6 +238,22 @@ export function registerPaths(registry: OpenAPIRegistry): void {
 
   registry.registerPath({
     method: "post",
+    path: "/api/notifications/channels",
+    summary: "Set a notification channel's opt-in preference",
+    security: authSecurity,
+    request: {
+      body: jsonBody(setChannelPreferenceSchema),
+    },
+    responses: {
+      200: jsonResponse("Preference updated", setChannelPreferenceResponseSchema),
+      400: validationErrorResponse,
+      401: unauthorizedResponse,
+      404: notFoundResponse,
+    },
+  });
+
+  registry.registerPath({
+    method: "post",
     path: "/api/notifications/web-push/subscriptions",
     summary: "Save Web Push subscription",
     security: authSecurity,
@@ -319,7 +338,7 @@ export function registerPaths(registry: OpenAPIRegistry): void {
     responses: {
       200: jsonResponse(
         "Streamer info",
-        z.array(streamerSummaryResponseSchema),
+        z.array(trackedStreamerSummaryResponseSchema),
       ),
       400: validationErrorResponse,
       401: unauthorizedResponse,

@@ -13,6 +13,8 @@ export function buildStreamer(
 ): Streamer & { users: string[] } {
   return {
     id: TEST_STREAMER_ID,
+    isLive: false,
+    liveSince: null,
     users: [],
     ...overrides,
   };

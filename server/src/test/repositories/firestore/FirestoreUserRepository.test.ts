@@ -117,6 +117,7 @@ describe("FirestoreUserRepository", () => {
         id: "user-1",
         canReceiveDM: true,
         subscriptions: [{ id: "streamer-1", notification_message: "hello" }],
+        notificationPreferences: {},
       });
     });
 
@@ -129,6 +130,7 @@ describe("FirestoreUserRepository", () => {
         id: "user-1",
         canReceiveDM: false,
         subscriptions: [],
+        notificationPreferences: {},
       });
     });
 
@@ -167,8 +169,18 @@ describe("FirestoreUserRepository", () => {
       firestore.write("users/user-2", { canReceiveDM: false });
 
       await expect(repository.getUsers()).resolves.toEqual([
-        { id: "user-1", canReceiveDM: true, subscriptions: [] },
-        { id: "user-2", canReceiveDM: false, subscriptions: [] },
+        {
+          id: "user-1",
+          canReceiveDM: true,
+          subscriptions: [],
+          notificationPreferences: {},
+        },
+        {
+          id: "user-2",
+          canReceiveDM: false,
+          subscriptions: [],
+          notificationPreferences: {},
+        },
       ]);
     });
 
@@ -179,7 +191,12 @@ describe("FirestoreUserRepository", () => {
       firestore.write("users/user-1/pushSubscriptions/sub-1", {});
 
       await expect(repository.getUsers()).resolves.toEqual([
-        { id: "user-1", canReceiveDM: false, subscriptions: [] },
+        {
+          id: "user-1",
+          canReceiveDM: false,
+          subscriptions: [],
+          notificationPreferences: {},
+        },
       ]);
     });
   });
@@ -310,6 +327,7 @@ describe("FirestoreUserRepository", () => {
         id: "user-1",
         canReceiveDM: true,
         subscriptions: [{ id: "streamer-1", notification_message: "hi" }],
+        notificationPreferences: {},
       } satisfies User);
     });
 

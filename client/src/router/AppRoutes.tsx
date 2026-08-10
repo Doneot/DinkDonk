@@ -9,6 +9,7 @@ import ScrollToTop from '../shared/components/ScrollToTop';
 
 const Dashboard = lazy(() => import('../pages/Dashboard'));
 const Login = lazy(() => import('../pages/Login'));
+const HowItWorks = lazy(() => import('../pages/HowItWorks'));
 const TermsOfService = lazy(() => import('../pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('../pages/PrivacyPolicy'));
 const NotFound = lazy(() => import('../pages/NotFound'));
@@ -24,7 +25,7 @@ export default function AppRoutes() {
   const showNavbar = !ROUTES_WITHOUT_NAVBAR.has(location.pathname);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100">
+    <div className="min-h-screen flex flex-col bg-bg">
       {showNavbar && <Navbar />}
       <ScrollToTop />
 
@@ -41,6 +42,7 @@ export default function AppRoutes() {
                 </RedirectIfAuthenticated>
               }
             />
+            <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="*" element={<NotFound />} />

@@ -93,13 +93,16 @@ describe("EventSubSyncService", () => {
 
     it("does nothing when every streamer is already subscribed", async () => {
       const { service, twitch } = setup({
-        subscriptions: [buildEventSubSubscription()],
+        subscriptions: [
+          buildEventSubSubscription(),
+          buildEventSubSubscription({ id: "sub-2", type: "stream.offline" }),
+        ],
         streamers: [buildStreamer({ id: "streamer-1" })],
       });
 
       await service.syncEventSubSubscriptions();
 
-      expect(twitch.subscriptions).toHaveLength(1);
+      expect(twitch.subscriptions).toHaveLength(2);
     });
 
     it("does nothing when there are no streamers", async () => {
@@ -185,7 +188,10 @@ describe("EventSubSyncService", () => {
         expect.any(String),
       );
 
-      expect(twitch.broadcasterIds()).toEqual(["streamer-2"]);
+      // Two subscriptions (stream.online + stream.offline) created for the
+      // one streamer that succeeded; streamer-1 failed on its very first
+      // (stream.online) attempt, so stream.offline was never even tried.
+      expect(twitch.broadcasterIds()).toEqual(["streamer-2", "streamer-2"]);
     });
 
     it("syncs every streamer across more than one batch", async () => {
@@ -200,9 +206,12 @@ describe("EventSubSyncService", () => {
 
       await service.syncEventSubSubscriptions();
 
-      expect(twitch.broadcasterIds().sort()).toEqual(
-        streamers.map((streamer) => streamer.id).sort(),
-      );
+      // Each streamer gets both stream.online and stream.offline.
+      const expectedIds = streamers
+        .flatMap((streamer) => [streamer.id, streamer.id])
+        .sort();
+
+      expect(twitch.broadcasterIds().sort()).toEqual(expectedIds);
     });
   });
 
@@ -214,17 +223,20 @@ describe("EventSubSyncService", () => {
 
       await service.handleStreamerAdded("streamer-9");
 
-      expect(twitch.broadcasterIds()).toEqual(["streamer-9"]);
+      expect(twitch.broadcasterIds()).toEqual(["streamer-9", "streamer-9"]);
     });
 
     it("is a no-op when the streamer is already subscribed", async () => {
       const { service, twitch } = setup({
-        subscriptions: [buildEventSubSubscription()],
+        subscriptions: [
+          buildEventSubSubscription(),
+          buildEventSubSubscription({ id: "sub-2", type: "stream.offline" }),
+        ],
       });
 
       await service.handleStreamerAdded("streamer-1");
 
-      expect(twitch.subscriptions).toHaveLength(1);
+      expect(twitch.subscriptions).toHaveLength(2);
     });
 
     it("does not create a duplicate subscription when two calls race for the same streamer", async () => {
@@ -238,7 +250,13 @@ describe("EventSubSyncService", () => {
         service.handleStreamerAdded("streamer-9"),
       ]);
 
-      expect(subscribeToEvent).toHaveBeenCalledOnce();
+      // One call per tracked type (stream.online, stream.offline) - never
+      // more, even though two callers raced for the same streamer.
+      expect(subscribeToEvent).toHaveBeenCalledTimes(2);
+      expect(subscribeToEvent.mock.calls.map((call) => call[0]).sort()).toEqual([
+        "stream.offline",
+        "stream.online",
+      ]);
     });
 
     it("re-checks against fresh data before creating, so a stale snapshot doesn't cause a duplicate once a concurrent caller already created one", async () => {
@@ -267,17 +285,17 @@ describe("EventSubSyncService", () => {
 
       await service.handleStreamerAdded("streamer-9");
 
-      expect(twitch.broadcasterIds()).toEqual(["streamer-9"]);
+      expect(twitch.broadcasterIds()).toEqual(["streamer-9", "streamer-9"]);
 
       resolveStaleRead([]);
 
       await callA;
 
       // Caller A's stale snapshot said "missing", but by the time it
-      // actually acquired the lock, caller B had already created the
-      // subscription - the fresh re-check inside the lock must catch that
-      // instead of creating a second one.
-      expect(twitch.broadcasterIds()).toEqual(["streamer-9"]);
+      // actually acquired the lock, caller B had already created both
+      // subscriptions - the fresh re-check inside the lock must catch that
+      // instead of creating duplicates.
+      expect(twitch.broadcasterIds()).toEqual(["streamer-9", "streamer-9"]);
     });
 
     it("ignores a subscription of another type for the same streamer", async () => {
@@ -289,7 +307,9 @@ describe("EventSubSyncService", () => {
 
       await service.handleStreamerAdded("streamer-1");
 
-      expect(twitch.subscriptions).toHaveLength(2);
+      // The pre-existing channel.update subscription, plus a freshly
+      // created stream.online and stream.offline pair.
+      expect(twitch.subscriptions).toHaveLength(3);
     });
   });
 });

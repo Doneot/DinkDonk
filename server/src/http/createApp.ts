@@ -7,6 +7,7 @@ import type { DiscordService } from "../modules/discord/ports/DiscordService.js"
 
 import type { Repositories } from "../app/container/repositories.js";
 import type { StreamNotificationService } from "../modules/notifications/application/StreamNotificationService.js";
+import type { StreamerLiveStateService } from "../modules/streamers/application/StreamerLiveStateService.js";
 import type { Redis } from "../infrastructure/redis/redisClient.js";
 
 import { configureRoutes } from "./configureRoutes.js";
@@ -25,6 +26,7 @@ type CreateAppOptions = {
 
   services: {
     streamNotification: StreamNotificationService;
+    streamerLiveState: StreamerLiveStateService;
   };
 
   /**
@@ -65,6 +67,7 @@ export function createApp({
     repositories,
     twitch,
     discord,
+    services,
     ...(disconnectUser ? { disconnectUser } : {}),
     ...(redis ? { redis } : {}),
   });

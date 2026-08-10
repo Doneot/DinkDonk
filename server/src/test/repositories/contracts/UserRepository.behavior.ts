@@ -99,6 +99,7 @@ export function userRepositoryBehavior(
         id: "user-1",
         canReceiveDM: true,
         subscriptions: [],
+        notificationPreferences: {},
       });
     });
 

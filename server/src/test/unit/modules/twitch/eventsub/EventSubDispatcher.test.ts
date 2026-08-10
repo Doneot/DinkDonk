@@ -6,6 +6,7 @@ import { createEventSubHandlerRegistry } from "../../../../../modules/twitch/eve
 
 import {
   buildRevocationEvent,
+  buildStreamOfflineEvent,
   buildStreamOnlineEvent,
   buildWebhookVerification,
 } from "../../../../builders/eventSub.js";
@@ -79,6 +80,18 @@ describe("dispatchEventSubNotification", () => {
       expect(result).toEqual({ status: 204 });
       expect(onNotification.mock.calls).toEqual([
         ["stream.online", payload.event],
+      ]);
+    });
+
+    it("runs the stream.offline handler with its own (started_at-less) event shape", async () => {
+      const { handlers, onNotification } = setup();
+      const payload = buildStreamOfflineEvent();
+
+      const result = await dispatch(payload, "notification", handlers);
+
+      expect(result).toEqual({ status: 204 });
+      expect(onNotification.mock.calls).toEqual([
+        ["stream.offline", payload.event],
       ]);
     });
 

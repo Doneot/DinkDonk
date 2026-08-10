@@ -2,6 +2,7 @@ import express from "express";
 import type { Request, Response, Router } from "express";
 import type { DiscordService } from "../../modules/discord/ports/DiscordService.js";
 import type { TwitchStreamerProvider } from "../../modules/twitch/ports/TwitchGateway.js";
+import type { StreamerLiveStateService } from "../../modules/streamers/application/StreamerLiveStateService.js";
 import type { Repositories } from "../../app/container/repositories.js";
 import { requireUser } from "../middleware/auth.js";
 import {
@@ -13,8 +14,10 @@ import {
 import {
   deletePushSubscriptionQuerySchema,
   savePushSubscriptionSchema,
+  setChannelPreferenceSchema,
   type SavePushSubscriptionRequest,
   type DeletePushSubscriptionQuery,
+  type SetChannelPreferenceRequest,
 } from "../schemas/notifications.js";
 import {
   searchStreamersQuerySchema,
@@ -42,9 +45,11 @@ import type {
   NotificationChannelsResponse,
   PublicKeyResponse,
   SavePushResponse,
+  SetChannelPreferenceResponse,
   StatusResponse,
   StreamerSummaryResponse,
   SubscribeResponse,
+  TrackedStreamerSummaryResponse,
   UnsubscribeResponse,
   UserCountResponse,
 } from "../schemas/responses.js";
@@ -65,6 +70,10 @@ type CreateApiRouterOptions = {
   // Mandatory: envSchema requires WEB_PUSH_PUBLIC_KEY, so every deployment
   // has one by the time routes are configured.
   webPushPublicKey: string;
+
+  services: {
+    streamerLiveState: StreamerLiveStateService;
+  };
 };
 
 // Translates a SubscribeResult/UnsubscribeResult/UpdateSubscriptionResult
@@ -129,6 +138,7 @@ export function createApiRouter({
   discord,
   ensureFreshToken,
   webPushPublicKey,
+  services,
 }: CreateApiRouterOptions): Router {
   const router = express.Router();
 
@@ -181,20 +191,48 @@ export function createApiRouter({
         await repositories.pushSubscriptions.getPushSubscriptions(authUser.id);
 
       const user = await repositories.users.getUser(authUser.id);
+      const preferences = user?.notificationPreferences ?? {};
 
       const payload = {
         discord: {
           enabled: Boolean(user?.canReceiveDM),
+
+          optedIn: preferences.discord !== false,
         },
 
         webPush: {
           enabled: pushSubscriptions.length > 0,
 
           subscriptions: pushSubscriptions.length,
+
+          optedIn: preferences.webPush !== false,
         },
       } satisfies NotificationChannelsResponse;
 
       res.json(payload);
+    },
+  );
+
+  router.post(
+    "/notifications/channels",
+
+    validateBody(setChannelPreferenceSchema),
+
+    async (req, res) => {
+      const user = requireUser(req);
+      const { channel, enabled } = validatedBody<SetChannelPreferenceRequest>(req);
+
+      const result = await repositories.users.updateNotificationPreference(
+        user.id,
+        channel,
+        enabled,
+      );
+
+      if (!result.success) {
+        throw new NotFoundError("We couldn't find your account.");
+      }
+
+      res.status(200).json({} satisfies SetChannelPreferenceResponse);
     },
   );
 
@@ -285,11 +323,56 @@ export function createApiRouter({
     async (req, res) => {
       const { ids } = validatedBody<BatchStreamerInfoRequest>(req);
 
-      const streamers = await twitch.fetchStreamers(ids);
+      const [streamers, liveStreams, cachedStates] = await Promise.all([
+        twitch.fetchStreamers(ids),
+
+        // Ground truth for "live right now" - see getLiveStreams's own doc
+        // comment for why this can't just be our own EventSub-fed cache.
+        twitch.getLiveStreams(ids),
+
+        // Bounded by batchStreamerInfoSchema's own 50-id cap, same as the
+        // Twitch calls above - no separate batching needed.
+        Promise.all(ids.map((id) => repositories.streamers.getStreamer(id))),
+      ]);
 
       if (!streamers.length) {
         throw new NotFoundError("We couldn't find that streamer.");
       }
+
+      const liveSinceByUserId = new Map(
+        liveStreams.map((stream) => [stream.user_id, stream.started_at]),
+      );
+      const cachedById = new Map(
+        cachedStates
+          .filter((streamer) => streamer !== null)
+          .map((streamer) => [streamer.id, streamer]),
+      );
+
+      // Reconciles our own persisted live state against Twitch's ground
+      // truth - not just returns it - so a streamer whose broadcast was
+      // already in progress before this app ever subscribed to their
+      // EventSub events (no stream.online webhook fires for a stream
+      // already underway) still ends up correctly marked live, for every
+      // other subscriber's realtime view too, not just this response. Only
+      // written when it actually changed, to avoid a Firestore write (and a
+      // socket broadcast) on every dashboard load for every subscription.
+      await Promise.all(
+        streamers.map(async ({ id }) => {
+          const liveSince = liveSinceByUserId.get(id) ?? null;
+          const isLive = liveSince !== null;
+          const cached = cachedById.get(id);
+
+          if (cached && cached.isLive === isLive && cached.liveSince === liveSince) {
+            return;
+          }
+
+          await services.streamerLiveState.reconcileLiveState(
+            id,
+            isLive,
+            liveSince,
+          );
+        }),
+      );
 
       const payload = streamers.map(
         ({
@@ -304,8 +387,12 @@ export function createApiRouter({
           avatar,
 
           id: id,
+
+          isLive: liveSinceByUserId.has(id),
+
+          liveSince: liveSinceByUserId.get(id) ?? null,
         }),
-      ) satisfies StreamerSummaryResponse[];
+      ) satisfies TrackedStreamerSummaryResponse[];
 
       res.json(payload);
     },

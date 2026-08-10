@@ -20,6 +20,7 @@ import type { Repositories } from "../app/container/repositories.js";
 import type { TwitchStreamerProvider } from "../modules/twitch/ports/TwitchGateway.js";
 import type { DiscordService } from "../modules/discord/ports/DiscordService.js";
 import type { Redis } from "../infrastructure/redis/redisClient.js";
+import type { StreamerLiveStateService } from "../modules/streamers/application/StreamerLiveStateService.js";
 
 import { createHealthRouter } from "./routes/healthRoutes.js";
 import { createMetricsAuth } from "./middleware/metricsAuth.js";
@@ -32,6 +33,10 @@ type ConfigureRoutesOptions = {
   twitch: TwitchStreamerProvider & { isReady?: boolean };
 
   discord: DiscordService;
+
+  services: {
+    streamerLiveState: StreamerLiveStateService;
+  };
 
   /**
    * Forwarded to the auth router so /logout can drop a user's live
@@ -51,6 +56,7 @@ export function configureRoutes({
   repositories,
   twitch,
   discord,
+  services,
   disconnectUser,
   redis,
 }: ConfigureRoutesOptions): void {
@@ -105,6 +111,8 @@ export function configureRoutes({
     ensureFreshToken,
 
     webPushPublicKey: env.webPush.publicKey,
+
+    services,
   });
 
   // /api/v1 is a non-breaking alias of /api: same router instances, so a

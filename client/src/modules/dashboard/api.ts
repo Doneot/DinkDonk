@@ -15,7 +15,10 @@ export function fetchUserCount(): Promise<number> {
 
 export async function checkCanReceiveDM(): Promise<boolean> {
   try {
-    const res = await api.get<CanReceiveDmResponse>("/can-receive-dm");
+    // POST, not GET: this route has a real side effect (a live probe DM to
+    // the user, plus persisting the result) - the backend only ever
+    // registered it as POST /api/can-receive-dm.
+    const res = await api.post<CanReceiveDmResponse>("/can-receive-dm");
     return res.data.canReceiveDM;
   } catch (err) {
     console.error("Failed to check DM permission", err);

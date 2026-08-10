@@ -6,6 +6,7 @@ import type {
   UnsubscribeResult,
   UpdateSubscriptionResult,
 } from "../domain/SubscribeResult.js";
+import type { UpdateNotificationPreferenceResult } from "../domain/NotificationPreferenceResult.js";
 import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
 
 export interface UserRepository {
@@ -76,4 +77,18 @@ export interface UserRepository {
     streamerId: string,
     data: Partial<Omit<Subscription, "id">>,
   ): Promise<UpdateSubscriptionResult>;
+
+  /**
+   * Sets a single channel's opt-in/opt-out preference (keyed by
+   * NotificationChannel.name), leaving every other channel's preference
+   * untouched - a read-modify-write of the whole map rather than a blanket
+   * `updateUser` call, the same care given to `subscriptions` elsewhere in
+   * this file (see ARCHITECTURE.md's "partial updates must not reset
+   * streamer subscriptions" note).
+   */
+  updateNotificationPreference(
+    userId: string,
+    channel: string,
+    enabled: boolean,
+  ): Promise<UpdateNotificationPreferenceResult>;
 }

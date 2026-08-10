@@ -36,6 +36,8 @@ export function createTestContainer(): TestContainer {
 
     fetchStreamers: async () => Promise.resolve([]),
 
+    getLiveStreams: async () => Promise.resolve([]),
+
     searchStreamers: async () =>
       Promise.resolve([
         {

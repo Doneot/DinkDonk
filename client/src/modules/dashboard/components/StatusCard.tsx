@@ -17,17 +17,25 @@ const StatusCard = () => {
   }, []);
 
   return (
-    <div className="p-4 sm:p-6 bg-white rounded-xl shadow-lg text-center sm:text-left">
-      <h2 className="text-lg sm:text-xl font-semibold text-gray-700">
-        Bot Status
-      </h2>
-      <p
-        className={`mt-2 sm:mt-4 text-xl sm:text-2xl ${
-          status === "Online" ? "text-green-500" : "text-red-500"
-        }`}
-      >
-        {status}
-      </p>
+    <div className="p-4 sm:p-5">
+      <div className="font-mono text-[0.66rem] uppercase tracking-widest text-ink-faint mb-2">
+        Signal
+      </div>
+      <div className="flex items-center gap-2 font-mono text-2xl tabular-nums">
+        {status === "loading" ? (
+          <span className="text-ink-dim">—</span>
+        ) : (
+          <>
+            <span className={`tally ${status === "Online" ? "is-on" : ""}`} />
+            <span className={status === "Online" ? "text-online" : "text-live"}>
+              {status}
+            </span>
+          </>
+        )}
+      </div>
+      <div className="font-mono text-[0.7rem] text-ink-faint mt-1">
+        bot connected to Discord
+      </div>
     </div>
   );
 };

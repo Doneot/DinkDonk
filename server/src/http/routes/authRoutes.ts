@@ -7,6 +7,7 @@ import { dashboardUrl } from "../../shared/utils/urls.js";
 import { requireAuthenticated, requireUser } from "../middleware/auth.js";
 import { AppError } from "../errors/AppError.js";
 import {
+  discordInviteUrl,
   isGoogleSignInEnabled,
   isTwitchSignInEnabled,
   LINK_DISCORD_INTENT_TTL_MS,
@@ -148,7 +149,9 @@ export function createAuthRouter({
       providers.push("twitch");
     }
 
-    res.json(authProvidersResponseSchema.parse({ providers }));
+    res.json(
+      authProvidersResponseSchema.parse({ providers, discordInviteUrl }),
+    );
   });
 
   router.get("/discord", discordAuth);

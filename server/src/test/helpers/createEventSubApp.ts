@@ -5,13 +5,13 @@ import { errorHandler } from "../../http/middleware/errorHandler.js";
 import { requestId } from "../../http/middleware/requestId.js";
 import { createEventSubRouter } from "../../http/routes/eventSubRoutes.js";
 import { InMemoryReplayStore } from "../../modules/notifications/infrastructure/InMemoryReplayStore.js";
-import type { TwitchEventSubStreamOnlineEvent } from "../../modules/twitch/domain/Twitch.js";
+import type { TwitchEventSubEvent } from "../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
 
 export const EVENTSUB_SECRET = "twitch-webhook-secret";
 
 export type ReceivedNotification = {
   type: string;
-  event: TwitchEventSubStreamOnlineEvent;
+  event: TwitchEventSubEvent;
 };
 
 export type EventSubTestContext = {
@@ -23,10 +23,7 @@ export type EventSubTestContext = {
 
 type CreateEventSubTestAppOptions = {
   secret?: string;
-  onNotification?: (
-    type: string,
-    event: TwitchEventSubStreamOnlineEvent,
-  ) => Promise<void>;
+  onNotification?: (type: string, event: TwitchEventSubEvent) => Promise<void>;
 };
 
 export function createEventSubTestApp({

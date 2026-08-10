@@ -46,6 +46,17 @@ export const logger = pino(
           target: "pino-pretty",
           options: {
             colorize: true,
+
+            // pino-pretty normally runs on a separate worker thread, writing
+            // asynchronously - shutdown.ts's logger.flush() before
+            // process.exit() doesn't reliably wait for that worker to finish
+            // draining its queue, so the final lines of a graceful shutdown
+            // ("Shutting down gracefully"/"Shutdown complete") can go
+            // missing from the container's log output. Synchronous writes
+            // cost throughput dev logging doesn't need, in exchange for
+            // never losing the log lines that matter most: the ones right
+            // before the process exits.
+            sync: true,
           },
         },
       }

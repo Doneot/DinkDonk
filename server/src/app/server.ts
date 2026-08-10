@@ -56,6 +56,10 @@ export function createServer(container: Container): Server {
 
   disconnectUser = (userId) => sockets.disconnectUser(userId);
 
+  container.bindSocketNotifier((userId, event, payload) =>
+    sockets.notifyUser(userId, event, payload),
+  );
+
   return {
     httpServer,
     sockets,

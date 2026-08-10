@@ -172,6 +172,24 @@ describe("web push payload validation", () => {
       },
     ],
     [
+      "a host that merely contains, rather than ends with, the WNS suffix (SSRF guard)",
+      {
+        subscription: {
+          ...VALID_PUSH_SUBSCRIPTION,
+          endpoint: "https://notify.windows.com.attacker.example/w",
+        },
+      },
+    ],
+    [
+      "a host that merely contains, rather than ends with, the google.com suffix (SSRF guard)",
+      {
+        subscription: {
+          ...VALID_PUSH_SUBSCRIPTION,
+          endpoint: "https://google.com.attacker.example/fcm/send/abc",
+        },
+      },
+    ],
+    [
       "missing keys",
       { subscription: { endpoint: VALID_PUSH_SUBSCRIPTION.endpoint } },
     ],
@@ -208,6 +226,36 @@ describe("web push payload validation", () => {
     expect(response.status).toBe(400);
     expect(save).not.toHaveBeenCalled();
     expectValidationError(response.body);
+  });
+
+  it("accepts a Windows Notification Service endpoint (Edge, some configurations)", async () => {
+    const { client } = await createClient();
+
+    const response = await client
+      .post("/api/notifications/web-push/subscriptions")
+      .send({
+        subscription: {
+          ...VALID_PUSH_SUBSCRIPTION,
+          endpoint: "https://wns2-par02p.notify.windows.com/w/?token=abc",
+        },
+      });
+
+    expect(response.status).toBe(201);
+  });
+
+  it("accepts a Google endpoint outside the googleapis.com zone (e.g. jmt17.google.com)", async () => {
+    const { client } = await createClient();
+
+    const response = await client
+      .post("/api/notifications/web-push/subscriptions")
+      .send({
+        subscription: {
+          ...VALID_PUSH_SUBSCRIPTION,
+          endpoint: "https://jmt17.google.com/fcm/send/abc",
+        },
+      });
+
+    expect(response.status).toBe(201);
   });
 
   it.each([

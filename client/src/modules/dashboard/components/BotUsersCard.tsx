@@ -15,11 +15,16 @@ const BotUsersCard = () => {
   }, []);
 
   return (
-    <div className="p-6 bg-white rounded-xl shadow-lg">
-      <h2 className="text-xl font-semibold text-gray-700">Users</h2>
-      <p className="mt-2 text-3xl text-indigo-600">
-        {userCount !== null ? userCount : "Loading..."}
-      </p>
+    <div className="p-4 sm:p-5">
+      <div className="font-mono text-[0.66rem] uppercase tracking-widest text-ink-faint mb-2">
+        Watchers
+      </div>
+      <div className="font-mono text-2xl tabular-nums text-ink">
+        {userCount !== null ? userCount : "—"}
+      </div>
+      <div className="font-mono text-[0.7rem] text-ink-faint mt-1">
+        accounts using DinkDonk
+      </div>
     </div>
   );
 };

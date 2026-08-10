@@ -8,6 +8,7 @@ import type {
   UnsubscribeResult,
   UpdateSubscriptionResult,
 } from "../../../modules/users/domain/SubscribeResult.js";
+import type { UpdateNotificationPreferenceResult } from "../../../modules/users/domain/NotificationPreferenceResult.js";
 import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
@@ -63,7 +64,12 @@ export class InMemoryUserRepository implements UserRepository {
     const isModification = existing !== undefined;
 
     const updated: User = {
-      ...(existing ?? { id: userId, subscriptions: [], canReceiveDM: false }),
+      ...(existing ?? {
+        id: userId,
+        subscriptions: [],
+        canReceiveDM: false,
+        notificationPreferences: {},
+      }),
       ...validated,
     };
 
@@ -103,7 +109,12 @@ export class InMemoryUserRepository implements UserRepository {
     let user = this.users.get(userId);
 
     if (!user) {
-      user = { id: userId, subscriptions: [], canReceiveDM: false };
+      user = {
+        id: userId,
+        subscriptions: [],
+        canReceiveDM: false,
+        notificationPreferences: {},
+      };
       this.users.set(userId, user);
     }
 
@@ -252,6 +263,29 @@ export class InMemoryUserRepository implements UserRepository {
     user.subscriptions = user.subscriptions.map((s) =>
       s.id === streamerId ? updated : s,
     );
+
+    return Promise.resolve({ success: true });
+  }
+
+  updateNotificationPreference(
+    userId: string,
+    channel: string,
+    enabled: boolean,
+  ): Promise<UpdateNotificationPreferenceResult> {
+    if (!isNonEmptyString(userId) || !isNonEmptyString(channel)) {
+      return Promise.resolve({ success: false, reason: "invalid_input" });
+    }
+
+    const user = this.users.get(userId);
+
+    if (!user) {
+      return Promise.resolve({ success: false, reason: "user_not_found" });
+    }
+
+    user.notificationPreferences = {
+      ...(user.notificationPreferences ?? {}),
+      [channel]: enabled,
+    };
 
     return Promise.resolve({ success: true });
   }

@@ -19,7 +19,7 @@ const HomeButton = () => {
       type="button"
       onClick={handleClick}
       aria-label={user ? "Go to dashboard" : "Go to home"}
-      className="rounded-md p-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      className="rounded-md p-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
     >
       <img
         src="/DinkDonk.png"

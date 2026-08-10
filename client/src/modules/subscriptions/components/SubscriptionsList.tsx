@@ -15,16 +15,19 @@ const SubscriptionsList = ({
   handleMessageChange,
   disabled,
 }: SubscriptionsListProps) => {
+  const liveCount = subscriptions.filter((s) => s.isLive).length;
+
   return (
-    <div className="p-4 sm:p-6 bg-white rounded-xl shadow-lg mt-6 w-full max-w-3xl mx-auto">
-      <h2 className="text-lg sm:text-xl font-semibold mb-4 text-gray-700">
-        Your Subscribed Streamers
+    <div className="p-4 sm:p-6 bg-panel rounded-lg border border-seam-soft mt-6 w-full">
+      <h2 className="font-mono text-[0.7rem] uppercase tracking-widest text-ink-faint mb-4">
+        Your streamers — {subscriptions.length}
+        {liveCount > 0 && <span className="text-live"> · {liveCount} live</span>}
       </h2>
 
       {subscriptions.length === 0 ? (
-        <p className="text-gray-500">No streamers found.</p>
+        <p className="text-ink-faint">No streamers found.</p>
       ) : (
-        <ul className="space-y-4">
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {subscriptions.map((subscription) => (
             <SubscriptionRow
               key={subscription.id}

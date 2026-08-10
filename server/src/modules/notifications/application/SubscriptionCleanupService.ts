@@ -1,10 +1,13 @@
 import type { TwitchSubscriptionProvider } from "../../twitch/ports/TwitchGateway.js";
 import type { TwitchEventSubSubscription } from "../../twitch/domain/Twitch.js";
 import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
+import { TRACKED_EVENT_TYPES } from "./EventSubSyncService.js";
 import type { EventSubSyncService } from "./EventSubSyncService.js";
 
 import { eventSubSubscriptionsDeletedTotal } from "../../../infrastructure/metrics/prometheus.js";
 import { logger } from "../../../shared/logger/logger.js";
+
+type TrackedEventType = (typeof TRACKED_EVENT_TYPES)[number];
 
 // Bounds how many streamers' subscriber lists are read concurrently in one
 // sweep, so a large backlog of stream.online subscriptions doesn't fire
@@ -44,12 +47,11 @@ export class SubscriptionCleanupService {
     this.gcRunning = true;
 
     try {
-      const streamOnlineSubscriptions =
-        await this.getStreamOnlineSubscriptions();
+      const trackedSubscriptions = await this.getTrackedSubscriptions();
 
       const streamerIds = [
         ...new Set(
-          streamOnlineSubscriptions
+          trackedSubscriptions
             .map((sub) => sub.condition?.broadcaster_user_id)
             .filter((id): id is string => Boolean(id)),
         ),
@@ -74,7 +76,7 @@ export class SubscriptionCleanupService {
               // Reuse the list already fetched for this sweep instead of each
               // empty streamer re-fetching the entire Twitch EventSub
               // subscription list on its own.
-              await this.collectStreamer(streamerId, streamOnlineSubscriptions);
+              await this.collectStreamer(streamerId, trackedSubscriptions);
             } catch (error) {
               // Mirrors EventSubSyncService.syncEventSubSubscriptions's same
               // per-item isolation: one streamer's Twitch API failure
@@ -101,25 +103,24 @@ export class SubscriptionCleanupService {
       return;
     }
 
-    const streamOnlineSubscriptions =
-      await this.getStreamOnlineSubscriptions();
+    const trackedSubscriptions = await this.getTrackedSubscriptions();
 
-    await this.collectStreamer(streamerId, streamOnlineSubscriptions);
+    await this.collectStreamer(streamerId, trackedSubscriptions);
   }
 
-  private async getStreamOnlineSubscriptions(): Promise<
+  private async getTrackedSubscriptions(): Promise<
     TwitchEventSubSubscription[]
   > {
     const subscriptions = await this.twitch.getEventSubSubscriptions();
 
-    return subscriptions.filter(
-      (subscription) => subscription.type === "stream.online",
+    return subscriptions.filter((subscription) =>
+      TRACKED_EVENT_TYPES.includes(subscription.type as TrackedEventType),
     );
   }
 
   private async collectStreamer(
     streamerId: string,
-    streamOnlineSubscriptions: TwitchEventSubSubscription[],
+    trackedSubscriptions: TwitchEventSubSubscription[],
   ): Promise<void> {
     if (this.streamersBeingCollected.has(streamerId)) {
       return;
@@ -128,7 +129,11 @@ export class SubscriptionCleanupService {
     this.streamersBeingCollected.add(streamerId);
 
     try {
-      const matching = streamOnlineSubscriptions.filter(
+      // Both tracked types (stream.online and stream.offline) for this
+      // streamer are torn down together - they were created together by
+      // EventSubSyncService.ensureSubscriptions and have no independent
+      // lifecycle.
+      const matching = trackedSubscriptions.filter(
         (sub) => sub.condition?.broadcaster_user_id === streamerId,
       );
 

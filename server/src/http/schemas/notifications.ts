@@ -2,10 +2,26 @@ import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 
 import { PushSubscriptionSchema } from "../../modules/notifications/schemas/PushSubscriptionSchema.js";
+import { logger } from "../../shared/logger/logger.js";
 
 extendZodWithOpenApi(z);
 
 export const pushSubscriptionSchema = PushSubscriptionSchema.shape.subscription;
+
+// The only channel ids NotificationManager actually knows how to gate on
+// today (see NotificationChannel.name on DiscordNotificationChannel /
+// WebPushNotificationChannel) - a new channel needs an entry here before a
+// user can opt in/out of it.
+export const notificationChannelIdSchema = z.enum(["discord", "webPush"]);
+
+export const setChannelPreferenceSchema = z.object({
+  channel: notificationChannelIdSchema,
+  enabled: z.boolean(),
+});
+
+export type SetChannelPreferenceRequest = z.infer<
+  typeof setChannelPreferenceSchema
+>;
 
 // web-push's sendNotification() (see WebPushNotificationChannel.send) makes
 // an outbound HTTPS request to whatever `endpoint` a saved subscription
@@ -19,15 +35,47 @@ export const pushSubscriptionSchema = PushSubscriptionSchema.shape.subscription;
 // reuse this stricter schema, so removing a subscription saved before this
 // allowlist existed (or from a push service not yet listed here) still
 // works - only creating new SSRF-capable subscriptions is blocked.
-const ALLOWED_PUSH_ENDPOINT_HOSTS = new Set([
-  "fcm.googleapis.com", // Chrome, Edge, Opera, Samsung Internet, and other Chromium-based browsers
-  "updates.push.services.mozilla.com", // Firefox
-  "web.push.apple.com", // Safari (macOS/iOS)
-]);
+//
+// Deliberately whole *domain zones* a vendor controls, not exact hostnames:
+// an exact-host allowlist turned out to be real whack-a-mole in practice -
+// Chromium-based browsers alone have been seen issuing subscriptions from at
+// least fcm.googleapis.com, android.googleapis.com (legacy GCM), and
+// jmt17.google.com (an entirely different Google-owned zone, confirmed by a
+// live rejection, not documentation), and Edge separately from Windows
+// Notification Service's many regional subdomains. None of that is
+// exhaustively enumerable up front, and every host this list has missed so
+// far turned out to be a legitimate push relay under a vendor's own DNS zone
+// - which no outside attacker can get a hostname to resolve under, so
+// trusting the whole zone doesn't weaken the SSRF guard this exists for.
+const ALLOWED_PUSH_ENDPOINT_HOST_SUFFIXES = [
+  ".googleapis.com", // Chrome, Opera, Samsung Internet, and other Chromium-based browsers - fcm.googleapis.com, legacy android.googleapis.com/gcm
+  ".google.com", // Google also issues push endpoints directly under this separate zone in some regions/channels (e.g. jmt17.google.com)
+  ".mozilla.com", // Firefox - updates.push.services.mozilla.com
+  ".apple.com", // Safari (macOS/iOS) - web.push.apple.com
+  ".notify.windows.com", // Edge's own Windows Notification Service, sharded across many regional subdomains (wns2-par02p.notify.windows.com, ...) rather than one fixed host
+];
 
 function isAllowedPushEndpoint(endpoint: string): boolean {
   try {
-    return ALLOWED_PUSH_ENDPOINT_HOSTS.has(new URL(endpoint).hostname);
+    const { hostname } = new URL(endpoint);
+
+    const allowed = ALLOWED_PUSH_ENDPOINT_HOST_SUFFIXES.some((suffix) =>
+      hostname.endsWith(suffix),
+    );
+
+    // The endpoint's host (never the full URL - it carries a per-subscription
+    // token) is the one piece of information needed to know whether a real
+    // browser's push service just isn't on the allowlist yet, and there's no
+    // other way to learn it than a live rejection like this one. Interpolated
+    // directly into the message (not passed as a merging object) so it can't
+    // end up on a separate log line that a copy-paste drops.
+    if (!allowed) {
+      logger.warn(
+        `Rejected web push subscription: host "${hostname}" is not in the allowlist`,
+      );
+    }
+
+    return allowed;
   } catch {
     return false;
   }

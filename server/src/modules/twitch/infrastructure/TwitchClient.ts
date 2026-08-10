@@ -11,6 +11,7 @@ import { mapTwitchStreamer } from "./mappers/mapTwitchStreamer.js";
 
 import type {
   TwitchEventSubSubscription,
+  TwitchLiveStream,
   TwitchStreamer,
 } from "../domain/Twitch.js";
 import type {
@@ -295,6 +296,33 @@ export class TwitchClient
         id: ids,
       },
     });
+  }
+
+  async getLiveStreams(userIds: string[]): Promise<TwitchLiveStream[]> {
+    if (userIds.length === 0) return [];
+
+    const results: TwitchLiveStream[] = [];
+
+    // Same 100-per-request cap as fetchStreamers/the users endpoint.
+    for (
+      let i = 0;
+      i < userIds.length;
+      i += TwitchClient.MAX_USER_IDS_PER_REQUEST
+    ) {
+      const chunk = userIds.slice(i, i + TwitchClient.MAX_USER_IDS_PER_REQUEST);
+
+      const params = new URLSearchParams();
+
+      chunk.forEach((id) => {
+        params.append("user_id", id);
+      });
+
+      results.push(
+        ...(await this.request<TwitchLiveStream>("streams", { params })),
+      );
+    }
+
+    return results;
   }
 
   async getStreamer(login: string): Promise<TwitchStreamer | null> {

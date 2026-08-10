@@ -2,10 +2,11 @@ import { useState } from "react";
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AuthContext, type AuthContextValue } from "../../../context/authContextValue";
+import { SocketContext, type SocketContextValue } from "../../../context/socketContextValue";
 import SubscriptionsManager from "../components/SubscriptionsManager";
 import * as subscriptionsApiModule from "../api";
 import { notifyActionError as notifyActionErrorImport } from "../../../shared/api/errorToast";
-import type { User, StreamerSummary } from "../../../shared/types/api";
+import type { User, TrackedStreamerSummary } from "../../../shared/types/api";
 
 vi.mock("../api", () => ({
   searchStreamers: vi.fn(),
@@ -39,16 +40,29 @@ function TestHarness({ initialUser }: { initialUser: User }) {
     loading: false,
     logout: async () => {},
   };
+  const socketValue: SocketContextValue = {
+    socket: null,
+    connected: false,
+    liveStreamers: {},
+  };
   return (
     <AuthContext.Provider value={authValue}>
-      <SubscriptionsManager canReceiveDM={true} />
+      <SocketContext.Provider value={socketValue}>
+        <SubscriptionsManager canReceiveDM={true} />
+      </SocketContext.Provider>
     </AuthContext.Provider>
   );
 }
 
-function hydrateAsProfile(ids: string[]): Promise<StreamerSummary[]> {
+function hydrateAsProfile(ids: string[]): Promise<TrackedStreamerSummary[]> {
   return Promise.resolve(
-    ids.map((id) => ({ id, name: `Streamer ${id}`, avatar: "" })),
+    ids.map((id) => ({
+      id,
+      name: `Streamer ${id}`,
+      avatar: "",
+      isLive: false,
+      liveSince: null,
+    })),
   );
 }
 

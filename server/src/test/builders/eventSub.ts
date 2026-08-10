@@ -25,6 +25,24 @@ export function buildStreamOnlineEvent(
   };
 }
 
+export function buildStreamOfflineEvent(
+  overrides: Partial<EventSubEnvelope["event"]> = {},
+): EventSubEnvelope {
+  return {
+    subscription: {
+      type: "stream.offline",
+      version: "1",
+    },
+
+    event: {
+      broadcaster_user_id: TEST_STREAMER_ID,
+      broadcaster_user_login: "test_streamer",
+      broadcaster_user_name: "Test Streamer",
+      ...overrides,
+    },
+  };
+}
+
 export function buildWebhookVerification(
   challenge = "test-challenge",
 ): EventSubEnvelope {

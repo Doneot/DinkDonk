@@ -1,13 +1,15 @@
 const PrivacyPolicy = () => {
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12 bg-gray-100 text-gray-800">
-      <h1 className="text-4xl font-bold mb-6">Privacy Policy</h1>
-      <p className="text-sm text-gray-500 mb-8">
+    <div className="max-w-4xl mx-auto px-6 py-12 bg-bg text-ink-dim">
+      <h1 className="font-display uppercase [font-stretch:condensed] text-4xl font-bold mb-6 text-ink">
+        Privacy Policy
+      </h1>
+      <p className="font-mono text-xs uppercase tracking-wider text-ink-faint mb-8">
         Effective Date: July 21, 2025
       </p>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">1. Introduction</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">1. Introduction</h2>
         <p>
           DinkDonk (“we”, “our”, or “us”) respects your privacy. This Privacy
           Policy explains how we collect, use, and protect your information when
@@ -17,10 +19,10 @@ const PrivacyPolicy = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">
+        <h2 className="text-2xl font-semibold mb-2 text-ink">
           2. What Information We Collect
         </h2>
-        <ul className="list-disc pl-5">
+        <ul className="list-disc pl-5 marker:text-accent">
           <li>
             <strong>Discord ID:</strong> To identify and message you.
           </li>
@@ -40,9 +42,9 @@ const PrivacyPolicy = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">3. How We Use Your Data</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">3. How We Use Your Data</h2>
         <p>We use your data to:</p>
-        <ul className="list-disc pl-5">
+        <ul className="list-disc pl-5 marker:text-accent">
           <li>Send you Twitch live notifications through Discord</li>
           <li>Display personalized content on your dashboard</li>
           <li>Maintain and improve the service</li>
@@ -50,7 +52,7 @@ const PrivacyPolicy = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">
+        <h2 className="text-2xl font-semibold mb-2 text-ink">
           4. How We Store Your Data
         </h2>
         <p>
@@ -61,12 +63,12 @@ const PrivacyPolicy = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">5. Data Sharing</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">5. Data Sharing</h2>
         <p>
           We do <strong>not</strong> sell or rent your data. Your information is
           only shared with:
         </p>
-        <ul className="list-disc pl-5">
+        <ul className="list-disc pl-5 marker:text-accent">
           <li>Discord (to deliver notifications)</li>
           <li>Twitch (to get streamer status)</li>
         </ul>
@@ -77,7 +79,7 @@ const PrivacyPolicy = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">6. Cookies and Tracking</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">6. Cookies and Tracking</h2>
         <p>
           DinkDonk does not use cookies for tracking or advertising. We may use
           cookies to keep you logged in or store light/dark mode preferences.
@@ -85,7 +87,7 @@ const PrivacyPolicy = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">7. Your Rights</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">7. Your Rights</h2>
         <p>
           You can request the deletion of your data or opt-out of notifications
           at any time via your dashboard or by contacting us. You may also
@@ -94,7 +96,7 @@ const PrivacyPolicy = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2">
+        <h2 className="text-2xl font-semibold mb-2 text-ink">
           8. Changes to This Policy
         </h2>
         <p>
@@ -105,13 +107,13 @@ const PrivacyPolicy = () => {
       </section>
 
       <section>
-        <h2 className="text-2xl font-semibold mb-2">9. Contact Us</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">9. Contact Us</h2>
         <p>
           If you have any questions about this Privacy Policy or your data, you
           can reach us at:{" "}
           <a
             href="mailto:contact@dinkdonk.donuts.ovh"
-            className="text-blue-600 underline"
+            className="text-accent underline hover:text-accent-2"
           >
             contact@dinkdonk.donuts.ovh
           </a>
