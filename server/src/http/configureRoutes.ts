@@ -14,6 +14,7 @@ import {
 import { createAuthRouter } from "./routes/authRoutes.js";
 import { createApiRouter } from "./routes/apiRoutes.js";
 import { createMetricsRouter } from "./routes/metricsRoutes.js";
+import { createClientErrorRouter } from "./routes/clientErrorRoutes.js";
 
 import type { Repositories } from "../app/container/repositories.js";
 
@@ -121,10 +122,20 @@ export function configureRoutes({
   // first ("/api/v1" before "/api"): Express matches `app.use("/api", ...)`
   // against any path starting with "/api/", which would otherwise shadow
   // every "/api/v1/..." route if "/api" were registered first.
+  const clientErrorRouter = createClientErrorRouter();
+
   const prefixes = ["/api/v1", "/api"];
 
   for (const prefix of prefixes) {
     app.use(`${prefix}/auth`, authRouter);
+  }
+
+  // Unauthenticated, same as /auth above - registered ahead of the
+  // requireAuthenticated-gated /api mount below so a pre-login crash (e.g.
+  // on the Login page) can still be reported. See clientErrorRoutes.ts's
+  // own doc comment for why this doesn't require a session.
+  for (const prefix of prefixes) {
+    app.use(`${prefix}/client-errors`, clientErrorRouter);
   }
 
   for (const prefix of prefixes) {

@@ -13,12 +13,19 @@ import { getExistingDoc } from "../../../../shared/utils/firestore.js";
 import { logger } from "../../../../shared/logger/logger.js";
 
 export class FirestoreStreamerRepository implements StreamerRepository {
+  // Mirrors FirestoreUserRepository.GET_ALL_CHUNK_SIZE: Firestore#getAll has
+  // no hard documented cap, but chunking keeps each RPC's payload/latency
+  // bounded regardless of how many ids a caller passes in one call.
+  private static readonly GET_ALL_CHUNK_SIZE = 300;
+
+  private readonly db: Firestore;
   private readonly streamers: CollectionReference<DocumentData>;
 
   constructor(
     db: Firestore,
     readonly events: DomainEventBus,
   ) {
+    this.db = db;
     this.streamers = db.collection("streamers");
   }
 
@@ -33,6 +40,37 @@ export class FirestoreStreamerRepository implements StreamerRepository {
     const doc = await getExistingDoc(this.streamers, id);
 
     return doc ? this.toStreamer(doc.id, doc.data() ?? {}) : null;
+  }
+
+  async getStreamersByIds(ids: string[]): Promise<Streamer[]> {
+    const uniqueIds = [...new Set(ids.filter(isNonEmptyString))];
+
+    if (uniqueIds.length === 0) {
+      return [];
+    }
+
+    const streamers: Streamer[] = [];
+
+    for (
+      let i = 0;
+      i < uniqueIds.length;
+      i += FirestoreStreamerRepository.GET_ALL_CHUNK_SIZE
+    ) {
+      const chunk = uniqueIds.slice(
+        i,
+        i + FirestoreStreamerRepository.GET_ALL_CHUNK_SIZE,
+      );
+      const refs = chunk.map((id) => this.streamers.doc(id));
+      const docs = await this.db.getAll(...refs);
+
+      for (const doc of docs) {
+        if (doc.exists) {
+          streamers.push(this.toStreamer(doc.id, doc.data() ?? {}));
+        }
+      }
+    }
+
+    return streamers;
   }
 
   private toStreamer(id: string, data: DocumentData): Streamer {

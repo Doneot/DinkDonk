@@ -6,6 +6,7 @@ import {
   updateNotificationMessage,
 } from "../api";
 import { notifyActionError } from "../../../shared/api/errorToast";
+import { reportClientError } from "../../../shared/api/reportClientError";
 import { useAuth } from "../../../context/authContextValue";
 import { useSocket } from "../../../context/socketContextValue";
 import type { StreamerSummary, Subscription } from "../../../shared/types/api";
@@ -67,6 +68,7 @@ export function useSubscriptions() {
     } catch (err) {
       missingIds.forEach((id) => requestedIds.current.delete(id));
       console.error("Failed to fetch streamer profiles", err);
+      reportClientError(err, "useSubscriptions.hydrateProfiles");
     }
   }, []);
 

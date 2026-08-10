@@ -39,7 +39,30 @@ jobs:
 
       - name: Docker build smoke test
         working-directory: .
-        run: docker build -f server/Dockerfile.prod server
+        run: docker build -f server/Dockerfile.prod -t dinkdonk-server:ci server
+
+      - name: Docker runtime smoke test (fails fast on invalid config)
+        # The build check above only proves the image builds; it doesn't
+        # prove it can start. env.ts validates every required env var with
+        # Zod at import time, before any Discord/Twitch/Firestore network
+        # call - so running the image with no env vars at all exercises the
+        # exact "missing required env var in a new deployment target"
+        # failure mode the build check misses, without needing live
+        # third-party credentials in CI. (A true happy-path boot check - run
+        # to a listening /health/ready - needs real Discord/Twitch/Firebase
+        # credentials this public workflow doesn't have and shouldn't be
+        # given, so it's out of scope here.)
+        working-directory: .
+        run: |
+          set +e
+          docker run --rm dinkdonk-server:ci
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "Expected the container to exit non-zero on missing required env vars, but it exited 0"
+            exit 1
+          fi
+          echo "Container correctly failed fast (exit $status) on missing required configuration"
 
   client:
     runs-on: ubuntu-latest
@@ -59,8 +82,22 @@ jobs:
 
       - run: npm ci
       - run: npm run lint
+      - run: npm test
       - run: npm run build
 
       - name: Docker build smoke test
         working-directory: .
-        run: docker build -f deploy/Dockerfile.caddy .
+        run: docker build -f deploy/Dockerfile.caddy -t dinkdonk-caddy:ci .
+
+      - name: Validate Caddyfile inside the built image
+        # A build-only smoke test doesn't catch a broken Caddyfile (the
+        # image still builds fine even if Caddy would refuse to start on
+        # it) - `caddy validate` parses/checks the config without needing
+        # the real $DOMAIN/$ACME_EMAIL or a network ACME challenge, which a
+        # full `docker run` of this image would require.
+        run: |
+          docker run --rm \
+            -e DOMAIN=ci.example.com \
+            -e ACME_EMAIL=ci@example.com \
+            dinkdonk-caddy:ci \
+            caddy validate --config /etc/caddy/Caddyfile

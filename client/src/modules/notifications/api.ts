@@ -1,4 +1,5 @@
 import api from "../../shared/api/client";
+import { reportClientError } from "../../shared/api/reportClientError";
 import type {
   CanReceiveDmResponse,
   NotificationChannelId,
@@ -87,6 +88,7 @@ export async function checkCanReceiveDM(): Promise<boolean> {
     return res.data.canReceiveDM;
   } catch (err) {
     console.error("Failed to check DM permission", err);
+    reportClientError(err, "notifications.checkCanReceiveDM");
     throw err;
   }
 }

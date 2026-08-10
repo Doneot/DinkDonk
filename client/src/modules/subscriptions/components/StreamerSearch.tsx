@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { useClickOutside } from "../../../shared/hooks/useClickOutside";
 import { useStreamerSearch } from "../hooks/useStreamerSearch";
 import type { StreamerSummary } from "../../../shared/types/api";
@@ -17,6 +17,15 @@ const StreamerSearch = ({ subscribedIds, onSubscribe, disabled }: StreamerSearch
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const { suggestions, dismiss } = useStreamerSearch(search);
+
+  // WAI-ARIA APG combobox pattern: the listbox and each option need stable
+  // ids so the input's aria-controls/aria-activedescendant can reference
+  // them - useId() rather than s.id directly so the DOM id stays valid even
+  // if a streamer id ever contains characters that aren't legal there.
+  const listboxId = useId();
+  const optionId = (index: number) => `${listboxId}-option-${index}`;
+
+  const isOpen = isFocused && suggestions.length > 0;
 
   // Close dropdown on outside click
   useClickOutside(wrapperRef, () => setIsFocused(false));
@@ -67,6 +76,14 @@ const StreamerSearch = ({ subscribedIds, onSubscribe, disabled }: StreamerSearch
 
       {/* Input */}
       <input
+        role="combobox"
+        aria-expanded={isOpen}
+        aria-controls={listboxId}
+        aria-autocomplete="list"
+        aria-activedescendant={
+          isOpen && highlightIndex >= 0 ? optionId(highlightIndex) : undefined
+        }
+        autoComplete="off"
         className={`border rounded-md p-3 w-full focus:outline-none focus:ring-2 focus:ring-accent transition text-ink placeholder:text-ink-faint ${
           disabled
             ? "bg-panel-2 border-seam-soft cursor-not-allowed text-ink-faint"
@@ -85,14 +102,21 @@ const StreamerSearch = ({ subscribedIds, onSubscribe, disabled }: StreamerSearch
       />
 
       {/* Suggestions */}
-      {isFocused && suggestions.length > 0 && (
-        <ul className="absolute z-50 left-0 mt-2 bg-panel-2 border border-seam rounded-md shadow-lg max-h-60 overflow-y-auto w-full">
+      {isOpen && (
+        <ul
+          id={listboxId}
+          role="listbox"
+          className="absolute z-50 left-0 mt-2 bg-panel-2 border border-seam rounded-md shadow-lg max-h-60 overflow-y-auto w-full"
+        >
           {suggestions.map((s, index) => {
             const isSubscribed = subscribedIds.includes(s.id);
 
             return (
               <li
                 key={s.id}
+                id={optionId(index)}
+                role="option"
+                aria-selected={highlightIndex === index}
                 className={`flex items-center justify-between gap-3 transition border-t border-seam-soft first:border-t-0 ${
                   highlightIndex === index ? "bg-accent/10" : "hover:bg-tile"
                 }`}

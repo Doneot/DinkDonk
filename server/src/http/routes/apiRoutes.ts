@@ -330,9 +330,10 @@ export function createApiRouter({
         // comment for why this can't just be our own EventSub-fed cache.
         twitch.getLiveStreams(ids),
 
-        // Bounded by batchStreamerInfoSchema's own 50-id cap, same as the
-        // Twitch calls above - no separate batching needed.
-        Promise.all(ids.map((id) => repositories.streamers.getStreamer(id))),
+        // One batched Firestore read instead of one per id (still bounded
+        // by batchStreamerInfoSchema's own 50-id cap either way, but this
+        // is a single round trip rather than up to 50 concurrent ones).
+        repositories.streamers.getStreamersByIds(ids),
       ]);
 
       if (!streamers.length) {
@@ -343,9 +344,7 @@ export function createApiRouter({
         liveStreams.map((stream) => [stream.user_id, stream.started_at]),
       );
       const cachedById = new Map(
-        cachedStates
-          .filter((streamer) => streamer !== null)
-          .map((streamer) => [streamer.id, streamer]),
+        cachedStates.map((streamer) => [streamer.id, streamer]),
       );
 
       // Reconciles our own persisted live state against Twitch's ground

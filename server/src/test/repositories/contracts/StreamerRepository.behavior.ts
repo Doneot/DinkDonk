@@ -55,6 +55,39 @@ export function streamerRepositoryBehavior(
       expect(streamers).toHaveLength(2);
     });
 
+    describe("getStreamersByIds", () => {
+      it("returns the streamers matching the given ids, omitting unknown ones", async () => {
+        const repository = createRepository();
+
+        repository.seed(buildStreamer({ id: "1" }));
+        repository.seed(buildStreamer({ id: "2" }));
+
+        const streamers = await repository.getStreamersByIds([
+          "1",
+          "missing",
+          "2",
+        ]);
+
+        expect(streamers.map((s) => s.id).sort()).toEqual(["1", "2"]);
+      });
+
+      it("returns an empty array for an empty id list", async () => {
+        const repository = createRepository();
+
+        await expect(repository.getStreamersByIds([])).resolves.toEqual([]);
+      });
+
+      it("de-duplicates repeated ids", async () => {
+        const repository = createRepository();
+
+        repository.seed(buildStreamer({ id: "1" }));
+
+        const streamers = await repository.getStreamersByIds(["1", "1"]);
+
+        expect(streamers).toHaveLength(1);
+      });
+    });
+
     it("creates a streamer", async () => {
       const repository = createRepository();
 

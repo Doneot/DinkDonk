@@ -2,11 +2,17 @@ import { lazy, Suspense } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import RedirectIfAuthenticated from '../modules/auth/components/RedirectIfAuthenticated';
 import ProtectedRoute from '../modules/auth/components/ProtectedRoute';
-import Home from '../pages/Home';
 import Footer from '../shared/components/Footer';
 import Navbar from '../shared/components/Navbar';
 import ScrollToTop from '../shared/components/ScrollToTop';
 
+// Home used to be imported eagerly, so the landing page paid for
+// react-router-dom/socket.io-client/axios/react-toastify in the same entry
+// chunk as every other route even though it's the one page every visitor
+// hits first and before any of those do anything - lazy-loading it here
+// keeps that weight out of first paint the same way every other route
+// already avoids it.
+const Home = lazy(() => import('../pages/Home'));
 const Dashboard = lazy(() => import('../pages/Dashboard'));
 const Login = lazy(() => import('../pages/Login'));
 const HowItWorks = lazy(() => import('../pages/HowItWorks'));

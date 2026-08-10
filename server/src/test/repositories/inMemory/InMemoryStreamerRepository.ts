@@ -29,6 +29,16 @@ export class InMemoryStreamerRepository implements StreamerRepository {
     return Promise.resolve(this.streamers.get(id) ?? null);
   }
 
+  getStreamersByIds(ids: string[]): Promise<Streamer[]> {
+    const uniqueIds = [...new Set(ids.filter(isNonEmptyString))];
+
+    return Promise.resolve(
+      uniqueIds
+        .map((id) => this.streamers.get(id))
+        .filter((streamer): streamer is Streamer => streamer !== undefined),
+    );
+  }
+
   createStreamer(id: string): Promise<void> {
     const created = !this.streamers.has(id);
 

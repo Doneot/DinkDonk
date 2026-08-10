@@ -15,6 +15,11 @@ const ALLOWED_ADVISORY_IDS = new Set([
   // firebase-admin's only fix bump is a semver-major downgrade. Moderate in
   // practice (this codebase never takes attacker-controlled input into the
   // affected uuid code path), tracked here pending a real upstream fix.
+  //
+  // Recheck trigger: "no fix available" is a point-in-time fact, not a
+  // permanent one - re-run `npm audit` after bumping firebase-admin to its
+  // next major version (or at least once a quarter) to see whether a
+  // non-breaking fix has landed upstream, and drop this entry once it has.
   1119441,
 ]);
 

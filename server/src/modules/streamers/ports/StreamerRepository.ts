@@ -15,6 +15,16 @@ export interface StreamerRepository {
    */
   getStreamers(limit?: number): Promise<Streamer[]>;
   getStreamer(id: string): Promise<Streamer | null>;
+
+  /**
+   * Batched equivalent of calling getStreamer() once per id - one (or a few,
+   * for a very large `ids`) round trip instead of one per id, the same
+   * shape UserRepository.getUsersByIds() already uses. Ids with no matching
+   * streamer are simply omitted, not returned as null, so callers don't
+   * need to filter afterward.
+   */
+  getStreamersByIds(ids: string[]): Promise<Streamer[]>;
+
   createStreamer(id: string): Promise<void>;
   deleteStreamer(id: string): Promise<void>;
 
