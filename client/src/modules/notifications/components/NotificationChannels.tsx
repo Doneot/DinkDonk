@@ -1,9 +1,9 @@
 import { useCallback } from "react";
 import ChannelCell from "./ChannelCell";
-import ConnectDiscordButton from "../../dashboard/components/ConnectDiscordButton";
-import DiscordInviteButton from "../../dashboard/components/DiscordInviteButton";
-import CheckDMButton from "../../dashboard/components/CheckDMButton";
-import { checkCanReceiveDM } from "../../dashboard/api";
+import ConnectDiscordButton from "./ConnectDiscordButton";
+import DiscordInviteButton from "./DiscordInviteButton";
+import CheckDMButton from "./CheckDMButton";
+import { checkCanReceiveDM } from "../api";
 import { useNotificationChannels } from "../hooks/useNotificationChannels";
 import { useAuthProviders } from "../../auth/hooks/useAuthProviders";
 import { useAuth } from "../../../context/authContextValue";

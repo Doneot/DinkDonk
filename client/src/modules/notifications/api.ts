@@ -1,5 +1,6 @@
 import api from "../../shared/api/client";
 import type {
+  CanReceiveDmResponse,
   NotificationChannelId,
   NotificationChannelsResponse,
   PublicKeyResponse,
@@ -75,4 +76,17 @@ export function setNotificationChannelPreference(
   return api
     .post("/notifications/channels", { channel, enabled })
     .then(() => undefined);
+}
+
+export async function checkCanReceiveDM(): Promise<boolean> {
+  try {
+    // POST, not GET: this route has a real side effect (a live probe DM to
+    // the user, plus persisting the result) - the backend only ever
+    // registered it as POST /api/can-receive-dm.
+    const res = await api.post<CanReceiveDmResponse>("/can-receive-dm");
+    return res.data.canReceiveDM;
+  } catch (err) {
+    console.error("Failed to check DM permission", err);
+    throw err;
+  }
 }
