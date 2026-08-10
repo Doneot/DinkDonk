@@ -1,12 +1,20 @@
-# React + Vite
+# DinkDonk — client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The React + TypeScript frontend for DinkDonk, built with Vite.
 
-Currently, two official plugins are available:
+See the root [README](../README.md) for what DinkDonk actually does, and [ARCHITECTURE.md](../ARCHITECTURE.md) for how this package is organized (`modules/`, `shared/`, `context/`, `pages/`, `router/`).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Commands
 
-## Expanding the ESLint configuration
+```bash
+npm run dev         # Vite dev server on :5000 - proxies /api, /eventsub, /socket.io to a backend on :3000 (see vite.config.ts)
+npm test            # Vitest suite
+npm run lint         # ESLint
+npm run typecheck    # tsc -b
+npm run build        # production build to dist/
+npm run preview      # preview the production build locally
+```
 
-If you are developing a production application, we recommend using TypeScript and enable type-aware lint rules. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Configuration
+
+`client/.env` should contain only public `VITE_*` values — see `client/src/config/env.ts` for what's read (currently just `VITE_SOCKET_URL`, which defaults to same-origin if unset).

@@ -6,8 +6,8 @@
 Twitch EventSub
     -> backend notification pipeline
         -> Discord notifications
+        -> Web Push notifications
         -> realtime Socket.IO events
-        -> future Web Push notifications
 
 Frontend
     -> manages subscriptions
@@ -77,7 +77,7 @@ Responsibilities:
 - session handling (Firestore-backed session store, cookie config)
 - Passport authentication strategies and OAuth callback routes
 - request validation (Zod schemas per route)
-- HTTP routes: API routes, auth routes, the Twitch EventSub webhook, health and metrics endpoints
+- HTTP routes: API routes, auth routes, the Twitch EventSub webhook, health and metrics endpoints, and an unauthenticated endpoint the frontend forwards caught client-side errors to (`clientErrorRoutes.ts`), logged through the same pino pipeline as every server-side error
 
 Important files:
 
@@ -86,7 +86,7 @@ server/src/http/createApp.ts
 server/src/http/configureMiddleware.ts
 server/src/http/configureRoutes.ts
 server/src/http/passport.ts
-server/src/http/routes/            apiRoutes.ts, authRoutes.ts, eventSubRoutes.ts, healthRoutes.ts, metricsRoutes.ts
+server/src/http/routes/            apiRoutes.ts, authRoutes.ts, eventSubRoutes.ts, healthRoutes.ts, metricsRoutes.ts, clientErrorRoutes.ts
 server/src/http/middleware/        requestId, requestLogger, httpMetrics, auth, errorHandler, validate
 server/src/http/schemas/           Zod request/response schemas, also reused to generate the OpenAPI spec
 server/src/http/errors/            typed HTTP error classes (BadRequestError, NotFoundError, ...)
@@ -308,9 +308,18 @@ shared/types/api.ts        types mirroring the backend's response shapes - impor
                             boundaries (User, Subscription, Provider, ...), same as how the backend's
                             User domain type is imported by ports/application code in other modules
 shared/hooks/useClickOutside.ts
+shared/api/reportClientError.ts    forwards a caught error to POST /api/client-errors; fire-and-forget,
+                                    never throws
 shared/components/         generic, module-agnostic UI: Navbar, Footer, HomeButton, ScrollToTop,
-                            ErrorBoundary
+                            ErrorBoundary, CardErrorFallback
 ```
+
+`ErrorBoundary` takes an optional `fallback` render-prop (a function from a `retry` callback to a
+`ReactNode`) so a boundary can be scoped to one widget instead of the whole page - see
+`Dashboard.tsx`, which gives each card its own boundary (using the shared `CardErrorFallback`
+component) so one crashing card doesn't blank the rest of the dashboard. Every boundary reports
+what it caught via `reportClientError`, regardless of whether it uses the default full-page
+fallback or a scoped one.
 
 ---
 
@@ -322,7 +331,7 @@ React providers and shared state: `AuthContext`/`SocketContext`, each split into
 
 ## router/
 
-Application routing (`AppRoutes.tsx`). Defines the public/login area and the authenticated dashboard area, and lazy-loads every route except the landing page via `React.lazy`.
+Application routing (`AppRoutes.tsx`). Defines the public/login area and the authenticated dashboard area, and lazy-loads every route via `React.lazy` - including the landing page, so the entry bundle isn't paying for `Dashboard`/`Login`/etc.'s code before a visitor has picked a route.
 
 ---
 
@@ -435,30 +444,23 @@ Current:
 
 ```txt
 Twitch EventSub
-    -> Discord notifications
+    -> NotificationManager
+        -> Discord
+        -> Web Push
+        -> Socket.IO (realtime dashboard)
 ```
 
-Target:
+Web Push shipped after this roadmap was first written - the section below is what's left, not what's next. Keeping it here rather than deleting it once satisfied is deliberate: it's the log of the actual sequencing decision (why Web Push came before native clients), not just a to-do list.
+
+Not yet built:
 
 ```txt
 Twitch EventSub
-    -> NotificationService
-        -> Discord
-        -> Web Push
-        -> native clients
+    -> NotificationManager
+        -> native desktop/mobile clients
 ```
 
-This architecture keeps the notification system extensible without coupling the application to a single delivery provider.
-
-Recommended next step:
-
-```txt
-Add Web Push notifications before building full native apps.
-```
-
-Reason:
-- works without Discord
-- uses browser/OS notification systems
-- fits the existing web UI
-- keeps the project lightweight
-- supports future mobile/PWA improvements
+Reason this was sequenced after Web Push, not before:
+- Web Push works without Discord and needed no new client to receive it - it's delivered through the existing web app (see `client/public/sw.js`, `manifest.webmanifest`)
+- native clients are a bigger investment (a client to build and ship) for a use case Web Push + the installable PWA already covers reasonably well
+- revisit once there's a concrete reason the PWA/Web Push combination isn't enough (e.g. richer native notification actions, a dedicated mobile app for other reasons)

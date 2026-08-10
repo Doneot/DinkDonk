@@ -131,7 +131,8 @@ deploy/secrets/
   twitch-client-secret
   twitch-webhook-secret
   session-secret
-  admin-password
+  encryption-key
+  metrics-token
 ```
 
 Expected staging secret files:
@@ -145,8 +146,11 @@ deploy/secrets-staging/
   twitch-client-secret
   twitch-webhook-secret
   session-secret
-  admin-password
+  encryption-key
+  metrics-token
 ```
+
+`deploy/.env.example` is the source of truth for this list (including what each one is for and how to generate it) - check there first if this drifts again.
 
 Each non-JSON secret file should contain only the raw value.
 
@@ -302,8 +306,16 @@ docker compose --env-file deploy/.env.production -f deploy/compose.prod.yml logs
 
 7. Test:
 
+`/health/ready` isn't reachable from the public domain - the backend only `expose`s port 3000 on the private Docker network (never published to the host), and Caddy doesn't proxy `/health/*` (see "Caddy routing" below: only `/api/*`, `/eventsub`, and `/socket.io/*` are). Check the backend container's own health status instead - it's already running the same check internally (see "Healthcheck" below):
+
 ```bash
-curl https://dinkdonk.donuts.ovh/api/health
+docker compose --env-file deploy/.env.production -f deploy/compose.prod.yml ps
+```
+
+Look for `healthy` in the backend service's status column. Then confirm Caddy is actually serving the frontend end-to-end:
+
+```bash
+curl -I https://dinkdonk.donuts.ovh/
 ```
 
 ---
@@ -383,14 +395,16 @@ UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN=false
 
 The backend healthcheck should use Node rather than requiring `wget` or `curl` inside the production image.
 
-Recommended healthcheck:
+`/health/ready` (not `/health` or `/api/health`) is the actual endpoint - it checks the Firestore connection and, if configured, Discord/Twitch readiness (see `server/src/http/routes/healthRoutes.ts`), returning 503 rather than 200 if any of those aren't ready yet. `/health/live` is a plain liveness check with no dependency checks, for an orchestrator that wants to distinguish "process is up" from "process is ready to serve traffic." Neither is reachable from the public domain - see the "Test:" step under First deploy below for why, and how to check readiness anyway.
+
+`server/Dockerfile.prod` already bakes this in as the image's own `HEALTHCHECK`, and `compose.prod.yml`/`compose.staging.yml` both configure it the same way - the block below is what they actually run, kept here for reference:
 
 ```yaml
 healthcheck:
   test:
     [
       "CMD-SHELL",
-      "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""
+      "node -e \"fetch('http://127.0.0.1:3000/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""
     ]
   interval: 30s
   timeout: 5s

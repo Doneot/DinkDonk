@@ -1,150 +1,77 @@
 # DinkDonk
 
-DinkDonk is a Twitch live notification platform.
+DinkDonk tells you the moment a Twitch streamer you follow goes live — without you having to check Twitch.
 
-It tracks Twitch streamers through Twitch EventSub and delivers live notifications to users through multiple notification channels.
-
-Current notification channels:
-- Discord direct messages
-- Web realtime updates through Socket.IO
-
-Planned notification channels:
-- Web Push notifications
-- Native desktop/mobile notifications
-
-The project includes:
-- React + Vite frontend
-- Node.js + Express backend
-- Socket.IO realtime layer
-- Firestore persistence
-- Discord bot integration
-- Dockerized deployment architecture
-- Caddy reverse proxy with automatic HTTPS
+Sign in, pick the streamers you care about, and choose how you want to hear about it: a Discord DM, a browser push notification, or just watching your dashboard update in real time. No more missing a stream because you weren't scrolling Twitch at the right moment.
 
 ---
 
-# Features
+## What you can do
 
-- Twitch OAuth login
-- Streamer subscription management
-- Discord live notifications
-- EventSub lifecycle management
-- Socket.IO realtime updates
-- Production-ready Docker deployment
-- Portable VPS architecture
-- Automatic HTTPS with Caddy
-- Environment separation: development, staging, production
-- Docker secrets support
+- **Track streamers.** Search Twitch and subscribe to up to 200 streamers.
+- **Get notified your way.** Turn on Discord DMs, browser push notifications, or both — independently, per channel.
+- **Custom messages.** Set your own notification text per streamer (e.g. "don't forget the raffle!").
+- **Watch it happen live.** The dashboard updates the instant a streamer goes live, no refresh needed.
+- **Use it from Discord.** Everything the dashboard does is also available as slash commands, if you'd rather not leave Discord.
+- **Install it.** DinkDonk is installable as an app on desktop and mobile (Add to Home Screen / Install App) - no app store needed.
 
----
+## Signing in
 
-# Tech stack
+DinkDonk uses Twitch's own EventSub system to know the instant a streamer goes live, so no polling and no delay. Sign in with your Discord account (always available); a given deployment may also offer Google or Twitch sign-in.
 
-## Frontend
+## Discord commands
 
-- React
-- Vite
-- React Router
-- Socket.IO client
+If you'd rather manage things without opening the dashboard:
 
-## Backend
+| Command | What it does |
+|---|---|
+| `/subscribe` | Subscribe to a Twitch streamer, with an optional custom notification message |
+| `/unsubscribe` | Stop getting notified about a streamer |
+| `/list` | See who you're subscribed to |
+| `/set-message` | Change the custom message for a streamer you're already subscribed to |
+| `/dashboard` | Get a link straight to your dashboard |
+| `/get-subscriptions` | Same as `/list`, phrased for scripting/automation use |
+| `/help` | List available commands |
 
-- Node.js
-- Express
-- Socket.IO
-- Passport
-- Firestore
-- Discord.js
+## Notification channels
 
-## Infrastructure
-
-- Docker
-- Docker Compose
-- Caddy
+- **Discord DMs** — the bot needs to share a server with you and be able to DM you. If DMs aren't working, the dashboard's notification settings can tell you why and let you re-check.
+- **Browser push** — works even when DinkDonk isn't open in a tab. Supported on desktop Chrome/Firefox/Edge and, on iOS/iPadOS, after adding DinkDonk to your Home Screen.
+- **Live dashboard** — no notification setup required; just have the dashboard open and it updates itself.
 
 ---
 
-# Project structure
+## For developers
+
+DinkDonk is a React + TypeScript frontend, a Node.js + Express + TypeScript backend, Firestore for persistence, and Socket.IO for realtime updates, deployed behind Caddy with Docker Compose.
 
 ```txt
-client/
-  src/
-
-server/
-  src/
-  Dockerfile
-  deploy-commands.js
-
-deploy/
-  compose.dev.yml
-  compose.staging.yml
-  compose.prod.yml
-  Dockerfile.caddy
-  Caddyfile
-  .env.production
-  .env.staging
-  secrets/
-  secrets-staging/
-
-ARCHITECTURE.md
-DEPLOYMENT.md
-README.md
+client/     React + Vite frontend
+server/     Node.js + Express backend
+deploy/     Docker Compose, Caddy, environment/secrets layout
 ```
 
----
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — how the codebase is organized, module by module.
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** — running your own instance (dev, staging, production).
+- **[client/README.md](client/README.md)** — frontend-specific commands and structure.
 
-# Development setup
-
-## Install dependencies
+### Quick local setup
 
 ```bash
 cd server && npm install
 cd ../client && npm install
 ```
 
-## Configure development environment
+Create `server/.env.development` (backend credentials, Firebase dev credentials) and `client/.env` (public `VITE_*` values only).
 
-Create:
-
-```txt
-server/.env.development
-client/.env
-```
-
-The backend development env should contain local credentials and Firebase development credentials.
-
-The frontend env should only contain public `VITE_*` values.
-
-## Start backend
-
-Recommended: Docker Compose, matching production's topology and giving you Redis plus the Prometheus/Grafana monitoring stack for free.
-
-First launch or after dependency changes:
+Recommended - Docker Compose, which also gives you Redis and the Prometheus/Grafana monitoring stack:
 
 ```bash
-docker compose -f deploy/compose.dev.yml up --build
+docker compose -f deploy/compose.dev.yml up --build   # first run / after dependency changes
+docker compose -f deploy/compose.dev.yml up            # normal development
 ```
 
-Normal development:
-
-```bash
-docker compose -f deploy/compose.dev.yml up
-```
-
-The backend uses bind mounts and nodemon for hot reload.
-
-### Without Docker
-
-Docker isn't required. `REDIS_URL` is optional - every Redis-backed feature (rate limiting, EventSub replay dedup, the distributed token-refresh lock) falls back to an in-process equivalent when it's unset, so you can run the backend directly:
-
-```bash
-cd server
-npm run dev
-```
-
-Leave `REDIS_URL` out of `server/.env.development` entirely to run this way. This is fine for solo development; it just means rate limiting/replay dedup reset on every restart and don't apply across multiple instances - exactly the tradeoff production avoids by setting `REDIS_URL`. If you want real Redis without the rest of the Compose stack, run `docker run -p 6379:6379 redis:7-alpine` (or a local Redis install) and set `REDIS_URL=redis://localhost:6379`.
-
-## Start frontend
+Without Docker: `REDIS_URL` is optional (every Redis-backed feature falls back to an in-process equivalent when it's unset), so `cd server && npm run dev` works standalone.
 
 In another terminal:
 
@@ -153,93 +80,38 @@ cd client
 npm run dev
 ```
 
-Open:
+Open [http://localhost:5000](http://localhost:5000).
 
-```txt
-http://localhost:5000
-```
+Full production/staging setup lives in **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
----
+### Discord slash commands (deployment)
 
-# Production deployment
-
-See:
-
-```txt
-DEPLOYMENT.md
-```
-
----
-
-# Discord slash commands
-
-Deploy Discord commands manually:
+Slash command registration is manual and deliberately not run on every backend startup:
 
 ```bash
 cd server
 npm run deploy:commands
 ```
 
-Slash command deployment should remain explicit. It should not happen on every backend startup.
-
 ---
 
-# EventSub behavior
-
-Production deployments intentionally keep EventSub subscriptions during restart/redeploy.
-
-Development environments can optionally remove subscriptions on shutdown:
-
-```env
-UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN=true
-```
-
-Production recommendation:
-
-```env
-UNSUBSCRIBE_EVENTSUB_ON_SHUTDOWN=false
-```
-
----
-
-# Secrets
-
-Production secrets live in:
-
-```txt
-deploy/secrets/
-```
-
-Staging secrets live in:
-
-```txt
-deploy/secrets-staging/
-```
-
-Only `.gitkeep` should be committed from those directories.
+## Secrets
 
 Never commit:
+
 - Discord bot token
 - Discord client secret
 - Twitch client secret
 - Twitch webhook secret
 - Firebase service account JSON
-- session secret
-- admin password
+- Session secret
+- Token encryption key
+- Metrics token
+
+Production secrets live in `deploy/secrets/` (staging: `deploy/secrets-staging/`) — only `.gitkeep` should ever be committed from those directories. See `deploy/.env.example` for the full list of what each deployment needs.
 
 ---
 
-# Future roadmap
-
-- Notification channel abstraction
-- Web Push notifications
-- Native desktop notifications
-- Mobile push notifications
-- Notification preference UI
-- PWA support
-
----
-
-# License
+## License
 
 Private project.
