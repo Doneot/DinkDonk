@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
+import axios from "axios";
 import { AuthContext, type AuthContextValue } from "../../../context/authContextValue";
 import { SocketContext, type SocketContextValue, type LiveState } from "../../../context/socketContextValue";
 import { useSubscriptions } from "../hooks/useSubscriptions";
@@ -146,6 +147,115 @@ describe("useSubscriptions", () => {
     expect(result.current.enrichedSubscriptions[0]).toMatchObject({
       isLive: true,
       liveSince: "2026-08-10T12:00:00Z",
+    });
+  });
+
+  describe("handleMessageChange autosave", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("aborts a still-in-flight save when a newer edit's debounce fires, so a slower older request can't land after it", async () => {
+      const signals: (AbortSignal | undefined)[] = [];
+      subscriptionsApi.updateNotificationMessage.mockImplementation(
+        (_id: string, _message: string, signal?: AbortSignal) => {
+          signals.push(signal);
+          return new Promise<void>((_resolve, reject) => {
+            signal?.addEventListener?.("abort", () => {
+              reject(new axios.CanceledError("canceled"));
+            });
+          });
+        },
+      );
+
+      const { Wrapper } = createWrapper({
+        id: "u1",
+        subscriptions: [{ id: "s1", notification_message: "" }],
+      });
+      const { result } = renderHook(() => useSubscriptions(), { wrapper: Wrapper });
+
+      act(() => {
+        result.current.handleMessageChange("s1", "first edit");
+      });
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(subscriptionsApi.updateNotificationMessage).toHaveBeenCalledTimes(1);
+      expect(signals[0]?.aborted).toBe(false);
+
+      act(() => {
+        result.current.handleMessageChange("s1", "second edit");
+      });
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(subscriptionsApi.updateNotificationMessage).toHaveBeenCalledTimes(2);
+      // The first (now-stale) request must be aborted rather than left to
+      // resolve on its own time - otherwise, on a slow connection, it could
+      // still land after the second and silently overwrite "second edit"
+      // with "first edit" server-side.
+      expect(signals[0]?.aborted).toBe(true);
+      expect(subscriptionsApi.updateNotificationMessage).toHaveBeenNthCalledWith(
+        2,
+        "s1",
+        "second edit",
+        expect.any(AbortSignal),
+      );
+    });
+
+    it("cancels a not-yet-fired debounced save when the streamer is unsubscribed first", async () => {
+      subscriptionsApi.unsubscribeFromStreamer.mockResolvedValue(undefined);
+
+      const { Wrapper } = createWrapper({
+        id: "u1",
+        subscriptions: [{ id: "s1", notification_message: "" }],
+      });
+      const { result } = renderHook(() => useSubscriptions(), { wrapper: Wrapper });
+
+      act(() => {
+        result.current.handleMessageChange("s1", "edit");
+      });
+
+      await act(async () => {
+        await result.current.handleUnsubscribe("s1");
+      });
+
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(subscriptionsApi.updateNotificationMessage).not.toHaveBeenCalled();
+    });
+
+    it("aborts an already-in-flight save when the streamer is unsubscribed", async () => {
+      const abortSpy = vi.fn();
+      subscriptionsApi.updateNotificationMessage.mockImplementation(
+        (_id: string, _message: string, signal?: AbortSignal) => {
+          signal?.addEventListener?.("abort", abortSpy);
+          return new Promise<void>(() => {
+            // never resolves on its own - only abort() settles it
+          });
+        },
+      );
+      subscriptionsApi.unsubscribeFromStreamer.mockResolvedValue(undefined);
+
+      const { Wrapper } = createWrapper({
+        id: "u1",
+        subscriptions: [{ id: "s1", notification_message: "" }],
+      });
+      const { result } = renderHook(() => useSubscriptions(), { wrapper: Wrapper });
+
+      act(() => {
+        result.current.handleMessageChange("s1", "edit");
+      });
+      await vi.advanceTimersByTimeAsync(600);
+      expect(subscriptionsApi.updateNotificationMessage).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await result.current.handleUnsubscribe("s1");
+      });
+
+      expect(abortSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

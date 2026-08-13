@@ -59,7 +59,8 @@ server/src/app/bootstrap.ts           starts the runtime, container, HTTP server
 server/src/app/shutdown.ts            registers signal handlers, tears everything down with per-step timeouts
 server/src/app/server.ts              builds the http.Server + Socket.IO server
 server/src/app/configureEventSubscriptions.ts   wires DomainEventBus events to application services
-server/src/app/SubscriptionCleanupScheduler.ts  periodic EventSub subscription garbage collection
+server/src/app/IntervalScheduler.ts   generic recurring-task runner; drives EventSub subscription
+                                       garbage collection and session garbage collection
 server/src/app/container/            dependency injection: repositories.ts, providers.ts, services.ts, notifications.ts, index.ts
 server/src/app/runtime/              tunnel/runtime lifecycle (ngrok/ssh), independent of any one module
 ```
@@ -277,9 +278,10 @@ client/src/modules/subscriptions/hooks/useSubscriptions.ts  hydration cache, sub
                                                               debounced autosave - everything
                                                               SubscriptionsManager used to do inline
 client/src/modules/subscriptions/hooks/useStreamerSearch.ts debounced, race-condition-guarded search
-client/src/modules/dashboard/api.ts                          fetchStatus, fetchUserCount, checkCanReceiveDM
+client/src/modules/dashboard/api.ts                          fetchStatus, fetchUserCount
 client/src/modules/notifications/api.ts                      Web Push subscribe/unsubscribe (browser
-                                                              Push API + the save/delete HTTP calls)
+                                                              Push API + the save/delete HTTP calls),
+                                                              checkCanReceiveDM
 ```
 
 **Deliberate deviations from the backend's module layering** (not oversights - see the backend's own `modules/` section above for what's being deviated from):
@@ -292,7 +294,7 @@ client/src/modules/notifications/api.ts                      Web Push subscribe/
 
 ## pages/
 
-Route-level screens, one per route in `router/AppRoutes.tsx`. Pages compose components from one or more `modules/` (and occasionally call a module's `api.ts` directly, e.g. `Dashboard.tsx` sourcing `checkCanReceiveDM` to hand to `CheckDMButton` as a prop) but hold no business logic of their own.
+Route-level screens, one per route in `router/AppRoutes.tsx`. Pages compose components from one or more `modules/` but hold no business logic of their own - e.g. `Dashboard.tsx` only lays out `StatusCard`, `BotUsersCard`, `NotificationChannels`, and `SubscriptionsManager` behind per-card `ErrorBoundary`s and reads `user` from `AuthContext`; it never calls a module's `api.ts` directly (that's `NotificationChannels.tsx` sourcing `checkCanReceiveDM` to hand to `CheckDMButton` as a prop).
 
 ---
 
@@ -338,6 +340,8 @@ Application routing (`AppRoutes.tsx`). Defines the public/login area and the aut
 ## test/
 
 `test/setup.ts` - Vitest + Testing Library setup, referenced from `vite.config.ts`. Actual tests live colocated in each module's own `__tests__/` (e.g. `modules/subscriptions/__tests__/`) rather than in a separate top-level tree mirroring `src/` the way the backend's `test/` does - colocated tests are the dominant, tool-supported convention in the Vite/Vitest/React ecosystem, and the backend's separate tree also exists to house in-memory port fakes and cross-implementation contract tests that have no frontend equivalent (see the `ports/`+`infrastructure/` deviation above).
+
+`vite.config.ts` also gates coverage (`npm run coverage`, run in CI): thresholds are set a few points below whatever coverage actually was when last raised, same reasoning as the backend's `vitest.config.ts` thresholds. Unlike the backend (~95% across the board), the frontend's thresholds are currently much lower and honestly reflect a real gap, not a target: `pages/`, `router/`, and a few presentational `shared/components/` (`ErrorBoundary`, `Navbar`, `UserMenu`, ...) have no tests yet. `context/`, `modules/dashboard/`, the `shared/api/client.ts` 401 interceptor, and `useAuthProviders`/`useStreamerSearch` do.
 
 ---
 

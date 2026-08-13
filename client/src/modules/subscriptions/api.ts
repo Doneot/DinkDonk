@@ -31,8 +31,9 @@ export function unsubscribeFromStreamer(streamerId: string): Promise<void> {
 export function updateNotificationMessage(
   id: string,
   message: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   return api
-    .post("/subscriptions/set-message", { id, message })
+    .post("/subscriptions/set-message", { id, message }, { signal })
     .then(() => undefined);
 }

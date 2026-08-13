@@ -12,7 +12,7 @@ import { useAuth } from "../../../context/authContextValue";
 // them out as part of the same instrument-strip grid as StatusCard/
 // BotUsersCard, rather than a visually separate settings panel.
 const NotificationChannels = () => {
-  const { discord, webPush } = useNotificationChannels();
+  const { loading, discord, webPush } = useNotificationChannels();
   const { setUser } = useAuth();
   // Server-computed (from the app's own Discord client id), not a separate
   // frontend env var - see passport.ts's discordInviteUrl for why: this CTA
@@ -33,23 +33,27 @@ const NotificationChannels = () => {
       <ChannelCell
         label="Discord DMs"
         statusText={
-          !discord.linked
-            ? "Not connected"
-            : !discord.capable
-              ? "Blocked"
-              : discord.optedIn
-                ? "On"
-                : "Off"
+          loading
+            ? "Loading…"
+            : !discord.linked
+              ? "Not connected"
+              : !discord.capable
+                ? "Blocked"
+                : discord.optedIn
+                  ? "On"
+                  : "Off"
         }
         subCaption={
-          !discord.linked
-            ? "connect your Discord account to enable"
-            : discord.capable
-              ? "direct message when a streamer goes live"
-              : "invite the bot or re-check access below"
+          loading
+            ? "checking your notification settings"
+            : !discord.linked
+              ? "connect your Discord account to enable"
+              : discord.capable
+                ? "direct message when a streamer goes live"
+                : "invite the bot or re-check access below"
         }
-        checked={discord.capable && discord.optedIn}
-        disabled={!discord.capable}
+        checked={!loading && discord.capable && discord.optedIn}
+        disabled={loading || !discord.capable}
         busy={discord.busy}
         onToggle={discord.toggle}
       >
@@ -74,15 +78,23 @@ const NotificationChannels = () => {
       <ChannelCell
         label="Browser push"
         statusText={
-          !webPush.supported ? "Unsupported" : webPush.enabled ? "On" : "Off"
+          loading
+            ? "Loading…"
+            : !webPush.supported
+              ? "Unsupported"
+              : webPush.enabled
+                ? "On"
+                : "Off"
         }
         subCaption={
-          webPush.supported
-            ? "native notification, this device"
-            : "add to Home Screen on iPhone/iPad"
+          loading
+            ? "checking your notification settings"
+            : webPush.supported
+              ? "native notification, this device"
+              : "add to Home Screen on iPhone/iPad"
         }
-        checked={webPush.enabled}
-        disabled={!webPush.supported}
+        checked={!loading && webPush.enabled}
+        disabled={loading || !webPush.supported}
         busy={webPush.busy}
         onToggle={webPush.toggle}
       />

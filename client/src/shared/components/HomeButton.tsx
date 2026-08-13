@@ -1,4 +1,3 @@
-// src/shared/components/HomeButton.tsx
 import { useAuth } from "../../context/authContextValue";
 import { useNavigate } from "react-router-dom";
 

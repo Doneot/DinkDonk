@@ -49,7 +49,8 @@ export class IntervalScheduler {
     // takes longer than intervalMs.
     if (this.running) {
       logger.warn(
-        `${this.taskName} still running from the previous tick; skipping this one`,
+        { taskName: this.taskName },
+        "Still running from the previous tick; skipping this one",
       );
 
       return;

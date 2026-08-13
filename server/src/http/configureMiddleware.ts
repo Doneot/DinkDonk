@@ -2,7 +2,7 @@ import type { Express, RequestHandler } from "express";
 import type { Firestore } from "firebase-admin/firestore";
 
 import helmet from "helmet";
-import { rateLimit } from "express-rate-limit";
+import { ipKeyGenerator, rateLimit } from "express-rate-limit";
 
 import cors from "cors";
 import session from "express-session";
@@ -123,7 +123,14 @@ export function configureMiddleware({
     limit: 100,
     standardHeaders: "draft-8", // draft-6: `RateLimit-*` headers; draft-7 & draft-8: combined `RateLimit` header
     legacyHeaders: false,
-    ipv6Subnet: 56, // Set to 60 or 64 to be less aggressive, or 52 or 48 to be more aggressive
+    // Keyed by user id once a session is authenticated, so unrelated users
+    // behind the same NAT/VPN/corporate proxy don't share one budget. Only
+    // the pre-login surface this limiter also covers (/api/auth, the
+    // unauthenticated /api/client-errors reporter) falls back to
+    // ipKeyGenerator - same IPv6 /56 grouping the ipv6Subnet option would
+    // have applied to the default IP-based generator, which a custom
+    // keyGenerator otherwise bypasses.
+    keyGenerator: (req) => req.user?.id ?? ipKeyGenerator(req.ip ?? "", 56),
     // Health/readiness probes are polled frequently by the orchestrator and
     // must never be starved by public API traffic sharing the same budget.
     skip: (req) =>
@@ -139,7 +146,14 @@ export function configureMiddleware({
 
   // Twitch's own EventSub webhook traffic (plus redeliveries) is unauthenticated
   // and public, so it needs its own bound distinct from the general API limiter
-  // rather than being left completely unlimited.
+  // rather than being left completely unlimited. Necessarily IP-keyed, unlike
+  // `limiter` above: nothing that identifies which streamer/subscription an
+  // EventSub delivery is for is available until after signature verification
+  // and body parsing, which happen inside createEventSubRouter, downstream of
+  // this middleware - and Twitch is known to deliver from a small, shared IP
+  // pool, so this is effectively one budget across every subscribed streamer
+  // on the deployment. The limit is set generously (well above normal
+  // single-deployment volume) to account for that.
   const eventSubLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
     limit: 120,

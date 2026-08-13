@@ -123,7 +123,8 @@ export class TwitchProvider extends EventEmitter<TwitchProviderEvents> {
     );
 
     logger.info(
-      `Removed ${matchingSubscriptions.length} EventSub subscriptions for this callback`,
+      { count: matchingSubscriptions.length },
+      "Removed EventSub subscriptions for this callback",
     );
   }
 }

@@ -1,4 +1,3 @@
-// src/modules/auth/components/RedirectIfAuthenticated.tsx
 import { useEffect, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/authContextValue";

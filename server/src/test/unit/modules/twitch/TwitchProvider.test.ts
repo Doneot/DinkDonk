@@ -212,7 +212,8 @@ describe("TwitchProvider", () => {
 
       expect(unsubscribeFromEvent.mock.calls).toEqual([["sub-1"], ["sub-3"]]);
       expect(info).toHaveBeenCalledWith(
-        "Removed 2 EventSub subscriptions for this callback",
+        { count: 2 },
+        "Removed EventSub subscriptions for this callback",
       );
     });
 

@@ -25,6 +25,14 @@ export function verifyEventSubSignature({
     return false;
   }
 
+  // Math.abs, not a one-sided check: a message timestamped in the future is
+  // treated the same as a stale one. That's deliberate, not an oversight -
+  // this check only bounds replay/staleness exposure as defense-in-depth,
+  // and the HMAC below (keyed by a secret only Twitch and this server know)
+  // is what actually gates authenticity; a forged message can't get further
+  // by picking a future timestamp instead of a past one. Rejecting a
+  // clock-skewed-but-genuine delivery symmetrically is the safer failure
+  // mode of the two.
   const age = Math.abs(Date.now() - sentAt);
 
   if (age > MAX_EVENTSUB_MESSAGE_AGE_MS) {

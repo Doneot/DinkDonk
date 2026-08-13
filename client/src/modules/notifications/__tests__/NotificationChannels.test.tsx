@@ -26,6 +26,7 @@ const useNotificationChannels = useNotificationChannelsImport as unknown as Mock
 const useAuthProviders = useAuthProvidersImport as unknown as Mock;
 
 function channelsState(overrides: {
+  loading?: boolean;
   discord?: Partial<{
     linked: boolean;
     capable: boolean;
@@ -41,7 +42,7 @@ function channelsState(overrides: {
   }>;
 }) {
   return {
-    loading: false,
+    loading: overrides.loading ?? false,
     discord: {
       linked: true,
       capable: true,
@@ -123,6 +124,32 @@ describe("NotificationChannels", () => {
     expect(screen.getByText("On")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("switch", { name: "Toggle Discord DMs" }));
     expect(toggle).toHaveBeenCalledWith(false);
+  });
+
+  it("shows a neutral loading state and disables both toggles while channel data is still loading", () => {
+    // Regression test: useNotificationChannels() computes `loading` but the
+    // component used to destructure only `{ discord, webPush }`, so a real
+    // account (optedIn defaults true, webPush.enabled defaults false) would
+    // flash as already-configured before the fetch resolved.
+    useNotificationChannels.mockReturnValue(
+      channelsState({
+        loading: true,
+        discord: { linked: true, capable: true, optedIn: true },
+        webPush: { supported: true, enabled: false },
+      }),
+    );
+
+    renderWithUser({ id: "u1", providers: ["discord"], canReceiveDM: true });
+
+    const loadingTexts = screen.getAllByText("Loading…");
+    expect(loadingTexts).toHaveLength(2);
+    expect(
+      screen.getByRole("switch", { name: "Toggle Discord DMs" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("switch", { name: "Toggle Browser push" }),
+    ).toBeDisabled();
+    expect(screen.queryByText("On")).not.toBeInTheDocument();
   });
 
   it("disables the browser push toggle when unsupported", () => {

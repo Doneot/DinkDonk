@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useCallback, useState } from "react";
+import axios from "axios";
 import {
   fetchStreamerProfiles,
   subscribeToStreamer,
@@ -33,6 +34,12 @@ export function useSubscriptions() {
   const [profileCache, setProfileCache] = useState<Record<string, StreamerProfile>>({});
 
   const saveTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // One in-flight save request per id at a time - firing a new debounced
+  // save aborts whichever request for the same id is still in flight, so a
+  // slower older request can never resolve after (and silently overwrite)
+  // a newer one.
+  const saveControllers = useRef<Record<string, AbortController>>({});
 
   // Ids already fetched or in flight - kept out of the hydrateProfiles
   // dependency array so a cache update doesn't itself re-trigger hydration.
@@ -83,12 +90,14 @@ export function useSubscriptions() {
   }, [subscriptions, hydrateProfiles]);
 
   // ----------------------------
-  // CLEANUP PENDING AUTOSAVE TIMEOUTS ON UNMOUNT
+  // CLEANUP PENDING AUTOSAVE TIMEOUTS/REQUESTS ON UNMOUNT
   // ----------------------------
   useEffect(() => {
     const timeouts = saveTimeouts.current;
+    const controllers = saveControllers.current;
     return () => {
       Object.values(timeouts).forEach(clearTimeout);
+      Object.values(controllers).forEach((controller) => controller.abort());
     };
   }, []);
 
@@ -175,6 +184,8 @@ export function useSubscriptions() {
 
         clearTimeout(saveTimeouts.current[id]);
         delete saveTimeouts.current[id];
+        saveControllers.current[id]?.abort();
+        delete saveControllers.current[id];
       } catch (err) {
         notifyActionError(err, "Failed to unsubscribe.");
       }
@@ -201,8 +212,16 @@ export function useSubscriptions() {
       clearTimeout(saveTimeouts.current[id]);
 
       saveTimeouts.current[id] = setTimeout(() => {
-        updateNotificationMessage(id, message).catch((err: unknown) =>
-          notifyActionError(err, "Failed to update notification message."),
+        saveControllers.current[id]?.abort();
+
+        const controller = new AbortController();
+        saveControllers.current[id] = controller;
+
+        updateNotificationMessage(id, message, controller.signal).catch(
+          (err: unknown) => {
+            if (axios.isCancel(err)) return;
+            notifyActionError(err, "Failed to update notification message.");
+          },
         );
       }, 600);
     },

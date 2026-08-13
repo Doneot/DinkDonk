@@ -12,7 +12,7 @@ import type { CommandContext } from "../modules/discord/domain/CommandContext.js
 
 export const data = new SlashCommandBuilder()
   .setName("get-subscriptions")
-  .setDescription("Get all eventsub subscription")
+  .setDescription("Get all EventSub subscriptions")
   // Enforced server-side by Discord (not just hidden client-side), so this
   // cannot be bypassed the way a password argument visible in the invocation
   // could be - but only inside a guild: default_member_permissions checks

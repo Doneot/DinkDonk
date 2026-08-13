@@ -30,7 +30,9 @@ const TermsOfService = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2 text-ink">3. Account and Data</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">
+          3. Account and Data
+        </h2>
         <p>
           You may log in with your Discord account. We store your Discord user
           ID, Twitch follow preferences, and notification settings. We do not
@@ -66,9 +68,9 @@ const TermsOfService = () => {
           6. Intellectual Property
         </h2>
         <p>
-          All content, code, and designs are property of [Your Name or Company],
-          unless otherwise noted. External services like Discord and Twitch are
-          used under their own terms.
+          All content, code, and designs are property of Doneot, unless
+          otherwise noted. External services like Discord and Twitch are used
+          under their own terms.
         </p>
       </section>
 
@@ -91,7 +93,9 @@ const TermsOfService = () => {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-semibold mb-2 text-ink">9. Changes to Terms</h2>
+        <h2 className="text-2xl font-semibold mb-2 text-ink">
+          9. Changes to Terms
+        </h2>
         <p>
           These Terms may be updated from time to time. Significant changes will
           be communicated via the dashboard or Discord.

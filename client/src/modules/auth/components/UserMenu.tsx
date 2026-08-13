@@ -1,4 +1,3 @@
-// src/modules/auth/components/UserMenu.tsx
 import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/authContextValue";
