@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createEventSubHandlerRegistry } from "../../../../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
 import type {
   TwitchEventSubStreamOfflineEvent,
   TwitchEventSubStreamOnlineEvent,
 } from "../../../../../modules/twitch/domain/Twitch.js";
+import { createEventSubHandlerRegistry } from "../../../../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
 
 const onlineEvent: TwitchEventSubStreamOnlineEvent = {
   broadcaster_user_id: "streamer-1",

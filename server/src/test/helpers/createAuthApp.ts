@@ -1,18 +1,17 @@
 import express from "express";
-import session from "express-session";
 import type { Express, NextFunction, Request, Response } from "express";
+import session from "express-session";
 
 import { errorHandler } from "../../http/middleware/errorHandler.js";
 import { requestId } from "../../http/middleware/requestId.js";
 import { initializeValidatedRequest } from "../../http/middleware/validate.js";
 import { createAuthRouter } from "../../http/routes/authRoutes.js";
-
 import type { Identity } from "../../modules/auth/domain/Identity.js";
 import { buildIdentity, buildSessionUser } from "../builders/auth.js";
 import { seedState } from "../fixtures/seedState.js";
 import type { TestState } from "../fixtures/seedState.js";
-import { createTestContainer } from "./createTestContainer.js";
 import type { InMemoryIdentityRepository } from "../repositories/inMemory/InMemoryIdentityRepository.js";
+import { createTestContainer } from "./createTestContainer.js";
 
 export const AUTH_TEST_USER = buildSessionUser({
   id: "user-1",

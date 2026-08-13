@@ -5,9 +5,8 @@ import {
   statusResponseSchema,
   userCountResponseSchema,
 } from "../../../http/schemas/responses.js";
-
-import { buildUser } from "../../builders/user.js";
 import { buildIdentity } from "../../builders/auth.js";
+import { buildUser } from "../../builders/user.js";
 import { createTestApp } from "../../helpers/createTestApp.js";
 import { TestClient } from "../../helpers/TestClient.js";
 

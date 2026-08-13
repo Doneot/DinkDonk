@@ -1,6 +1,6 @@
+import { useSubscriptions } from "../hooks/useSubscriptions";
 import StreamerSearch from "./StreamerSearch";
 import SubscriptionsList from "./SubscriptionsList";
-import { useSubscriptions } from "../hooks/useSubscriptions";
 
 interface SubscriptionsManagerProps {
   canReceiveDM?: boolean;

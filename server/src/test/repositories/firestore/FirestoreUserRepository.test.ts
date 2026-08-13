@@ -1,16 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
 import type { Firestore } from "firebase-admin/firestore";
+import { describe, expect, it, vi } from "vitest";
 
+import type { User } from "../../../modules/users/domain/User.js";
 import { FirestoreUserRepository } from "../../../modules/users/infrastructure/firestore/FirestoreUserRepository.js";
 import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
-import type { User } from "../../../modules/users/domain/User.js";
-
-import { userRepositoryBehavior } from "../contracts/UserRepository.behavior.js";
 import {
   FakeFirestore,
   FakeDocumentReference,
 } from "../../helpers/fakeFirestore.js";
+import { userRepositoryBehavior } from "../contracts/UserRepository.behavior.js";
 
 userRepositoryBehavior("FirestoreUserRepository", () => {
   const firestore = new FakeFirestore();

@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
+
+import { useAuth } from "../../../context/authContextValue";
+import { notifyActionError } from "../../../shared/api/errorToast";
+import type { NotificationChannelId } from "../../../shared/types/api";
 import {
   disableWebPushNotifications,
   enableWebPushNotifications,
@@ -8,9 +12,6 @@ import {
   isWebPushSupported,
   setNotificationChannelPreference,
 } from "../api";
-import { notifyActionError } from "../../../shared/api/errorToast";
-import { useAuth } from "../../../context/authContextValue";
-import type { NotificationChannelId } from "../../../shared/types/api";
 
 // One state/toggle shape per channel, so a future channel (email, a native
 // app, ...) is "add a block shaped like these two", not a UI rewrite.

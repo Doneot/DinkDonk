@@ -1,13 +1,14 @@
-import type { Server as HttpServer } from "node:http";
-import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Server as HttpServer, IncomingMessage, ServerResponse } from "node:http";
+
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import type { Session, SessionData } from "express-session";
 import { Server, type Socket } from "socket.io";
+
+import type { Redis } from "../infrastructure/redis/redisClient.js";
+import { resolveIdentity } from "../modules/auth/application/resolveIdentity.js";
+import type { IdentityRepository } from "../modules/auth/ports/IdentityRepository.js";
 import { env } from "../shared/config/env.js";
 import { logger } from "../shared/logger/logger.js";
-import type { IdentityRepository } from "../modules/auth/ports/IdentityRepository.js";
-import { resolveIdentity } from "../modules/auth/application/resolveIdentity.js";
-import type { Redis } from "../infrastructure/redis/redisClient.js";
 
 type AuthenticatedSocket = Socket & {
   userId: string;

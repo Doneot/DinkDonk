@@ -1,7 +1,7 @@
+import { logger } from "../../../shared/logger/logger.js";
+import { TokenDecryptionError } from "../../../shared/utils/crypto.js";
 import type { Identity } from "../domain/Identity.js";
 import type { IdentityRepository } from "../ports/IdentityRepository.js";
-import { TokenDecryptionError } from "../../../shared/utils/crypto.js";
-import { logger } from "../../../shared/logger/logger.js";
 
 export type IdentityResolution =
   | { status: "found"; identity: Identity }

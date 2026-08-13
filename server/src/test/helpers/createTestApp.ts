@@ -1,22 +1,20 @@
 import cookieParser from "cookie-parser";
 import express from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import session from "express-session";
 
-import type { Express, NextFunction, Request, Response } from "express";
-
-import { createApiRouter } from "../../http/routes/apiRoutes.js";
-import { StreamerLiveStateService } from "../../modules/streamers/application/StreamerLiveStateService.js";
 import { requireAuthenticated } from "../../http/middleware/auth.js";
 import { errorHandler } from "../../http/middleware/errorHandler.js";
 import { requestId } from "../../http/middleware/requestId.js";
 import { initializeValidatedRequest } from "../../http/middleware/validate.js";
-
-import { seedState } from "../fixtures/seedState.js";
-import { createTestContainer } from "./createTestContainer.js";
-import type { TestState } from "../fixtures/seedState.js";
+import { createApiRouter } from "../../http/routes/apiRoutes.js";
 import type { Identity, SessionUser } from "../../modules/auth/domain/Identity.js";
+import { StreamerLiveStateService } from "../../modules/streamers/application/StreamerLiveStateService.js";
 import { buildIdentity } from "../builders/auth.js";
+import { seedState } from "../fixtures/seedState.js";
+import type { TestState } from "../fixtures/seedState.js";
 import type { InMemoryIdentityRepository } from "../repositories/inMemory/InMemoryIdentityRepository.js";
+import { createTestContainer } from "./createTestContainer.js";
 
 const DEFAULT_AUTH_USER = Object.freeze<SessionUser>({
   id: "user-1",

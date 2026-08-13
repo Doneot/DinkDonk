@@ -1,5 +1,4 @@
 import type { User } from "../../modules/users/domain/User.js";
-
 import { TEST_USER_ID } from "../constants.js";
 
 export function buildUser(overrides: Partial<User> = {}): User {

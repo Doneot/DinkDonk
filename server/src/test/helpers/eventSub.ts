@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
-import request from "supertest";
+
 import type { Express } from "express";
+import request from "supertest";
 
 import type { EventSubEnvelope } from "../../http/schemas/eventSub.js";
 

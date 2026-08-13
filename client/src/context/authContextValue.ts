@@ -1,4 +1,5 @@
 import { createContext, useContext, type Dispatch, type SetStateAction } from "react";
+
 import type { User } from "../shared/types/api";
 
 export interface AuthContextValue {

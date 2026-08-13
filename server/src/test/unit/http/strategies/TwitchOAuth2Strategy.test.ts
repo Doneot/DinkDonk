@@ -1,6 +1,6 @@
 import type { AxiosInstance } from "axios";
-import { describe, expect, it, vi } from "vitest";
 import type { StrategyOptions } from "passport-oauth2";
+import { describe, expect, it, vi } from "vitest";
 
 import { TwitchOAuth2Strategy } from "../../../../http/strategies/TwitchOAuth2Strategy.js";
 

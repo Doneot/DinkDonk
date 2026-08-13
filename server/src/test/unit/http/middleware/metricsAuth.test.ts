@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { createMetricsAuth } from "../../../../http/middleware/metricsAuth.js";
 import { UnauthorizedError } from "../../../../http/errors/UnauthorizedError.js";
-
+import { createMetricsAuth } from "../../../../http/middleware/metricsAuth.js";
 import { createMockRequest, createNext } from "../../../helpers/express.js";
 
 const TOKEN = "a-real-metrics-token-1234567890";

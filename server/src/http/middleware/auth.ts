@@ -1,9 +1,9 @@
 import type express from "express";
 import refresh from "passport-oauth2-refresh";
-import { logger } from "../../shared/logger/logger.js";
-import type { IdentityRepository } from "../../modules/auth/ports/IdentityRepository.js";
-import type { Redis } from "../../infrastructure/redis/redisClient.js";
 
+import type { Redis } from "../../infrastructure/redis/redisClient.js";
+import type { IdentityRepository } from "../../modules/auth/ports/IdentityRepository.js";
+import { logger } from "../../shared/logger/logger.js";
 import { UnauthorizedError } from "../errors/UnauthorizedError.js";
 
 const MAX_TOKEN_AGE_MS = 6 * 24 * 60 * 60 * 1000;

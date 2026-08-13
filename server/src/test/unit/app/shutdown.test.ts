@@ -1,11 +1,12 @@
 import type http from "node:http";
+
 import type { MockInstance } from "vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Container } from "../../../app/container/index.js";
-import type { Server } from "../../../app/server.js";
-import type { Runtime } from "../../../app/runtime/Runtime.js";
 import type { IntervalScheduler } from "../../../app/IntervalScheduler.js";
+import type { Runtime } from "../../../app/runtime/Runtime.js";
+import type { Server } from "../../../app/server.js";
 import { registerShutdownHooks } from "../../../app/shutdown.js";
 import type { UserChangeBroadcaster } from "../../../modules/users/application/UserChangeBroadcaster.js";
 import type { SocketServer } from "../../../realtime/socketServer.js";

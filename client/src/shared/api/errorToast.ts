@@ -1,5 +1,5 @@
-import { toast } from "react-toastify";
 import { isAxiosError } from "axios";
+import { toast } from "react-toastify";
 
 // 401s are already handled globally by the axios response interceptor
 // (session-expired toast + redirect in shared/api/client.ts) - toasting

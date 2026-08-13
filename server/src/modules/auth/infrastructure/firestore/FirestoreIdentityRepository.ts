@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+
 import type {
   Firestore,
   CollectionReference,
@@ -6,25 +7,24 @@ import type {
   DocumentData,
 } from "firebase-admin/firestore";
 
+import { encryptSecret } from "../../../../shared/utils/crypto.js";
+import { getExistingDoc } from "../../../../shared/utils/firestore.js";
+import { isNonEmptyString } from "../../../../shared/utils/validators.js";
 import type {
   DiscordCredential,
   GoogleCredential,
   Identity,
   TwitchCredential,
 } from "../../domain/Identity.js";
+import { IdentityConflictError } from "../../domain/IdentityConflictError.js";
+import { IdentityNotFoundError } from "../../domain/IdentityNotFoundError.js";
 import type { IdentityRepository } from "../../ports/IdentityRepository.js";
+import { toIdentity } from "./mappers/identityMapper.js";
 import {
   DiscordCredentialSchema,
   IdentityRecordSchema,
 } from "./records/IdentityRecord.js";
 import type { IdentityRecord } from "./records/IdentityRecord.js";
-
-import { isNonEmptyString } from "../../../../shared/utils/validators.js";
-import { encryptSecret } from "../../../../shared/utils/crypto.js";
-import { getExistingDoc } from "../../../../shared/utils/firestore.js";
-import { toIdentity } from "./mappers/identityMapper.js";
-import { IdentityConflictError } from "../../domain/IdentityConflictError.js";
-import { IdentityNotFoundError } from "../../domain/IdentityNotFoundError.js";
 
 function discordLinkId(discordId: string): string {
   return `discord:${discordId}`;

@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+
 import { reportClientError } from "../api/reportClientError";
 
 interface ErrorBoundaryProps {

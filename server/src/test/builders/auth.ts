@@ -5,7 +5,6 @@ import type {
   SessionUser,
   TwitchCredential,
 } from "../../modules/auth/domain/Identity.js";
-
 import { TEST_DISCORD_ID } from "../constants.js";
 
 const DEFAULT_FETCH_TIME = 1_700_000_000_000;

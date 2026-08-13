@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import { fetchStatus } from "../api";
 
 type Status = "loading" | "Online" | "Offline" | "Unknown";

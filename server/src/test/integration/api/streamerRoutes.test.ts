@@ -5,7 +5,6 @@ import {
   streamerSummaryResponseSchema,
   trackedStreamerSummaryResponseSchema,
 } from "../../../http/schemas/responses.js";
-
 import { createTestApp } from "../../helpers/createTestApp.js";
 import { TestClient } from "../../helpers/TestClient.js";
 

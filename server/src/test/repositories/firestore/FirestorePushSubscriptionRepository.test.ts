@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { FirestorePushSubscriptionRepository } from "../../../modules/notifications/infrastructure/firestore/FirestorePushSubscriptionRepository.js";
 import type { PushSubscription } from "../../../modules/notifications/domain/PushSubscription.js";
-
-import { pushSubscriptionRepositoryBehavior } from "../contracts/PushSubscriptionRepository.behavior.js";
+import { FirestorePushSubscriptionRepository } from "../../../modules/notifications/infrastructure/firestore/FirestorePushSubscriptionRepository.js";
 import { FakeFirestore } from "../../helpers/fakeFirestore.js";
-
 import { anyValue } from "../../helpers/matchers.js";
+import { pushSubscriptionRepositoryBehavior } from "../contracts/PushSubscriptionRepository.behavior.js";
 
 pushSubscriptionRepositoryBehavior("FirestorePushSubscriptionRepository", () => {
   const firestore = new FakeFirestore();

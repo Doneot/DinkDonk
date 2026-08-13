@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
 import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
+import { describe, expect, it, vi } from "vitest";
 
-import { env } from "../../../../../shared/config/env.js";
 import { execute } from "../../../../../commands/dashboard.js";
+import { env } from "../../../../../shared/config/env.js";
 
 function createInteraction() {
   const reply = vi.fn().mockResolvedValue(undefined);

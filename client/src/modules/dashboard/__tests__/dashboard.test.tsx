@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+
 import api from "../../../shared/api/client";
 import { fetchStatus, fetchUserCount } from "../api";
-import StatusCard from "../components/StatusCard";
 import BotUsersCard from "../components/BotUsersCard";
+import StatusCard from "../components/StatusCard";
 
 vi.mock("../../../shared/api/client", () => ({
   default: { get: vi.fn() },

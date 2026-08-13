@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Notification } from "../../../../modules/notifications/domain/Notification.js";
 import { logger } from "../../../../shared/logger/logger.js";
-
 import { buildPushSubscription } from "../../../builders/pushSubscription.js";
 import { buildUser } from "../../../builders/user.js";
 import { InMemoryPushSubscriptionRepository } from "../../../repositories/inMemory/InMemoryPushSubscriptionRepository.js";

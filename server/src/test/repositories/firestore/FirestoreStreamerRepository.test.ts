@@ -1,12 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { Streamer } from "../../../modules/streamers/domain/Streamer.js";
 import { FirestoreStreamerRepository } from "../../../modules/streamers/infrastructure/firestore/FirestoreStreamerRepository.js";
 import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
-import type { Streamer } from "../../../modules/streamers/domain/Streamer.js";
-
-import { streamerRepositoryBehavior } from "../contracts/StreamerRepository.behavior.js";
 import { FakeFirestore, FakeQuery } from "../../helpers/fakeFirestore.js";
+import { streamerRepositoryBehavior } from "../contracts/StreamerRepository.behavior.js";
 
 streamerRepositoryBehavior("FirestoreStreamerRepository", () => {
   const firestore = new FakeFirestore();

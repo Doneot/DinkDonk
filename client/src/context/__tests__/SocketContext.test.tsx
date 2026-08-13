@@ -1,10 +1,11 @@
+import { render, screen, waitFor, act } from "@testing-library/react";
 import { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+
+import type { User } from "../../shared/types/api";
+import { AuthContext, useAuth, type AuthContextValue } from "../authContextValue";
 import { SocketProvider } from "../SocketContext";
 import { useSocket } from "../socketContextValue";
-import { AuthContext, useAuth, type AuthContextValue } from "../authContextValue";
-import type { User } from "../../shared/types/api";
 
 type Handler = (...args: unknown[]) => void;
 

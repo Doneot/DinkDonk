@@ -1,10 +1,10 @@
 import { MessageFlags } from "discord.js";
 import type { ChatInputCommandInteraction } from "discord.js";
 
-import type { User } from "../../modules/users/domain/User.js";
-import type { SubscribeFailureReason } from "../../modules/users/domain/SubscribeResult.js";
-import type { TwitchStreamer } from "../../modules/twitch/domain/Twitch.js";
 import type { CommandContext } from "../../modules/discord/domain/CommandContext.js";
+import type { TwitchStreamer } from "../../modules/twitch/domain/Twitch.js";
+import type { SubscribeFailureReason } from "../../modules/users/domain/SubscribeResult.js";
+import type { User } from "../../modules/users/domain/User.js";
 
 /**
  * Every reply here is ephemeral, error or success: subscriptions and their

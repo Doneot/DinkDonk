@@ -1,16 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { SubscriptionCleanupService } from "../../../../modules/notifications/application/SubscriptionCleanupService.js";
 import { EventSubSyncService } from "../../../../modules/notifications/application/EventSubSyncService.js";
+import { SubscriptionCleanupService } from "../../../../modules/notifications/application/SubscriptionCleanupService.js";
 import type { TwitchEventSubSubscription } from "../../../../modules/twitch/domain/Twitch.js";
-
+import { logger } from "../../../../shared/logger/logger.js";
 import { buildStreamer } from "../../../builders/streamer.js";
 import {
   buildEventSubSubscription,
   FakeTwitchSubscriptions,
 } from "../../../helpers/fakeTwitch.js";
 import { InMemoryStreamerRepository } from "../../../repositories/inMemory/InMemoryStreamerRepository.js";
-import { logger } from "../../../../shared/logger/logger.js";
 
 function setup({
   subscriptions = [] as TwitchEventSubSubscription[],

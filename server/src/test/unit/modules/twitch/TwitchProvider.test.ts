@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { register } from "../../../../infrastructure/metrics/prometheus.js";
 import { TwitchProvider } from "../../../../modules/twitch/application/TwitchProvider.js";
+import type { TwitchEventSubSubscription } from "../../../../modules/twitch/domain/Twitch.js";
 import type { TwitchAuthenticator } from "../../../../modules/twitch/infrastructure/TwitchAuthenticator.js";
 import type { TwitchClient } from "../../../../modules/twitch/infrastructure/TwitchClient.js";
-import type { TwitchEventSubSubscription } from "../../../../modules/twitch/domain/Twitch.js";
 import { logger } from "../../../../shared/logger/logger.js";
-import { register } from "../../../../infrastructure/metrics/prometheus.js";
 
 const CALLBACK_URL = "http://localhost:3000/eventsub";
 

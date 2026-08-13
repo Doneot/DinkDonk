@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import axios from "axios";
+import { useEffect, useMemo, useRef, useCallback, useState } from "react";
+
+import { useAuth } from "../../../context/authContextValue";
+import { useSocket } from "../../../context/socketContextValue";
+import { notifyActionError } from "../../../shared/api/errorToast";
+import { reportClientError } from "../../../shared/api/reportClientError";
+import type { StreamerSummary, Subscription } from "../../../shared/types/api";
 import {
   fetchStreamerProfiles,
   subscribeToStreamer,
   unsubscribeFromStreamer,
   updateNotificationMessage,
 } from "../api";
-import { notifyActionError } from "../../../shared/api/errorToast";
-import { reportClientError } from "../../../shared/api/reportClientError";
-import { useAuth } from "../../../context/authContextValue";
-import { useSocket } from "../../../context/socketContextValue";
-import type { StreamerSummary, Subscription } from "../../../shared/types/api";
 import type { EnrichedSubscription, StreamerProfile } from "../types";
 
 // Assumes a single call site (true today, in SubscriptionsManager) - two

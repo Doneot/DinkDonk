@@ -1,19 +1,16 @@
 import express from "express";
-
 import type { Express, RequestHandler } from "express";
 
-import type { TwitchStreamerProvider } from "../modules/twitch/ports/TwitchGateway.js";
-import type { DiscordService } from "../modules/discord/ports/DiscordService.js";
-
 import type { Repositories } from "../app/container/repositories.js";
+import type { Redis } from "../infrastructure/redis/redisClient.js";
+import type { DiscordService } from "../modules/discord/ports/DiscordService.js";
 import type { StreamNotificationService } from "../modules/notifications/application/StreamNotificationService.js";
 import type { StreamerLiveStateService } from "../modules/streamers/application/StreamerLiveStateService.js";
-import type { Redis } from "../infrastructure/redis/redisClient.js";
-
-import { configureRoutes } from "./configureRoutes.js";
+import type { TwitchStreamerProvider } from "../modules/twitch/ports/TwitchGateway.js";
 import { configureMiddleware } from "./configureMiddleware.js";
-import { errorHandler } from "./middleware/errorHandler.js";
+import { configureRoutes } from "./configureRoutes.js";
 import { NotFoundError } from "./errors/NotFoundError.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 
 type CreateAppOptions = {
   sessionMiddleware: RequestHandler;

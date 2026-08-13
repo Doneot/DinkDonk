@@ -1,14 +1,13 @@
-import { createRuntime } from "./runtime/createRuntime.js";
-import { createContainer } from "./container/index.js";
-import { createServer } from "./server.js";
-import { UserChangeBroadcaster } from "../modules/users/application/UserChangeBroadcaster.js";
-import { configureEventSubscriptions } from "./configureEventSubscriptions.js";
-import { IntervalScheduler } from "./IntervalScheduler.js";
-import { registerShutdownHooks } from "./shutdown.js";
 import { FirestoreSessionRepository } from "../modules/auth/infrastructure/firestore/FirestoreSessionRepository.js";
-
+import { UserChangeBroadcaster } from "../modules/users/application/UserChangeBroadcaster.js";
 import { env } from "../shared/config/env.js";
 import { logger } from "../shared/logger/logger.js";
+import { configureEventSubscriptions } from "./configureEventSubscriptions.js";
+import { createContainer } from "./container/index.js";
+import { IntervalScheduler } from "./IntervalScheduler.js";
+import { createRuntime } from "./runtime/createRuntime.js";
+import { createServer } from "./server.js";
+import { registerShutdownHooks } from "./shutdown.js";
 
 export async function bootstrap() {
   const runtime = await createRuntime();

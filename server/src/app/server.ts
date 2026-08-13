@@ -1,12 +1,13 @@
 import http from "http";
-import { createApp } from "../http/createApp.js";
+
 import type e from "express";
+
 import { createSessionMiddleware } from "../http/configureMiddleware.js";
+import { createApp } from "../http/createApp.js";
 import {
   createSocketServer,
   type SocketServer,
 } from "../realtime/socketServer.js";
-
 import type { Container } from "./container/index.js";
 
 export interface Server {

@@ -1,6 +1,6 @@
+import { decryptSecret } from "../../../../../shared/utils/crypto.js";
 import type { Identity } from "../../../domain/Identity.js";
 import type { IdentityRecord } from "../records/IdentityRecord.js";
-import { decryptSecret } from "../../../../../shared/utils/crypto.js";
 
 export function toIdentity(uid: string, record: IdentityRecord): Identity {
   return {

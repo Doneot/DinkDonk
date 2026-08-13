@@ -6,7 +6,6 @@ import {
   publicKeyResponseSchema,
   savePushResponseSchema,
 } from "../../../http/schemas/responses.js";
-
 import { buildPushSubscription } from "../../builders/pushSubscription.js";
 import { buildUser } from "../../builders/user.js";
 import {

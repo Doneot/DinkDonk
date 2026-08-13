@@ -1,14 +1,14 @@
 import crypto from "node:crypto";
+
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createApp } from "../../../http/createApp.js";
 import { createSessionMiddleware } from "../../../http/configureMiddleware.js";
+import { createApp } from "../../../http/createApp.js";
 import type { StreamNotificationService } from "../../../modules/notifications/application/StreamNotificationService.js";
 import type { StreamerLiveStateService } from "../../../modules/streamers/application/StreamerLiveStateService.js";
 import { env } from "../../../shared/config/env.js";
 import { logger } from "../../../shared/logger/logger.js";
-
 import { buildStreamOnlineEvent } from "../../builders/eventSub.js";
 import { createTestContainer } from "../../helpers/createTestContainer.js";
 import { buildEventSubHeaders } from "../../helpers/eventSub.js";

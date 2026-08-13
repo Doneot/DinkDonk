@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { fetchAuthProviders } from "../api";
+
 import type { AuthProvidersResponse } from "../../../shared/types/api";
+import { fetchAuthProviders } from "../api";
 
 export function useAuthProviders(): AuthProvidersResponse | null {
   const [config, setConfig] = useState<AuthProvidersResponse | null>(null);

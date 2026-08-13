@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { useAuthProviders } from "../hooks/useAuthProviders";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+
 import * as authApiModule from "../api";
+import { useAuthProviders } from "../hooks/useAuthProviders";
 
 vi.mock("../api", () => ({
   fetchAuthProviders: vi.fn(),

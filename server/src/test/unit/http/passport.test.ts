@@ -2,13 +2,12 @@ import type { Profile } from "passport-discord";
 import type { Profile as GoogleProfile } from "passport-google-oauth20";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ConflictError } from "../../../http/errors/ConflictError.js";
 import type { Identity, SessionUser } from "../../../modules/auth/domain/Identity.js";
 import { IdentityConflictError } from "../../../modules/auth/domain/IdentityConflictError.js";
-import { ConflictError } from "../../../http/errors/ConflictError.js";
 import { env } from "../../../shared/config/env.js";
-import { TokenDecryptionError } from "../../../shared/utils/crypto.js";
 import { logger } from "../../../shared/logger/logger.js";
-
+import { TokenDecryptionError } from "../../../shared/utils/crypto.js";
 import { buildIdentity, buildSessionUser } from "../../builders/auth.js";
 import { InMemoryIdentityRepository } from "../../repositories/inMemory/InMemoryIdentityRepository.js";
 

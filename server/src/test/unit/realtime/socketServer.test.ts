@@ -1,4 +1,5 @@
 import http from "node:http";
+
 import type { RequestHandler } from "express";
 import type { Redis } from "ioredis";
 import type { Socket } from "socket.io";
@@ -9,8 +10,8 @@ import { createSocketServer } from "../../../realtime/socketServer.js";
 import type { SocketServer } from "../../../realtime/socketServer.js";
 import { logger } from "../../../shared/logger/logger.js";
 import { TokenDecryptionError } from "../../../shared/utils/crypto.js";
-import { InMemoryIdentityRepository } from "../../repositories/inMemory/InMemoryIdentityRepository.js";
 import { buildIdentity } from "../../builders/auth.js";
+import { InMemoryIdentityRepository } from "../../repositories/inMemory/InMemoryIdentityRepository.js";
 
 type FakeRedis = {
   duplicate: ReturnType<typeof vi.fn>;

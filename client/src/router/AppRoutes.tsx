@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
-import RedirectIfAuthenticated from '../modules/auth/components/RedirectIfAuthenticated';
+
 import ProtectedRoute from '../modules/auth/components/ProtectedRoute';
+import RedirectIfAuthenticated from '../modules/auth/components/RedirectIfAuthenticated';
 import Footer from '../shared/components/Footer';
 import Navbar from '../shared/components/Navbar';
 import ScrollToTop from '../shared/components/ScrollToTop';

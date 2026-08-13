@@ -1,11 +1,11 @@
 import { logger } from "../../../../shared/logger/logger.js";
+import type { IdentityRepository } from "../../../auth/ports/IdentityRepository.js";
 import type { User } from "../../../users/domain/User.js";
+import type { UserRepository } from "../../../users/ports/UserRepository.js";
 import type {
   Notification,
   NotificationResult,
 } from "../../domain/Notification.js";
-import type { UserRepository } from "../../../users/ports/UserRepository.js";
-import type { IdentityRepository } from "../../../auth/ports/IdentityRepository.js";
 
 type DiscordMessenger = {
   notifyUser(userId: string, message: string): Promise<void>;

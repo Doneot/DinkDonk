@@ -6,13 +6,12 @@ import type {
   TwitchEventSubStreamOnlineEvent,
   TwitchStreamer,
 } from "../../../../modules/twitch/domain/Twitch.js";
-
+import { logger } from "../../../../shared/logger/logger.js";
 import { buildStreamer } from "../../../builders/streamer.js";
 import { buildUser } from "../../../builders/user.js";
 import { FakeTwitchStreamers } from "../../../helpers/fakeTwitch.js";
 import { InMemoryStreamerRepository } from "../../../repositories/inMemory/InMemoryStreamerRepository.js";
 import { InMemoryUserRepository } from "../../../repositories/inMemory/InMemoryUserRepository.js";
-import { logger } from "../../../../shared/logger/logger.js";
 
 afterEach(() => {
   vi.restoreAllMocks();

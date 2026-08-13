@@ -6,7 +6,6 @@ import {
   TwitchClient,
 } from "../../../../modules/twitch/infrastructure/TwitchClient.js";
 import { logger } from "../../../../shared/logger/logger.js";
-
 import { anyString } from "../../../helpers/matchers.js";
 
 type HttpResponse = {

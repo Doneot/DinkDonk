@@ -1,4 +1,5 @@
 import { io, type Socket } from "socket.io-client";
+
 import { env } from "../config/env";
 import type { User } from "./types/api";
 

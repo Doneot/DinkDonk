@@ -1,10 +1,11 @@
 import { z } from "zod";
+
 import {
   eventSubEnvelopeSchema,
   eventSubEventSchemasByType,
 } from "../../../http/schemas/eventSub.js";
-import { EventSubValidationError } from "./EventSubValidationError.js";
 import type { EventSubHandlerRegistry } from "./EventSubHandlerRegistry.js";
+import { EventSubValidationError } from "./EventSubValidationError.js";
 import { parseEventSubJson } from "./parseEventSubJson.js";
 
 export async function dispatchEventSubNotification(

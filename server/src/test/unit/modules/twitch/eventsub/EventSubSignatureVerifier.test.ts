@@ -4,7 +4,6 @@ import {
   verifyEventSubSignature,
   type VerifyEventSubSignatureOptions,
 } from "../../../../../modules/twitch/eventsub/EventSubSignatureVerifier.js";
-
 import { signEventSubMessage } from "../../../../helpers/eventSub.js";
 
 const SECRET = "twitch-webhook-secret";

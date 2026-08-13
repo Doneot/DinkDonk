@@ -1,8 +1,8 @@
-import request from "supertest";
 import type { Express, NextFunction, Request, Response } from "express";
+import request from "supertest";
 
-import type { SessionUser } from "../../modules/auth/domain/Identity.js";
 import type { Repositories } from "../../app/container/repositories.js";
+import type { SessionUser } from "../../modules/auth/domain/Identity.js";
 
 export class TestClient {
   public readonly agent;

@@ -1,15 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DiscordNotificationChannel } from "../../../../modules/notifications/infrastructure/channels/DiscordNotificationChannel.js";
-import type { Notification } from "../../../../modules/notifications/domain/Notification.js";
-import type { User } from "../../../../modules/users/domain/User.js";
 import type { Identity } from "../../../../modules/auth/domain/Identity.js";
+import type { Notification } from "../../../../modules/notifications/domain/Notification.js";
+import { DiscordNotificationChannel } from "../../../../modules/notifications/infrastructure/channels/DiscordNotificationChannel.js";
+import type { User } from "../../../../modules/users/domain/User.js";
 import { logger } from "../../../../shared/logger/logger.js";
-
-import { buildUser } from "../../../builders/user.js";
 import { buildDiscordCredential, buildIdentity } from "../../../builders/auth.js";
-import { InMemoryUserRepository } from "../../../repositories/inMemory/InMemoryUserRepository.js";
+import { buildUser } from "../../../builders/user.js";
 import { InMemoryIdentityRepository } from "../../../repositories/inMemory/InMemoryIdentityRepository.js";
+import { InMemoryUserRepository } from "../../../repositories/inMemory/InMemoryUserRepository.js";
 
 // Deliberately distinct from any default test user id, so every test below
 // exercises the Discord-secondary-provider case (uid !== discord.id) unless

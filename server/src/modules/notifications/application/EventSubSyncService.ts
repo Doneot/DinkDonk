@@ -1,10 +1,8 @@
+import { eventSubSubscriptionsCreatedTotal } from "../../../infrastructure/metrics/prometheus.js";
+import { logger } from "../../../shared/logger/logger.js";
+import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
 import type { TwitchEventSubSubscription } from "../../twitch/domain/Twitch.js";
 import type { TwitchSubscriptionProvider } from "../../twitch/ports/TwitchGateway.js";
-import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
-
-import { eventSubSubscriptionsCreatedTotal } from "../../../infrastructure/metrics/prometheus.js";
-
-import { logger } from "../../../shared/logger/logger.js";
 
 /**
  * Twitch EventSub subscription statuses that mean the subscription is no

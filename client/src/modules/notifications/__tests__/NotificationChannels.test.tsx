@@ -1,11 +1,12 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+
 import { AuthContext, type AuthContextValue } from "../../../context/authContextValue";
-import NotificationChannels from "../components/NotificationChannels";
-import * as notificationsApiModule from "../api";
-import { useNotificationChannels as useNotificationChannelsImport } from "../hooks/useNotificationChannels";
-import { useAuthProviders as useAuthProvidersImport } from "../../auth/hooks/useAuthProviders";
 import type { User } from "../../../shared/types/api";
+import { useAuthProviders as useAuthProvidersImport } from "../../auth/hooks/useAuthProviders";
+import * as notificationsApiModule from "../api";
+import NotificationChannels from "../components/NotificationChannels";
+import { useNotificationChannels as useNotificationChannelsImport } from "../hooks/useNotificationChannels";
 
 vi.mock("../api", () => ({
   checkCanReceiveDM: vi.fn(),

@@ -1,21 +1,22 @@
 import express from "express";
-import passport from "passport";
 import type { ErrorRequestHandler, RequestHandler, Router } from "express";
+import passport from "passport";
+
+import type { Provider } from "../../modules/auth/domain/Identity.js";
+import type { IdentityRepository } from "../../modules/auth/ports/IdentityRepository.js";
+import type { DiscordService } from "../../modules/discord/ports/DiscordService.js";
+import type { UserRepository } from "../../modules/users/ports/UserRepository.js";
 import { logger } from "../../shared/logger/logger.js";
-import { SESSION_COOKIE_NAME } from "../configureMiddleware.js";
 import { dashboardUrl } from "../../shared/utils/urls.js";
-import { requireAuthenticated, requireUser } from "../middleware/auth.js";
+import { SESSION_COOKIE_NAME } from "../configureMiddleware.js";
 import { AppError } from "../errors/AppError.js";
+import { requireAuthenticated, requireUser } from "../middleware/auth.js";
 import {
   discordInviteUrl,
   isGoogleSignInEnabled,
   isTwitchSignInEnabled,
   LINK_DISCORD_INTENT_TTL_MS,
 } from "../passport.js";
-import type { DiscordService } from "../../modules/discord/ports/DiscordService.js";
-import type { UserRepository } from "../../modules/users/ports/UserRepository.js";
-import type { IdentityRepository } from "../../modules/auth/ports/IdentityRepository.js";
-import type { Provider } from "../../modules/auth/domain/Identity.js";
 import {
   authProvidersResponseSchema,
   userResponseSchema,

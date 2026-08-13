@@ -1,5 +1,4 @@
 import type { Streamer } from "../../modules/streamers/domain/Streamer.js";
-
 import { TEST_STREAMER_ID } from "../constants.js";
 
 /**

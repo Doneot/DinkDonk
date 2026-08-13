@@ -1,5 +1,4 @@
 import type { Subscription } from "../../modules/users/domain/Subscription.js";
-
 import { TEST_STREAMER_ID } from "../constants.js";
 
 export function buildSubscription(

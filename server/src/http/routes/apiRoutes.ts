@@ -1,9 +1,22 @@
 import express from "express";
 import type { Request, Response, Router } from "express";
-import type { DiscordService } from "../../modules/discord/ports/DiscordService.js";
-import type { TwitchStreamerProvider } from "../../modules/twitch/ports/TwitchGateway.js";
-import type { StreamerLiveStateService } from "../../modules/streamers/application/StreamerLiveStateService.js";
+
 import type { Repositories } from "../../app/container/repositories.js";
+import {
+  discordDmChecksTotal,
+  streamerSubscriptionsTotal,
+} from "../../infrastructure/metrics/prometheus.js";
+import type { DiscordService } from "../../modules/discord/ports/DiscordService.js";
+import type {
+  SavePushSubscribeResult,
+  DeletePushSubscribeResult,
+} from "../../modules/notifications/types/PushSubscribeResult.js";
+import type { StreamerLiveStateService } from "../../modules/streamers/application/StreamerLiveStateService.js";
+import type { TwitchStreamerProvider } from "../../modules/twitch/ports/TwitchGateway.js";
+import type { SubscribeFailureReason } from "../../modules/users/domain/SubscribeResult.js";
+import { BadRequestError } from "../errors/BadRequestError.js";
+import { ConflictError } from "../errors/ConflictError.js";
+import { NotFoundError } from "../errors/NotFoundError.js";
 import { requireUser } from "../middleware/auth.js";
 import {
   validatedBody,
@@ -19,27 +32,6 @@ import {
   type DeletePushSubscriptionQuery,
   type SetChannelPreferenceRequest,
 } from "../schemas/notifications.js";
-import {
-  searchStreamersQuerySchema,
-  batchStreamerInfoSchema,
-  type BatchStreamerInfoRequest,
-  type SearchStreamerRequest,
-} from "../schemas/streamers.js";
-import {
-  subscribeSchema,
-  setMessageSchema,
-  type SubscribeRequest,
-  type UnsubscribeRequest,
-  type SetMessageRequest,
-} from "../schemas/subscriptions.js";
-import { NotFoundError } from "../errors/NotFoundError.js";
-import { ConflictError } from "../errors/ConflictError.js";
-import { BadRequestError } from "../errors/BadRequestError.js";
-import type { SubscribeFailureReason } from "../../modules/users/domain/SubscribeResult.js";
-import type {
-  SavePushSubscribeResult,
-  DeletePushSubscribeResult,
-} from "../../modules/notifications/types/PushSubscribeResult.js";
 import type {
   CanReceiveDmResponse,
   NotificationChannelsResponse,
@@ -54,9 +46,18 @@ import type {
   UserCountResponse,
 } from "../schemas/responses.js";
 import {
-  discordDmChecksTotal,
-  streamerSubscriptionsTotal,
-} from "../../infrastructure/metrics/prometheus.js";
+  searchStreamersQuerySchema,
+  batchStreamerInfoSchema,
+  type BatchStreamerInfoRequest,
+  type SearchStreamerRequest,
+} from "../schemas/streamers.js";
+import {
+  subscribeSchema,
+  setMessageSchema,
+  type SubscribeRequest,
+  type UnsubscribeRequest,
+  type SetMessageRequest,
+} from "../schemas/subscriptions.js";
 
 type CreateApiRouterOptions = {
   repositories: Repositories;

@@ -1,7 +1,6 @@
 import type { Redis } from "ioredis";
 
 import { logger } from "../../../shared/logger/logger.js";
-
 import type { ReplayStore } from "../ports/ReplayStore.js";
 
 const DEFAULT_PREFIX = "eventsub:replay:";

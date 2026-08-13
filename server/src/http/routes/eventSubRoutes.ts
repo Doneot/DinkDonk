@@ -1,20 +1,21 @@
 import express from "express";
 import type { Router } from "express";
 import { z } from "zod";
-import { createEventSubHandlerRegistry } from "../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
-import type { TwitchEventSubEvent } from "../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
-import { eventSubHeadersSchema } from "../schemas/eventSub.js";
-import { verifyEventSubSignature } from "../../modules/twitch/eventsub/EventSubSignatureVerifier.js";
-import { dispatchEventSubNotification } from "../../modules/twitch/eventsub/EventSubDispatcher.js";
-import { EventSubValidationError } from "../../modules/twitch/eventsub/EventSubValidationError.js";
-import { BadRequestError } from "../errors/BadRequestError.js";
+
 import {
   eventSubRequestsTotal,
   eventSubSignatureFailuresTotal,
   eventSubDuplicateMessagesTotal,
 } from "../../infrastructure/metrics/prometheus.js";
 import type { ReplayStore } from "../../modules/notifications/ports/ReplayStore.js";
+import { dispatchEventSubNotification } from "../../modules/twitch/eventsub/EventSubDispatcher.js";
+import { createEventSubHandlerRegistry } from "../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
+import type { TwitchEventSubEvent } from "../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
+import { verifyEventSubSignature } from "../../modules/twitch/eventsub/EventSubSignatureVerifier.js";
+import { EventSubValidationError } from "../../modules/twitch/eventsub/EventSubValidationError.js";
 import { logger } from "../../shared/logger/logger.js";
+import { BadRequestError } from "../errors/BadRequestError.js";
+import { eventSubHeadersSchema } from "../schemas/eventSub.js";
 
 type CreateEventSubRouterOptions = {
   secret: string;

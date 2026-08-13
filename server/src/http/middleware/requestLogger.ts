@@ -1,5 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+
 import { pinoHttp } from "pino-http";
+
 import { logger } from "../../shared/logger/logger.js";
 
 type RequestWithContext = IncomingMessage & {

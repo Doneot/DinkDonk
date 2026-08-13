@@ -1,12 +1,10 @@
 import { EventSubSyncService } from "../../modules/notifications/application/EventSubSyncService.js";
+import type { NotificationManager } from "../../modules/notifications/application/NotificationManager.js";
 import { StreamNotificationService } from "../../modules/notifications/application/StreamNotificationService.js";
 import { SubscriptionCleanupService } from "../../modules/notifications/application/SubscriptionCleanupService.js";
 import { StreamerLiveStateService } from "../../modules/streamers/application/StreamerLiveStateService.js";
-
-import type { NotificationManager } from "../../modules/notifications/application/NotificationManager.js";
-import type { TwitchProvider } from "../../modules/twitch/application/TwitchProvider.js";
 import type { SocketNotifier } from "../../modules/streamers/application/StreamerLiveStateService.js";
-
+import type { TwitchProvider } from "../../modules/twitch/application/TwitchProvider.js";
 import type { Repositories } from "./repositories.js";
 
 export function createServices(

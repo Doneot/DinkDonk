@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { EventSubValidationError } from "../../../../../modules/twitch/eventsub/EventSubValidationError.js";
 import { dispatchEventSubNotification } from "../../../../../modules/twitch/eventsub/EventSubDispatcher.js";
 import { createEventSubHandlerRegistry } from "../../../../../modules/twitch/eventsub/EventSubHandlerRegistry.js";
-
+import { EventSubValidationError } from "../../../../../modules/twitch/eventsub/EventSubValidationError.js";
 import {
   buildRevocationEvent,
   buildStreamOfflineEvent,

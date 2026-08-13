@@ -1,12 +1,11 @@
-import { FirestoreUserRepository } from "../../modules/users/infrastructure/firestore/FirestoreUserRepository.js";
 import { FirestoreIdentityRepository } from "../../modules/auth/infrastructure/firestore/FirestoreIdentityRepository.js";
-import { FirestoreStreamerRepository } from "../../modules/streamers/infrastructure/firestore/FirestoreStreamerRepository.js";
-import { FirestorePushSubscriptionRepository } from "../../modules/notifications/infrastructure/firestore/FirestorePushSubscriptionRepository.js";
-
-import type { UserRepository } from "../../modules/users/ports/UserRepository.js";
 import type { IdentityRepository } from "../../modules/auth/ports/IdentityRepository.js";
-import type { StreamerRepository } from "../../modules/streamers/ports/StreamerRepository.js";
+import { FirestorePushSubscriptionRepository } from "../../modules/notifications/infrastructure/firestore/FirestorePushSubscriptionRepository.js";
 import type { PushSubscriptionRepository } from "../../modules/notifications/ports/PushSubscriptionRepository.js";
+import { FirestoreStreamerRepository } from "../../modules/streamers/infrastructure/firestore/FirestoreStreamerRepository.js";
+import type { StreamerRepository } from "../../modules/streamers/ports/StreamerRepository.js";
+import { FirestoreUserRepository } from "../../modules/users/infrastructure/firestore/FirestoreUserRepository.js";
+import type { UserRepository } from "../../modules/users/ports/UserRepository.js";
 import { createDomainEventBus } from "../../shared/events/DomainEventBus.js";
 import { logger } from "../../shared/logger/logger.js";
 

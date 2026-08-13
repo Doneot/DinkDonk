@@ -1,4 +1,5 @@
 import type { RequestHandler } from "express";
+
 import { httpRequestDurationSeconds } from "../../infrastructure/metrics/prometheus.js";
 
 // Express types req.route as `any`; narrow it to the one field we read.

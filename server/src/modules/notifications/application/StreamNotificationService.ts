@@ -1,14 +1,14 @@
-import type { TwitchStreamerProvider } from "../../twitch/ports/TwitchGateway.js";
-import type { UserRepository } from "../../users/ports/UserRepository.js";
-import type { User } from "../../users/domain/User.js";
+import { logger } from "../../../shared/logger/logger.js";
 import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
-import type { NotificationManager } from "./NotificationManager.js";
 import type {
   TwitchEventSubStreamOnlineEvent,
   TwitchStreamer,
 } from "../../twitch/domain/Twitch.js";
+import type { TwitchStreamerProvider } from "../../twitch/ports/TwitchGateway.js";
+import type { User } from "../../users/domain/User.js";
+import type { UserRepository } from "../../users/ports/UserRepository.js";
 import { buildStreamerLivePayload } from "../domain/buildStreamerLiveNotification.js";
-import { logger } from "../../../shared/logger/logger.js";
+import type { NotificationManager } from "./NotificationManager.js";
 
 // Bounds how many subscribers are notified concurrently so a very popular
 // streamer going live doesn't fire thousands of simultaneous Firestore reads

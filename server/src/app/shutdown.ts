@@ -1,10 +1,10 @@
-import type { Container } from "./container/index.js";
-import type { Server } from "./server.js";
-import type { IntervalScheduler } from "./IntervalScheduler.js";
 import type { UserChangeBroadcaster } from "../modules/users/application/UserChangeBroadcaster.js";
 import { env } from "../shared/config/env.js";
 import { logger } from "../shared/logger/logger.js";
+import type { Container } from "./container/index.js";
+import type { IntervalScheduler } from "./IntervalScheduler.js";
 import type { Runtime } from "./runtime/Runtime.js";
+import type { Server } from "./server.js";
 
 const SHUTDOWN_STEP_TIMEOUT_MS = 5000;
 

@@ -1,6 +1,7 @@
 import { memo } from "react";
-import SubscriptionRow from "./SubscriptionRow";
+
 import type { EnrichedSubscription } from "../types";
+import SubscriptionRow from "./SubscriptionRow";
 
 interface SubscriptionsListProps {
   subscriptions: EnrichedSubscription[];

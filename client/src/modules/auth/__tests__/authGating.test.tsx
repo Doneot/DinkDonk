@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { describe, it, expect } from "vitest";
+
 import { AuthContext, type AuthContextValue } from "../../../context/authContextValue";
 import ProtectedRoute from "../components/ProtectedRoute";
 import RedirectIfAuthenticated from "../components/RedirectIfAuthenticated";

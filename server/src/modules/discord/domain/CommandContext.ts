@@ -1,11 +1,10 @@
+import type { IdentityRepository } from "../../auth/ports/IdentityRepository.js";
+import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
 import type {
   TwitchStreamerProvider,
   TwitchSubscriptionProvider,
 } from "../../twitch/ports/TwitchGateway.js";
-
 import type { UserRepository } from "../../users/ports/UserRepository.js";
-import type { IdentityRepository } from "../../auth/ports/IdentityRepository.js";
-import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
 
 export type CommandContext = {
   twitch: TwitchStreamerProvider & TwitchSubscriptionProvider;

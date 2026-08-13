@@ -1,11 +1,9 @@
 import { EventEmitter } from "node:events";
 
-import { logger } from "../../../shared/logger/logger.js";
-
-import type { TwitchClient } from "../infrastructure/TwitchClient.js";
-import { TwitchAuthenticator } from "../infrastructure/TwitchAuthenticator.js";
-
 import { eventSubSubscriptionsDeletedTotal } from "../../../infrastructure/metrics/prometheus.js";
+import { logger } from "../../../shared/logger/logger.js";
+import { TwitchAuthenticator } from "../infrastructure/TwitchAuthenticator.js";
+import type { TwitchClient } from "../infrastructure/TwitchClient.js";
 
 export type TwitchProviderOptions = {
   client: TwitchClient;

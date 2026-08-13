@@ -1,12 +1,13 @@
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+
 import { AuthContext, type AuthContextValue } from "../../../context/authContextValue";
 import { SocketContext, type SocketContextValue } from "../../../context/socketContextValue";
-import SubscriptionsManager from "../components/SubscriptionsManager";
-import * as subscriptionsApiModule from "../api";
 import { notifyActionError as notifyActionErrorImport } from "../../../shared/api/errorToast";
 import type { User, TrackedStreamerSummary } from "../../../shared/types/api";
+import * as subscriptionsApiModule from "../api";
+import SubscriptionsManager from "../components/SubscriptionsManager";
 
 vi.mock("../api", () => ({
   searchStreamers: vi.fn(),

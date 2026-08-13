@@ -1,13 +1,13 @@
-import type { User } from "../domain/User.js";
-import type { UserUpdate } from "../domain/UserUpdate.js";
-import type { Subscription } from "../domain/Subscription.js";
+import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
+import type { UpdateNotificationPreferenceResult } from "../domain/NotificationPreferenceResult.js";
 import type {
   SubscribeResult,
   UnsubscribeResult,
   UpdateSubscriptionResult,
 } from "../domain/SubscribeResult.js";
-import type { UpdateNotificationPreferenceResult } from "../domain/NotificationPreferenceResult.js";
-import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
+import type { Subscription } from "../domain/Subscription.js";
+import type { User } from "../domain/User.js";
+import type { UserUpdate } from "../domain/UserUpdate.js";
 
 export interface UserRepository {
   /**

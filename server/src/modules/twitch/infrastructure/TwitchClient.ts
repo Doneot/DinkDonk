@@ -1,14 +1,10 @@
 import axios from "axios";
 import type { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios";
 
+import { keepAliveHttpsAgent } from "../../../infrastructure/http/httpsAgent.js";
 import { env } from "../../../shared/config/env.js";
 import { logger } from "../../../shared/logger/logger.js";
 import { assertDefined } from "../../../shared/utils/assert.js";
-import { keepAliveHttpsAgent } from "../../../infrastructure/http/httpsAgent.js";
-import { normalizeTwitchLogin } from "./normalizeTwitchLogin.js";
-
-import { mapTwitchStreamer } from "./mappers/mapTwitchStreamer.js";
-
 import type {
   TwitchEventSubSubscription,
   TwitchLiveStream,
@@ -18,6 +14,8 @@ import type {
   TwitchStreamerProvider,
   TwitchSubscriptionProvider,
 } from "../ports/TwitchGateway.js";
+import { mapTwitchStreamer } from "./mappers/mapTwitchStreamer.js";
+import { normalizeTwitchLogin } from "./normalizeTwitchLogin.js";
 
 export type TwitchRequestOptions = {
   method?: AxiosRequestConfig["method"];

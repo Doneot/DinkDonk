@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { PushSubscriptionRepository } from "../../../modules/notifications/ports/PushSubscriptionRepository.js";
-import { buildPushSubscription } from "../../builders/pushSubscription.js";
-
-import type { SeededRepositoryFactory } from "./SeededRepository.js";
 import type { PushSubscription } from "../../../modules/notifications/domain/PushSubscription.js";
 import { MAX_PUSH_SUBSCRIPTIONS } from "../../../modules/notifications/domain/PushSubscription.js";
+import type { PushSubscriptionRepository } from "../../../modules/notifications/ports/PushSubscriptionRepository.js";
+import { buildPushSubscription } from "../../builders/pushSubscription.js";
+import type { SeededRepositoryFactory } from "./SeededRepository.js";
 
 export function pushSubscriptionRepositoryBehavior(
   name: string,

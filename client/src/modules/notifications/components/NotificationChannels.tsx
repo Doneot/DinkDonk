@@ -1,12 +1,13 @@
 import { useCallback } from "react";
-import ChannelCell from "./ChannelCell";
-import ConnectDiscordButton from "./ConnectDiscordButton";
-import DiscordInviteButton from "./DiscordInviteButton";
-import CheckDMButton from "./CheckDMButton";
+
+import { useAuth } from "../../../context/authContextValue";
+import { useAuthProviders } from "../../auth/hooks/useAuthProviders";
 import { checkCanReceiveDM } from "../api";
 import { useNotificationChannels } from "../hooks/useNotificationChannels";
-import { useAuthProviders } from "../../auth/hooks/useAuthProviders";
-import { useAuth } from "../../../context/authContextValue";
+import ChannelCell from "./ChannelCell";
+import CheckDMButton from "./CheckDMButton";
+import ConnectDiscordButton from "./ConnectDiscordButton";
+import DiscordInviteButton from "./DiscordInviteButton";
 
 // Renders as a pair of cells (no wrapper of its own) so Dashboard can lay
 // them out as part of the same instrument-strip grid as StatusCard/

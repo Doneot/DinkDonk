@@ -5,11 +5,10 @@ import {
   unsubscribeResponseSchema,
   updateSubscriptionResponseSchema,
 } from "../../../http/schemas/responses.js";
-
+import { register } from "../../../infrastructure/metrics/prometheus.js";
+import type { TestState } from "../../fixtures/seedState.js";
 import { createTestApp } from "../../helpers/createTestApp.js";
 import { TestClient } from "../../helpers/TestClient.js";
-import type { TestState } from "../../fixtures/seedState.js";
-import { register } from "../../../infrastructure/metrics/prometheus.js";
 
 async function createClient(state?: TestState) {
   const ctx = await createTestApp(state ? { state } : {});

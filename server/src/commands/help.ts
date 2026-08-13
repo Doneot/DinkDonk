@@ -1,5 +1,6 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder } from "discord.js";
+
 import { replyEphemeral } from "./shared/commandReplies.js";
 
 export const data = new SlashCommandBuilder()

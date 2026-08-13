@@ -1,11 +1,10 @@
-import type { TwitchSubscriptionProvider } from "../../twitch/ports/TwitchGateway.js";
-import type { TwitchEventSubSubscription } from "../../twitch/domain/Twitch.js";
-import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
-import { TRACKED_EVENT_TYPES } from "./EventSubSyncService.js";
-import type { EventSubSyncService } from "./EventSubSyncService.js";
-
 import { eventSubSubscriptionsDeletedTotal } from "../../../infrastructure/metrics/prometheus.js";
 import { logger } from "../../../shared/logger/logger.js";
+import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
+import type { TwitchEventSubSubscription } from "../../twitch/domain/Twitch.js";
+import type { TwitchSubscriptionProvider } from "../../twitch/ports/TwitchGateway.js";
+import { TRACKED_EVENT_TYPES } from "./EventSubSyncService.js";
+import type { EventSubSyncService } from "./EventSubSyncService.js";
 
 type TrackedEventType = (typeof TRACKED_EVENT_TYPES)[number];
 

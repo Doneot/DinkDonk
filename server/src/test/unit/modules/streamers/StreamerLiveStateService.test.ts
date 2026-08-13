@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { StreamerLiveStateService } from "../../../../modules/streamers/application/StreamerLiveStateService.js";
-import { InMemoryStreamerRepository } from "../../../repositories/inMemory/InMemoryStreamerRepository.js";
-import { buildStreamer } from "../../../builders/streamer.js";
 import type {
   TwitchEventSubStreamOfflineEvent,
   TwitchEventSubStreamOnlineEvent,
 } from "../../../../modules/twitch/domain/Twitch.js";
+import { buildStreamer } from "../../../builders/streamer.js";
+import { InMemoryStreamerRepository } from "../../../repositories/inMemory/InMemoryStreamerRepository.js";
 
 function setup() {
   const streamers = new InMemoryStreamerRepository();

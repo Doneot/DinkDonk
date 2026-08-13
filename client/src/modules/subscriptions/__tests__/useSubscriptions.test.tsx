@@ -1,12 +1,13 @@
-import { useState, type ReactNode } from "react";
-import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import axios from "axios";
+import { useState, type ReactNode } from "react";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
+
 import { AuthContext, type AuthContextValue } from "../../../context/authContextValue";
 import { SocketContext, type SocketContextValue, type LiveState } from "../../../context/socketContextValue";
-import { useSubscriptions } from "../hooks/useSubscriptions";
-import * as subscriptionsApiModule from "../api";
 import type { User } from "../../../shared/types/api";
+import * as subscriptionsApiModule from "../api";
+import { useSubscriptions } from "../hooks/useSubscriptions";
 
 vi.mock("../api", () => ({
   fetchStreamerProfiles: vi.fn(),

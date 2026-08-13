@@ -1,7 +1,6 @@
 import type { SocketServer } from "../../../realtime/socketServer.js";
-import type { UserRepository } from "../ports/UserRepository.js";
-
 import { logger } from "../../../shared/logger/logger.js";
+import type { UserRepository } from "../ports/UserRepository.js";
 
 // A fatal onSnapshot error (auth expiry, network blip) terminates the
 // underlying listener stream permanently - retry after a short, fixed delay

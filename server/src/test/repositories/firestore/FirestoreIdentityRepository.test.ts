@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { FirestoreIdentityRepository } from "../../../modules/auth/infrastructure/firestore/FirestoreIdentityRepository.js";
 import type { Identity } from "../../../modules/auth/domain/Identity.js";
-
-import { identityRepositoryBehavior } from "../contracts/IdentityRepository.behavior.js";
+import { FirestoreIdentityRepository } from "../../../modules/auth/infrastructure/firestore/FirestoreIdentityRepository.js";
 import { buildDiscordCredential } from "../../builders/auth.js";
 import { FakeFirestore } from "../../helpers/fakeFirestore.js";
+import { identityRepositoryBehavior } from "../contracts/IdentityRepository.behavior.js";
 
 identityRepositoryBehavior("FirestoreIdentityRepository", () => {
   const firestore = new FakeFirestore();

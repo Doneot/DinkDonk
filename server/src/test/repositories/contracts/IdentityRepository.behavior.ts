@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { IdentityRepository } from "../../../modules/auth/ports/IdentityRepository.js";
 import type { Identity } from "../../../modules/auth/domain/Identity.js";
 import { IdentityNotFoundError } from "../../../modules/auth/domain/IdentityNotFoundError.js";
+import type { IdentityRepository } from "../../../modules/auth/ports/IdentityRepository.js";
 import {
   buildDiscordCredential,
   buildGoogleCredential,

@@ -1,5 +1,5 @@
-import type { Streamer } from "../domain/Streamer.js";
 import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
+import type { Streamer } from "../domain/Streamer.js";
 
 export interface StreamerRepository {
   /** Emits "streamerAdded" when a new streamer is created. */

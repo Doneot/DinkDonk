@@ -1,13 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { UserRepository } from "../../../modules/users/ports/UserRepository.js";
-
-import { buildUser } from "../../builders/user.js";
-import { buildSubscription } from "../../builders/subscription.js";
-import type { SeededRepositoryFactory } from "./SeededRepository.js";
-import type { User } from "../../../modules/users/domain/User.js";
 import { MAX_SUBSCRIPTIONS } from "../../../modules/users/domain/Subscription.js";
 import type { Subscription } from "../../../modules/users/domain/Subscription.js";
+import type { User } from "../../../modules/users/domain/User.js";
+import type { UserRepository } from "../../../modules/users/ports/UserRepository.js";
+import { buildSubscription } from "../../builders/subscription.js";
+import { buildUser } from "../../builders/user.js";
+import type { SeededRepositoryFactory } from "./SeededRepository.js";
 
 export function userRepositoryBehavior(
   name: string,

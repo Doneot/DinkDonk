@@ -1,8 +1,8 @@
-import type { StreamerRepository } from "../ports/StreamerRepository.js";
 import type {
   TwitchEventSubStreamOfflineEvent,
   TwitchEventSubStreamOnlineEvent,
 } from "../../twitch/domain/Twitch.js";
+import type { StreamerRepository } from "../ports/StreamerRepository.js";
 
 // A plain function rather than a socketServer/SocketServer dependency: this
 // service is constructed inside app/container (before the HTTP/Socket.IO

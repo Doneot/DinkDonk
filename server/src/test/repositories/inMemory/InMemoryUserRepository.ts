@@ -1,20 +1,19 @@
-import type { UserRepository } from "../../../modules/users/ports/UserRepository.js";
-import type { User } from "../../../modules/users/domain/User.js";
-import type { UserUpdate } from "../../../modules/users/domain/UserUpdate.js";
-import type { Subscription } from "../../../modules/users/domain/Subscription.js";
-import { MAX_SUBSCRIPTIONS } from "../../../modules/users/domain/Subscription.js";
+import type { UpdateNotificationPreferenceResult } from "../../../modules/users/domain/NotificationPreferenceResult.js";
 import type {
   SubscribeResult,
   UnsubscribeResult,
   UpdateSubscriptionResult,
 } from "../../../modules/users/domain/SubscribeResult.js";
-import type { UpdateNotificationPreferenceResult } from "../../../modules/users/domain/NotificationPreferenceResult.js";
+import type { Subscription } from "../../../modules/users/domain/Subscription.js";
+import { MAX_SUBSCRIPTIONS } from "../../../modules/users/domain/Subscription.js";
+import type { User } from "../../../modules/users/domain/User.js";
+import type { UserUpdate } from "../../../modules/users/domain/UserUpdate.js";
+import { UserUpdateSchema } from "../../../modules/users/infrastructure/firestore/records/UserRecord.js";
+import type { UserRepository } from "../../../modules/users/ports/UserRepository.js";
+import { SubscriptionSchema } from "../../../modules/users/schemas/SubscriptionSchema.js";
 import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
-import { SubscriptionSchema } from "../../../modules/users/schemas/SubscriptionSchema.js";
-import { UserUpdateSchema } from "../../../modules/users/infrastructure/firestore/records/UserRecord.js";
-
 import { isNonEmptyString } from "../../../shared/utils/validators.js";
 import { InMemorySubscriberStore } from "./InMemorySubscriberStore.js";
 

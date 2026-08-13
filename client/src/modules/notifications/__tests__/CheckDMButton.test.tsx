@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
-import CheckDMButton from "../components/CheckDMButton";
+import { describe, it, expect, vi, afterEach } from "vitest";
+
 import { notifyActionError as notifyActionErrorImport } from "../../../shared/api/errorToast";
+import CheckDMButton from "../components/CheckDMButton";
 
 vi.mock("../../../shared/api/errorToast", () => ({
   notifyActionError: vi.fn(),

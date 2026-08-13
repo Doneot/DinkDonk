@@ -1,11 +1,11 @@
 import { EventEmitter } from "node:events";
+
 import { describe, expect, it, vi } from "vitest";
 
-import type { Container } from "../../../app/container/index.js";
 import { configureEventSubscriptions } from "../../../app/configureEventSubscriptions.js";
+import type { Container } from "../../../app/container/index.js";
 import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
-
 import { InMemoryStreamerRepository } from "../../repositories/inMemory/InMemoryStreamerRepository.js";
 import { InMemoryUserRepository } from "../../repositories/inMemory/InMemoryUserRepository.js";
 

@@ -1,12 +1,12 @@
 import express from "express";
 import type { Router } from "express";
 
+import { logger } from "../../shared/logger/logger.js";
+import { validateBody, validatedBody } from "../middleware/validate.js";
 import {
   clientErrorReportSchema,
   type ClientErrorReport,
 } from "../schemas/clientErrors.js";
-import { validateBody, validatedBody } from "../middleware/validate.js";
-import { logger } from "../../shared/logger/logger.js";
 
 /**
  * Closes the frontend's error-visibility gap: `ErrorBoundary` and a couple

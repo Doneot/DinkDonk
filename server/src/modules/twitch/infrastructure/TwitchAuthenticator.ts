@@ -1,9 +1,9 @@
 import axios from "axios";
 import type { AxiosInstance } from "axios";
 
+import { keepAliveHttpsAgent } from "../../../infrastructure/http/httpsAgent.js";
 import { env } from "../../../shared/config/env.js";
 import { assertDefined } from "../../../shared/utils/assert.js";
-import { keepAliveHttpsAgent } from "../../../infrastructure/http/httpsAgent.js";
 
 export type TwitchAuthenticatorOptions = {
   http?: AxiosInstance;

@@ -7,8 +7,9 @@ import {
 } from "firebase-admin/app";
 import type { Firestore } from "firebase-admin/firestore";
 import { getFirestore } from "firebase-admin/firestore";
-import { env } from "./env.js";
+
 import { assertDefined } from "../utils/assert.js";
+import { env } from "./env.js";
 
 export function createFirestore(): Firestore {
   if (!getApps().length) {

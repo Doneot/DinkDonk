@@ -1,5 +1,4 @@
 import type { PushSubscription } from "../../modules/notifications/domain/PushSubscription.js";
-
 import { TEST_USER_ID } from "../constants.js";
 
 export function buildPushSubscription(

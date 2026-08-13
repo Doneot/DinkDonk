@@ -1,10 +1,10 @@
-import StatusCard from "../modules/dashboard/components/StatusCard";
-import BotUsersCard from "../modules/dashboard/components/BotUsersCard";
-import SubscriptionsManager from "../modules/subscriptions/components/SubscriptionsManager";
-import NotificationChannels from "../modules/notifications/components/NotificationChannels";
-import ErrorBoundary from "../shared/components/ErrorBoundary";
-import CardErrorFallback from "../shared/components/CardErrorFallback";
 import { useAuth } from "../context/authContextValue";
+import BotUsersCard from "../modules/dashboard/components/BotUsersCard";
+import StatusCard from "../modules/dashboard/components/StatusCard";
+import NotificationChannels from "../modules/notifications/components/NotificationChannels";
+import SubscriptionsManager from "../modules/subscriptions/components/SubscriptionsManager";
+import CardErrorFallback from "../shared/components/CardErrorFallback";
+import ErrorBoundary from "../shared/components/ErrorBoundary";
 
 const Dashboard = () => {
   const { user } = useAuth();

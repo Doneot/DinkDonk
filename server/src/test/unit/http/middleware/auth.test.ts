@@ -1,24 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Redis } from "ioredis";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { UnauthorizedError } from "../../../../http/errors/UnauthorizedError.js";
 import type {
   Identity,
   Provider,
   SessionUser,
 } from "../../../../modules/auth/domain/Identity.js";
-import { UnauthorizedError } from "../../../../http/errors/UnauthorizedError.js";
 import { env } from "../../../../shared/config/env.js";
 import { logger } from "../../../../shared/logger/logger.js";
-
 import { buildIdentity, buildSessionUser } from "../../../builders/auth.js";
-import { InMemoryIdentityRepository } from "../../../repositories/inMemory/InMemoryIdentityRepository.js";
 import {
   createMockRequest,
   createMockResponse,
   createNext,
 } from "../../../helpers/express.js";
-
 import { stringContaining } from "../../../helpers/matchers.js";
+import { InMemoryIdentityRepository } from "../../../repositories/inMemory/InMemoryIdentityRepository.js";
 
 type RefreshCallback = (
   error: Error | { statusCode: number; data?: unknown } | null,

@@ -1,10 +1,11 @@
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
   faDiscord,
   faGoogle,
   faTwitch,
 } from "@fortawesome/free-brands-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
 import { useAuthProviders } from "../modules/auth/hooks/useAuthProviders";
 import type { Provider } from "../shared/types/api";
 

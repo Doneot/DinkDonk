@@ -1,7 +1,8 @@
 import { useId, useRef, useState, type KeyboardEvent } from "react";
+
 import { useClickOutside } from "../../../shared/hooks/useClickOutside";
-import { useStreamerSearch } from "../hooks/useStreamerSearch";
 import type { StreamerSummary } from "../../../shared/types/api";
+import { useStreamerSearch } from "../hooks/useStreamerSearch";
 
 interface StreamerSearchProps {
   subscribedIds: string[];

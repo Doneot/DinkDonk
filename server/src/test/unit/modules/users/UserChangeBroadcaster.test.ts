@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { UserChangeBroadcaster } from "../../../../modules/users/application/UserChangeBroadcaster.js";
-import type { UserRepository } from "../../../../modules/users/ports/UserRepository.js";
 import type { User } from "../../../../modules/users/domain/User.js";
+import type { UserRepository } from "../../../../modules/users/ports/UserRepository.js";
 import type { SocketServer } from "../../../../realtime/socketServer.js";
 import { logger } from "../../../../shared/logger/logger.js";
 

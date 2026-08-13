@@ -1,11 +1,10 @@
-import type { PushSubscriptionRepository } from "../../../modules/notifications/ports/PushSubscriptionRepository.js";
 import type { PushSubscription } from "../../../modules/notifications/domain/PushSubscription.js";
 import { MAX_PUSH_SUBSCRIPTIONS } from "../../../modules/notifications/domain/PushSubscription.js";
+import type { PushSubscriptionRepository } from "../../../modules/notifications/ports/PushSubscriptionRepository.js";
 import type {
   SavePushSubscribeResult,
   DeletePushSubscribeResult,
 } from "../../../modules/notifications/types/PushSubscribeResult.js";
-
 import { isNonEmptyString } from "../../../shared/utils/validators.js";
 
 export class InMemoryPushSubscriptionRepository implements PushSubscriptionRepository {

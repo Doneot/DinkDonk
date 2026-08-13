@@ -1,13 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { errorHandler } from "../../../../http/middleware/errorHandler.js";
 import { BadRequestError } from "../../../../http/errors/BadRequestError.js";
 import { NotFoundError } from "../../../../http/errors/NotFoundError.js";
 import { UnauthorizedError } from "../../../../http/errors/UnauthorizedError.js";
+import { errorHandler } from "../../../../http/middleware/errorHandler.js";
 import { env } from "../../../../shared/config/env.js";
 import { logger } from "../../../../shared/logger/logger.js";
 import { TokenDecryptionError } from "../../../../shared/utils/crypto.js";
-
 import {
   createMockRequest,
   createMockResponse,

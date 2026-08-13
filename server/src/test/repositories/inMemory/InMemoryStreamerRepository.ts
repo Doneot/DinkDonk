@@ -1,9 +1,8 @@
-import type { StreamerRepository } from "../../../modules/streamers/ports/StreamerRepository.js";
 import type { Streamer } from "../../../modules/streamers/domain/Streamer.js";
+import type { StreamerRepository } from "../../../modules/streamers/ports/StreamerRepository.js";
 import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { createDomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import { logger } from "../../../shared/logger/logger.js";
-
 import { isNonEmptyString } from "../../../shared/utils/validators.js";
 import { InMemorySubscriberStore } from "./InMemorySubscriberStore.js";
 

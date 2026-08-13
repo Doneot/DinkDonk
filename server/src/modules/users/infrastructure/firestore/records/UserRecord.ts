@@ -1,8 +1,8 @@
-import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
+import { z } from "zod";
 
-import { SubscriptionSchema } from "../../../schemas/SubscriptionSchema.js";
 import { MAX_SUBSCRIPTIONS } from "../../../domain/Subscription.js";
+import { SubscriptionSchema } from "../../../schemas/SubscriptionSchema.js";
 
 extendZodWithOpenApi(z);
 

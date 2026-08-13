@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
+import { describe, expect, it, vi } from "vitest";
 
 import { execute } from "../../../../../commands/get-subscriptions.js";
 import type { CommandContext } from "../../../../../modules/discord/domain/CommandContext.js";

@@ -1,7 +1,7 @@
 import { useAuth } from "../../context/authContextValue";
 import { useSocket } from "../../context/socketContextValue";
-import HomeButton from "./HomeButton";
 import UserMenu from "../../modules/auth/components/UserMenu";
+import HomeButton from "./HomeButton";
 
 const Navbar = () => {
   const { user } = useAuth();

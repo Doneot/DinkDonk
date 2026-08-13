@@ -3,9 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { FirestoreSessionRepository } from "../../../modules/auth/infrastructure/firestore/FirestoreSessionRepository.js";
 import { logger } from "../../../shared/logger/logger.js";
-
 import { FakeDocumentReference, FakeFirestore } from "../../helpers/fakeFirestore.js";
-
 import { anyNumber } from "../../helpers/matchers.js";
 
 const SESSION: SessionData = {

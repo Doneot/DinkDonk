@@ -1,9 +1,9 @@
-import type { Redis } from "ioredis";
 import type {
   Store,
   IncrementResponse,
   Options as RateLimitOptions,
 } from "express-rate-limit";
+import type { Redis } from "ioredis";
 
 // Atomic fixed-window counter: increments the key, and sets its expiry only
 // on the very first hit of the window. Setting the expiry unconditionally on

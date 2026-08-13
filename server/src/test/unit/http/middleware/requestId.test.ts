@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { requestId } from "../../../../http/middleware/requestId.js";
-
 import {
   createMockRequest,
   createMockResponse,

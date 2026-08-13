@@ -1,11 +1,11 @@
 import express from "express";
 import session from "express-session";
+import type { Profile, StrategyOptionsWithRequest } from "passport-discord";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Profile, StrategyOptionsWithRequest } from "passport-discord";
 
-import type { DiscordService } from "../../../modules/discord/ports/DiscordService.js";
 import { userResponseSchema } from "../../../http/schemas/responses.js";
+import type { DiscordService } from "../../../modules/discord/ports/DiscordService.js";
 import { InMemoryUserRepository } from "../../repositories/inMemory/InMemoryUserRepository.js";
 
 type VerifyDone = (error: unknown, user?: unknown) => void;

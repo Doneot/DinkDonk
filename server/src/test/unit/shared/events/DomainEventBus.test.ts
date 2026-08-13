@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import type { Logger } from "pino";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createDomainEventBus,

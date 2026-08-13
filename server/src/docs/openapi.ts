@@ -3,25 +3,10 @@ import {
   OpenApiGeneratorV3,
   extendZodWithOpenApi,
 } from "@asteasolutions/zod-to-openapi";
-
 import { z } from "zod";
 
 import { SESSION_COOKIE_NAME } from "../http/configureMiddleware.js";
-
-import { PushSubscriptionSchema } from "../modules/notifications/schemas/PushSubscriptionSchema.js";
-import { SubscriptionSchema } from "../modules/users/schemas/SubscriptionSchema.js";
-import { StreamerSchema } from "../modules/streamers/schemas/StreamerSchema.js";
-import { UserRecordSchema } from "../modules/users/infrastructure/firestore/records/UserRecord.js";
-
 import { savePushSubscriptionSchema } from "../http/schemas/notifications.js";
-import {
-  searchStreamersQuerySchema,
-  batchStreamerInfoSchema,
-} from "../http/schemas/streamers.js";
-import {
-  subscribeSchema,
-  setMessageSchema,
-} from "../http/schemas/subscriptions.js";
 import {
   canReceiveDmResponseSchema,
   deletePushResponseSchema,
@@ -37,7 +22,18 @@ import {
   userCountResponseSchema,
   userResponseSchema,
 } from "../http/schemas/responses.js";
-
+import {
+  searchStreamersQuerySchema,
+  batchStreamerInfoSchema,
+} from "../http/schemas/streamers.js";
+import {
+  subscribeSchema,
+  setMessageSchema,
+} from "../http/schemas/subscriptions.js";
+import { PushSubscriptionSchema } from "../modules/notifications/schemas/PushSubscriptionSchema.js";
+import { StreamerSchema } from "../modules/streamers/schemas/StreamerSchema.js";
+import { UserRecordSchema } from "../modules/users/infrastructure/firestore/records/UserRecord.js";
+import { SubscriptionSchema } from "../modules/users/schemas/SubscriptionSchema.js";
 import { registerPaths } from "./registerPaths.js";
 
 extendZodWithOpenApi(z);

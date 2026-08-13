@@ -1,5 +1,5 @@
-import type { Notification } from "./Notification.js";
 import type { TwitchStreamer } from "../../twitch/domain/Twitch.js";
+import type { Notification } from "./Notification.js";
 
 type BuildStreamerLivePayloadOptions = {
   streamer: TwitchStreamer;

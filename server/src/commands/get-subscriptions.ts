@@ -8,6 +8,7 @@ import {
   InteractionContextType,
   MessageFlags,
 } from "discord.js";
+
 import type { CommandContext } from "../modules/discord/domain/CommandContext.js";
 
 export const data = new SlashCommandBuilder()

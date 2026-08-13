@@ -1,13 +1,13 @@
 import express from "express";
 import session from "express-session";
+import type { StrategyOptions } from "passport-oauth2";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StrategyOptions } from "passport-oauth2";
 
-import type { DiscordService } from "../../../modules/discord/ports/DiscordService.js";
 import { userResponseSchema } from "../../../http/schemas/responses.js";
-import { InMemoryUserRepository } from "../../repositories/inMemory/InMemoryUserRepository.js";
 import type { TwitchProfile } from "../../../http/strategies/TwitchOAuth2Strategy.js";
+import type { DiscordService } from "../../../modules/discord/ports/DiscordService.js";
+import { InMemoryUserRepository } from "../../repositories/inMemory/InMemoryUserRepository.js";
 
 type VerifyDone = (error: unknown, user?: unknown) => void;
 type Verify = (

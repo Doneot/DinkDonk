@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import axios, { type InternalAxiosRequestConfig } from "axios";
 import { toast } from "react-toastify";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import api from "../client";
 
 vi.mock("react-toastify", () => ({

@@ -1,10 +1,11 @@
+import { renderHook, waitFor, act } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import { renderHook, waitFor, act } from "@testing-library/react";
+
 import { AuthContext, type AuthContextValue } from "../../../context/authContextValue";
-import { useNotificationChannels } from "../hooks/useNotificationChannels";
-import * as notificationsApiModule from "../api";
 import type { User } from "../../../shared/types/api";
+import * as notificationsApiModule from "../api";
+import { useNotificationChannels } from "../hooks/useNotificationChannels";
 
 vi.mock("../api", () => ({
   fetchNotificationChannels: vi.fn(),

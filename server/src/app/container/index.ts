@@ -1,21 +1,18 @@
-import { createFirestore } from "../../shared/config/firebase.js";
 import { createRedisClient } from "../../infrastructure/redis/redisClient.js";
-
-import { createRepositories, type Repositories } from "./repositories.js";
-import { createProviders } from "./providers.js";
-import { createNotificationManager } from "./notifications.js";
-import { createServices } from "./services.js";
-
 import type { Redis } from "../../infrastructure/redis/redisClient.js";
-import type { TwitchProvider } from "../../modules/twitch/application/TwitchProvider.js";
 import type { DiscordBot } from "../../modules/discord/infrastructure/DiscordBot.js";
-import type { NotificationManager } from "../../modules/notifications/application/NotificationManager.js";
 import type { EventSubSyncService } from "../../modules/notifications/application/EventSubSyncService.js";
+import type { NotificationManager } from "../../modules/notifications/application/NotificationManager.js";
 import type { StreamNotificationService } from "../../modules/notifications/application/StreamNotificationService.js";
 import type { SubscriptionCleanupService } from "../../modules/notifications/application/SubscriptionCleanupService.js";
-import type { StreamerLiveStateService } from "../../modules/streamers/application/StreamerLiveStateService.js";
-import type { SocketNotifier } from "../../modules/streamers/application/StreamerLiveStateService.js";
+import type { StreamerLiveStateService, SocketNotifier } from "../../modules/streamers/application/StreamerLiveStateService.js";
+import type { TwitchProvider } from "../../modules/twitch/application/TwitchProvider.js";
+import { createFirestore } from "../../shared/config/firebase.js";
 import type { Runtime } from "../runtime/Runtime.js";
+import { createNotificationManager } from "./notifications.js";
+import { createProviders } from "./providers.js";
+import { createRepositories, type Repositories } from "./repositories.js";
+import { createServices } from "./services.js";
 
 export interface Container {
   firestore: FirebaseFirestore.Firestore;

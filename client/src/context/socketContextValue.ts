@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { Socket } from "socket.io-client";
+
 import type { ServerToClientEvents, ClientToServerEvents } from "../shared/socket";
 
 export interface LiveState {

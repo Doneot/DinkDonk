@@ -5,7 +5,6 @@ import { createServer } from "../../../app/server.js";
 import type { DiscordBot } from "../../../modules/discord/infrastructure/DiscordBot.js";
 import type { StreamNotificationService } from "../../../modules/notifications/application/StreamNotificationService.js";
 import type { TwitchProvider } from "../../../modules/twitch/application/TwitchProvider.js";
-
 import { createTestContainer } from "../../helpers/createTestContainer.js";
 import { FakeFirestore } from "../../helpers/fakeFirestore.js";
 

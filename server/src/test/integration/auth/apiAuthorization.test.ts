@@ -1,13 +1,11 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { errorResponseSchema } from "../../../http/schemas/responses.js";
 import { createApiRouter } from "../../../http/routes/apiRoutes.js";
+import { errorResponseSchema } from "../../../http/schemas/responses.js";
 import { StreamerLiveStateService } from "../../../modules/streamers/application/StreamerLiveStateService.js";
-
-import { createTestApp } from "../../helpers/createTestApp.js";
+import { createTestApp, TEST_WEB_PUSH_PUBLIC_KEY } from "../../helpers/createTestApp.js";
 import { createTestContainer } from "../../helpers/createTestContainer.js";
-import { TEST_WEB_PUSH_PUBLIC_KEY } from "../../helpers/createTestApp.js";
 
 type RouterStack = {
   stack: Array<{

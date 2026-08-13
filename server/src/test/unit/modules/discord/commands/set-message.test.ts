@@ -1,10 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
 import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
+import { describe, expect, it, vi } from "vitest";
 
 import { execute } from "../../../../../commands/set-message.js";
 import type { CommandContext } from "../../../../../modules/discord/domain/CommandContext.js";
-import { buildUser } from "../../../../builders/user.js";
 import { buildIdentity } from "../../../../builders/auth.js";
+import { buildUser } from "../../../../builders/user.js";
 import { TEST_USER_ID } from "../../../../constants.js";
 
 function createInteraction(options: Record<string, string | null> = {}) {

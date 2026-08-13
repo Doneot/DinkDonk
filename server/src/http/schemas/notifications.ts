@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
+import { z } from "zod";
 
 import { PushSubscriptionSchema } from "../../modules/notifications/schemas/PushSubscriptionSchema.js";
 import { logger } from "../../shared/logger/logger.js";

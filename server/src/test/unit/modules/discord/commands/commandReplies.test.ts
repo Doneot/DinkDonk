@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import { MessageFlags, type ChatInputCommandInteraction } from "discord.js";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   describeReason,
@@ -7,11 +7,11 @@ import {
   requireDMCapableUser,
   resolveStreamerOrReply,
 } from "../../../../../commands/shared/commandReplies.js";
-import type { UserRepository } from "../../../../../modules/users/ports/UserRepository.js";
 import type { IdentityRepository } from "../../../../../modules/auth/ports/IdentityRepository.js";
 import type { TwitchStreamerProvider } from "../../../../../modules/twitch/ports/TwitchGateway.js";
-import { buildUser } from "../../../../builders/user.js";
+import type { UserRepository } from "../../../../../modules/users/ports/UserRepository.js";
 import { buildIdentity } from "../../../../builders/auth.js";
+import { buildUser } from "../../../../builders/user.js";
 import { TEST_USER_ID } from "../../../../constants.js";
 
 function buildContext(

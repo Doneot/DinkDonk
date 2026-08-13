@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { Streamer } from "../../../modules/streamers/domain/Streamer.js";
 import type { StreamerRepository } from "../../../modules/streamers/ports/StreamerRepository.js";
 import { buildStreamer } from "../../builders/streamer.js";
-import type { Streamer } from "../../../modules/streamers/domain/Streamer.js";
-
 import type { SeededRepositoryFactory } from "./SeededRepository.js";
 
 export function streamerRepositoryBehavior(

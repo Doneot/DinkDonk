@@ -1,5 +1,4 @@
 import { logger } from "../shared/logger/logger.js";
-
 import type { Container } from "./container/index.js";
 
 export function configureEventSubscriptions({

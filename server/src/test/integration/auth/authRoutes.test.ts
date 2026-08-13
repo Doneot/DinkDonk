@@ -2,13 +2,11 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { errorResponseSchema } from "../../../http/schemas/responses.js";
-import { userResponseSchema } from "../../../http/schemas/responses.js";
+import { errorResponseSchema, userResponseSchema } from "../../../http/schemas/responses.js";
 import { env } from "../../../shared/config/env.js";
 import { logger } from "../../../shared/logger/logger.js";
-
-import { buildUser } from "../../builders/user.js";
 import { buildIdentity } from "../../builders/auth.js";
+import { buildUser } from "../../builders/user.js";
 
 const DISCORD_AUTHORIZE_URL = "https://discord.com/oauth2/authorize";
 

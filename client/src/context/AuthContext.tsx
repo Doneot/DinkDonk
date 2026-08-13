@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+
 import api from "../shared/api/client";
-import { AuthContext } from "./authContextValue";
 import type { User } from "../shared/types/api";
+import { AuthContext } from "./authContextValue";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

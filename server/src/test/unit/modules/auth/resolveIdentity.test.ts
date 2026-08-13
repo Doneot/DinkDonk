@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { resolveIdentity } from "../../../../modules/auth/application/resolveIdentity.js";
 import type { IdentityRepository } from "../../../../modules/auth/ports/IdentityRepository.js";
-import { TokenDecryptionError } from "../../../../shared/utils/crypto.js";
 import { logger } from "../../../../shared/logger/logger.js";
+import { TokenDecryptionError } from "../../../../shared/utils/crypto.js";
 import { buildIdentity } from "../../../builders/auth.js";
 
 function setup() {

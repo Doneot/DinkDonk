@@ -4,13 +4,13 @@ import type {
   DocumentData,
 } from "firebase-admin/firestore";
 
-import type { StreamerRepository } from "../../ports/StreamerRepository.js";
-import type { Streamer } from "../../domain/Streamer.js";
 import type { DomainEventBus } from "../../../../shared/events/DomainEventBus.js";
-import { StreamerSchema } from "../../schemas/StreamerSchema.js";
-import { isNonEmptyString } from "../../../../shared/utils/validators.js";
-import { getExistingDoc } from "../../../../shared/utils/firestore.js";
 import { logger } from "../../../../shared/logger/logger.js";
+import { getExistingDoc } from "../../../../shared/utils/firestore.js";
+import { isNonEmptyString } from "../../../../shared/utils/validators.js";
+import type { Streamer } from "../../domain/Streamer.js";
+import type { StreamerRepository } from "../../ports/StreamerRepository.js";
+import { StreamerSchema } from "../../schemas/StreamerSchema.js";
 
 export class FirestoreStreamerRepository implements StreamerRepository {
   // Mirrors FirestoreUserRepository.GET_ALL_CHUNK_SIZE: Firestore#getAll has

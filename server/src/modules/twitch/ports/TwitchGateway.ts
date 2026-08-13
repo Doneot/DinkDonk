@@ -1,5 +1,4 @@
-import type { TwitchStreamer, TwitchLiveStream } from "../domain/Twitch.js";
-import type { TwitchEventSubSubscription } from "../domain/Twitch.js";
+import type { TwitchStreamer, TwitchLiveStream, TwitchEventSubSubscription } from "../domain/Twitch.js";
 
 export interface TwitchStreamerProvider {
   getStreamer(login: string): Promise<TwitchStreamer | null>;

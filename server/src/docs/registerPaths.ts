@@ -10,14 +10,6 @@ import {
   setChannelPreferenceSchema,
 } from "../http/schemas/notifications.js";
 import {
-  searchStreamersQuerySchema,
-  batchStreamerInfoSchema,
-} from "../http/schemas/streamers.js";
-import {
-  subscribeSchema,
-  setMessageSchema,
-} from "../http/schemas/subscriptions.js";
-import {
   canReceiveDmResponseSchema,
   deletePushResponseSchema,
   errorResponseSchema,
@@ -35,6 +27,14 @@ import {
   userCountResponseSchema,
   userResponseSchema,
 } from "../http/schemas/responses.js";
+import {
+  searchStreamersQuerySchema,
+  batchStreamerInfoSchema,
+} from "../http/schemas/streamers.js";
+import {
+  subscribeSchema,
+  setMessageSchema,
+} from "../http/schemas/subscriptions.js";
 
 const emptyResponse = {
   description: "No content",

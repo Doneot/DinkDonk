@@ -4,25 +4,24 @@ import type {
   DocumentData,
 } from "firebase-admin/firestore";
 
-import type { UserRepository } from "../../ports/UserRepository.js";
-import type { User } from "../../domain/User.js";
-import type { UserUpdate } from "../../domain/UserUpdate.js";
-import type { Subscription } from "../../domain/Subscription.js";
-import { MAX_SUBSCRIPTIONS } from "../../domain/Subscription.js";
+import type { DomainEventBus } from "../../../../shared/events/DomainEventBus.js";
+import { logger } from "../../../../shared/logger/logger.js";
+import { getExistingDoc } from "../../../../shared/utils/firestore.js";
+import { isNonEmptyString } from "../../../../shared/utils/validators.js";
+import type { UpdateNotificationPreferenceResult } from "../../domain/NotificationPreferenceResult.js";
 import type {
   SubscribeResult,
   UnsubscribeResult,
   UpdateSubscriptionResult,
 } from "../../domain/SubscribeResult.js";
-import type { UpdateNotificationPreferenceResult } from "../../domain/NotificationPreferenceResult.js";
-import type { DomainEventBus } from "../../../../shared/events/DomainEventBus.js";
-import { UserRecordSchema, UserUpdateSchema } from "./records/UserRecord.js";
-import { toUser } from "./mappers/userMapper.js";
+import type { Subscription } from "../../domain/Subscription.js";
+import { MAX_SUBSCRIPTIONS } from "../../domain/Subscription.js";
+import type { User } from "../../domain/User.js";
+import type { UserUpdate } from "../../domain/UserUpdate.js";
+import type { UserRepository } from "../../ports/UserRepository.js";
 import { SubscriptionSchema } from "../../schemas/SubscriptionSchema.js";
-
-import { isNonEmptyString } from "../../../../shared/utils/validators.js";
-import { getExistingDoc } from "../../../../shared/utils/firestore.js";
-import { logger } from "../../../../shared/logger/logger.js";
+import { toUser } from "./mappers/userMapper.js";
+import { UserRecordSchema, UserUpdateSchema } from "./records/UserRecord.js";
 
 export class FirestoreUserRepository implements UserRepository {
   // Zero production callers today (confirmed by audit) - getUsers' default

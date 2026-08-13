@@ -1,7 +1,8 @@
 import { useCallback, useRef, useState, type KeyboardEvent } from "react";
-import { toast } from "react-toastify";
-import { useAuth } from "../../../context/authContextValue";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+
+import { useAuth } from "../../../context/authContextValue";
 import { useClickOutside } from "../../../shared/hooks/useClickOutside";
 
 const UserMenu = () => {

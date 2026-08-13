@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { searchStreamers } from "../api";
+import { useEffect, useRef, useState } from "react";
+
 import type { StreamerSummary } from "../../../shared/types/api";
+import { searchStreamers } from "../api";
 
 // Debounced, race-condition-guarded streamer search. `suggestions` is a
 // value derived from `query`, but selecting/subscribing needs to clear the

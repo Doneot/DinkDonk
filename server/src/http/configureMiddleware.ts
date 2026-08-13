@@ -1,36 +1,29 @@
-import type { Express, RequestHandler } from "express";
-import type { Firestore } from "firebase-admin/firestore";
-
-import helmet from "helmet";
-import { ipKeyGenerator, rateLimit } from "express-rate-limit";
-
-import cors from "cors";
-import session from "express-session";
-
 import cookieParser from "cookie-parser";
-
-import { env } from "../shared/config/env.js";
-
-import { createEventSubRouter } from "./routes/eventSubRoutes.js";
-import { InMemoryReplayStore } from "../modules/notifications/infrastructure/InMemoryReplayStore.js";
-import { RedisReplayStore } from "../modules/notifications/infrastructure/RedisReplayStore.js";
-import { RedisRateLimitStore } from "../infrastructure/redis/RedisRateLimitStore.js";
-
-import { FirestoreSessionRepository } from "../modules/auth/infrastructure/firestore/FirestoreSessionRepository.js";
-import { configurePassport } from "./passport.js";
+import cors from "cors";
+import type { Express, RequestHandler } from "express";
+import { ipKeyGenerator, rateLimit } from "express-rate-limit";
+import session from "express-session";
+import type { Firestore } from "firebase-admin/firestore";
+import helmet from "helmet";
 
 import type { Redis } from "../infrastructure/redis/redisClient.js";
+import { RedisRateLimitStore } from "../infrastructure/redis/RedisRateLimitStore.js";
+import { FirestoreSessionRepository } from "../modules/auth/infrastructure/firestore/FirestoreSessionRepository.js";
 import type { IdentityRepository } from "../modules/auth/ports/IdentityRepository.js";
 import type { StreamNotificationService } from "../modules/notifications/application/StreamNotificationService.js";
+import { InMemoryReplayStore } from "../modules/notifications/infrastructure/InMemoryReplayStore.js";
+import { RedisReplayStore } from "../modules/notifications/infrastructure/RedisReplayStore.js";
 import type { StreamerLiveStateService } from "../modules/streamers/application/StreamerLiveStateService.js";
-import type { TwitchEventSubEvent } from "../modules/twitch/eventsub/EventSubHandlerRegistry.js";
 import type { TwitchEventSubStreamOnlineEvent } from "../modules/twitch/domain/Twitch.js";
-
+import type { TwitchEventSubEvent } from "../modules/twitch/eventsub/EventSubHandlerRegistry.js";
+import { env } from "../shared/config/env.js";
 import { assertDefined } from "../shared/utils/assert.js";
+import { httpMetrics } from "./middleware/httpMetrics.js";
 import { requestId } from "./middleware/requestId.js";
 import { requestLogger } from "./middleware/requestLogger.js";
-import { httpMetrics } from "./middleware/httpMetrics.js";
 import { initializeValidatedRequest } from "./middleware/validate.js";
+import { configurePassport } from "./passport.js";
+import { createEventSubRouter } from "./routes/eventSubRoutes.js";
 
 type ConfigureMiddlewareOptions = {
   app: Express;

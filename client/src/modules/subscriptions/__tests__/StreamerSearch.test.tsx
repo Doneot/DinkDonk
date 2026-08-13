@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import axios from "axios";
-import StreamerSearch from "../components/StreamerSearch";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import type { StreamerSummary } from "../../../shared/types/api";
+import StreamerSearch from "../components/StreamerSearch";
 
 interface PendingRequest {
   query: string;

@@ -1,5 +1,4 @@
 import { logger } from "../shared/logger/logger.js";
-
 import { bootstrap } from "./bootstrap.js";
 
 function logFatal(source: string, error: unknown): void {

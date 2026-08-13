@@ -1,5 +1,4 @@
 import type { EventSubEnvelope } from "../../http/schemas/eventSub.js";
-
 import { TEST_STREAMER_ID } from "../constants.js";
 
 const DEFAULT_STARTED_AT = "2024-01-01T12:00:00.000Z";

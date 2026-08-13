@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
-import type { Redis } from "ioredis";
 import type { Options as RateLimitOptions } from "express-rate-limit";
+import type { Redis } from "ioredis";
+import { describe, expect, it, vi } from "vitest";
 
 import { RedisRateLimitStore } from "../../../../infrastructure/redis/RedisRateLimitStore.js";
 

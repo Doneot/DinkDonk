@@ -1,11 +1,8 @@
+import type { DiscordBot } from "../../modules/discord/infrastructure/DiscordBot.js";
 import { NotificationManager } from "../../modules/notifications/application/NotificationManager.js";
-
 import { DiscordNotificationChannel } from "../../modules/notifications/infrastructure/channels/DiscordNotificationChannel.js";
 import { WebPushNotificationChannel } from "../../modules/notifications/infrastructure/channels/WebPushNotificationChannel.js";
-
 import { env } from "../../shared/config/env.js";
-
-import type { DiscordBot } from "../../modules/discord/infrastructure/DiscordBot.js";
 import type { Repositories } from "./repositories.js";
 
 export function createNotificationManager(

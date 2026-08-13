@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+
+import api from "../../shared/api/client";
 import { AuthProvider } from "../AuthContext";
 import { useAuth } from "../authContextValue";
-import api from "../../shared/api/client";
 
 vi.mock("../../shared/api/client", () => ({
   default: {

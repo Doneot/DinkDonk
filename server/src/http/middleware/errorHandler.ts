@@ -1,7 +1,5 @@
 import { STATUS_CODES } from "node:http";
 
-import { logger } from "../../shared/logger/logger.js";
-
 import type {
   Request,
   Response,
@@ -9,9 +7,10 @@ import type {
   ErrorRequestHandler,
 } from "express";
 
-import { AppError } from "../errors/AppError.js";
 import { env } from "../../shared/config/env.js";
+import { logger } from "../../shared/logger/logger.js";
 import { TokenDecryptionError } from "../../shared/utils/crypto.js";
+import { AppError } from "../errors/AppError.js";
 
 function errorLogContext(error: Error, req: Request): Record<string, unknown> {
   return {

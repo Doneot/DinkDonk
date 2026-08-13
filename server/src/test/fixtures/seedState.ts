@@ -1,6 +1,5 @@
 import type { PushSubscription } from "../../modules/notifications/domain/PushSubscription.js";
 import type { User } from "../../modules/users/domain/User.js";
-
 import type { TestContainer } from "../helpers/createTestContainer.js";
 
 export type TestState = {

@@ -1,9 +1,10 @@
 import { spawn } from "node:child_process";
+
 import { env } from "../../shared/config/env.js";
-import { assertDefined } from "../../shared/utils/assert.js";
 import { logger } from "../../shared/logger/logger.js";
-import type { Tunnel } from "./Tunnel.js";
+import { assertDefined } from "../../shared/utils/assert.js";
 import { killProcessTree } from "./process.js";
+import type { Tunnel } from "./Tunnel.js";
 
 export async function startSshTunnel(): Promise<Tunnel> {
   const process = spawn(

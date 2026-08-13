@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import type { Redis } from "ioredis";
+import { describe, expect, it, vi } from "vitest";
 
 import { RedisReplayStore } from "../../../../modules/notifications/infrastructure/RedisReplayStore.js";
 import { logger } from "../../../../shared/logger/logger.js";

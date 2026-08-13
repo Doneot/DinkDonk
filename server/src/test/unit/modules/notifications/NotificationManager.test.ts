@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { register } from "../../../../infrastructure/metrics/prometheus.js";
 import { NotificationManager } from "../../../../modules/notifications/application/NotificationManager.js";
 import type {
   Notification,
@@ -7,7 +8,6 @@ import type {
 } from "../../../../modules/notifications/domain/Notification.js";
 import type { User } from "../../../../modules/users/domain/User.js";
 import { logger } from "../../../../shared/logger/logger.js";
-import { register } from "../../../../infrastructure/metrics/prometheus.js";
 
 const user: User = {
   id: "user-1",

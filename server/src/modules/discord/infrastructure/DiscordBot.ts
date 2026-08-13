@@ -14,7 +14,6 @@ import {
 } from "discord.js";
 
 import { logger } from "../../../shared/logger/logger.js";
-
 import type { CommandContext } from "../domain/CommandContext.js";
 import type { DiscordService } from "../ports/DiscordService.js";
 

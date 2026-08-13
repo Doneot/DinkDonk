@@ -1,5 +1,5 @@
-import { logger } from "../../../shared/logger/logger.js";
 import { notificationsSentTotal } from "../../../infrastructure/metrics/prometheus.js";
+import { logger } from "../../../shared/logger/logger.js";
 import type { User } from "../../users/domain/User.js";
 import type {
   Notification,

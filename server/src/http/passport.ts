@@ -5,9 +5,10 @@ import {
   Strategy as GoogleStrategy,
   type Profile as GoogleProfile,
 } from "passport-google-oauth20";
+import type { VerifyCallback } from "passport-oauth2";
 import refresh from "passport-oauth2-refresh";
-import { env } from "../shared/config/env.js";
-import { assertDefined } from "../shared/utils/assert.js";
+
+import { resolveIdentity } from "../modules/auth/application/resolveIdentity.js";
 import type {
   DiscordCredential,
   GoogleCredential,
@@ -16,11 +17,11 @@ import type {
   SessionUser,
   TwitchCredential,
 } from "../modules/auth/domain/Identity.js";
-import type { IdentityRepository } from "../modules/auth/ports/IdentityRepository.js";
-import { resolveIdentity } from "../modules/auth/application/resolveIdentity.js";
 import { IdentityConflictError } from "../modules/auth/domain/IdentityConflictError.js";
+import type { IdentityRepository } from "../modules/auth/ports/IdentityRepository.js";
+import { env } from "../shared/config/env.js";
+import { assertDefined } from "../shared/utils/assert.js";
 import { ConflictError } from "./errors/ConflictError.js";
-import type { VerifyCallback } from "passport-oauth2";
 import { TwitchOAuth2Strategy, type TwitchProfile } from "./strategies/TwitchOAuth2Strategy.js";
 
 // Google sign-in is optional: existing deployments that haven't provisioned

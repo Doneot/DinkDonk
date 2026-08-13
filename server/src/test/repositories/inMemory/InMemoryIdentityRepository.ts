@@ -1,19 +1,19 @@
 import { randomUUID } from "crypto";
-import type { IdentityRepository } from "../../../modules/auth/ports/IdentityRepository.js";
+
 import type {
   DiscordCredential,
   GoogleCredential,
   Identity,
   TwitchCredential,
 } from "../../../modules/auth/domain/Identity.js";
+import { IdentityConflictError } from "../../../modules/auth/domain/IdentityConflictError.js";
+import { IdentityNotFoundError } from "../../../modules/auth/domain/IdentityNotFoundError.js";
 import {
   DiscordCredentialSchema,
   IdentityRecordSchema,
 } from "../../../modules/auth/infrastructure/firestore/records/IdentityRecord.js";
-
+import type { IdentityRepository } from "../../../modules/auth/ports/IdentityRepository.js";
 import { isNonEmptyString } from "../../../shared/utils/validators.js";
-import { IdentityConflictError } from "../../../modules/auth/domain/IdentityConflictError.js";
-import { IdentityNotFoundError } from "../../../modules/auth/domain/IdentityNotFoundError.js";
 
 export class InMemoryIdentityRepository implements IdentityRepository {
   private readonly identities = new Map<string, Identity>();

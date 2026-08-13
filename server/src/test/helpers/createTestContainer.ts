@@ -3,7 +3,6 @@ import type { DiscordService } from "../../modules/discord/ports/DiscordService.
 import type { TwitchStreamerProvider } from "../../modules/twitch/ports/TwitchGateway.js";
 import { createDomainEventBus } from "../../shared/events/DomainEventBus.js";
 import { logger } from "../../shared/logger/logger.js";
-
 import { InMemoryIdentityRepository } from "../repositories/inMemory/InMemoryIdentityRepository.js";
 import { InMemoryPushSubscriptionRepository } from "../repositories/inMemory/InMemoryPushSubscriptionRepository.js";
 import { InMemoryStreamerRepository } from "../repositories/inMemory/InMemoryStreamerRepository.js";

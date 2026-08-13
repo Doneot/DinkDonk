@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventSubSyncService } from "../../../../modules/notifications/application/EventSubSyncService.js";
 import type { TwitchEventSubSubscription } from "../../../../modules/twitch/domain/Twitch.js";
 import { logger } from "../../../../shared/logger/logger.js";
-
 import { buildStreamer } from "../../../builders/streamer.js";
 import {
   buildEventSubSubscription,

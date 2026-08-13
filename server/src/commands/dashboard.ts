@@ -1,5 +1,6 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 import { SlashCommandBuilder, MessageFlags } from "discord.js";
+
 import { dashboardUrl } from "../shared/utils/urls.js";
 
 export const data = new SlashCommandBuilder()

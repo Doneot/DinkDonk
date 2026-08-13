@@ -1,30 +1,23 @@
 import type { Express } from "express";
-
 import swaggerUi from "swagger-ui-express";
 
+import type { Repositories } from "../app/container/repositories.js";
 import { openApiDocument } from "../docs/openapi.js";
-
+import type { Redis } from "../infrastructure/redis/redisClient.js";
+import type { DiscordService } from "../modules/discord/ports/DiscordService.js";
+import type { StreamerLiveStateService } from "../modules/streamers/application/StreamerLiveStateService.js";
+import type { TwitchStreamerProvider } from "../modules/twitch/ports/TwitchGateway.js";
 import { env } from "../shared/config/env.js";
-
 import {
   createFreshTokenMiddleware,
   requireAuthenticated,
 } from "./middleware/auth.js";
-
-import { createAuthRouter } from "./routes/authRoutes.js";
-import { createApiRouter } from "./routes/apiRoutes.js";
-import { createMetricsRouter } from "./routes/metricsRoutes.js";
-import { createClientErrorRouter } from "./routes/clientErrorRoutes.js";
-
-import type { Repositories } from "../app/container/repositories.js";
-
-import type { TwitchStreamerProvider } from "../modules/twitch/ports/TwitchGateway.js";
-import type { DiscordService } from "../modules/discord/ports/DiscordService.js";
-import type { Redis } from "../infrastructure/redis/redisClient.js";
-import type { StreamerLiveStateService } from "../modules/streamers/application/StreamerLiveStateService.js";
-
-import { createHealthRouter } from "./routes/healthRoutes.js";
 import { createMetricsAuth } from "./middleware/metricsAuth.js";
+import { createApiRouter } from "./routes/apiRoutes.js";
+import { createAuthRouter } from "./routes/authRoutes.js";
+import { createClientErrorRouter } from "./routes/clientErrorRoutes.js";
+import { createHealthRouter } from "./routes/healthRoutes.js";
+import { createMetricsRouter } from "./routes/metricsRoutes.js";
 
 type ConfigureRoutesOptions = {
   app: Express;

@@ -1,4 +1,5 @@
 import { memo } from "react";
+
 import type { EnrichedSubscription } from "../types";
 
 interface SubscriptionRowProps {

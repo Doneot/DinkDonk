@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createHealthRouter } from "../../../http/routes/healthRoutes.js";
 import { createMetricsRouter } from "../../../http/routes/metricsRoutes.js";
 import { logger } from "../../../shared/logger/logger.js";
-
 import { InMemoryIdentityRepository } from "../../repositories/inMemory/InMemoryIdentityRepository.js";
 
 function createHealthApp(
