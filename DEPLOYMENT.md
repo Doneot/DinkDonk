@@ -128,12 +128,15 @@ deploy/secrets/
   firebase-service-account.json
   discord-token
   discord-client-secret
+  google-client-secret
   twitch-client-secret
   twitch-webhook-secret
   session-secret
   encryption-key
   metrics-token
 ```
+
+`google-client-secret` is optional: leave it empty (and `GOOGLE_CLIENT_ID` unset in `deploy/.env.production`) to keep Google sign-in disabled. If left empty, also remove `google_client_secret` from `compose.prod.yml`'s backend `secrets:` list - an empty file still reads as an empty string and fails validation at startup, unlike a file that's absent entirely.
 
 Expected staging secret files:
 
