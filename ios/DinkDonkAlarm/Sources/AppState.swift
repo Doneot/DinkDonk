@@ -9,22 +9,29 @@ final class AppState: ObservableObject {
     @Published private(set) var isLoggedIn: Bool
     @Published private(set) var connectionState: LiveSocketManager.ConnectionState = .disconnected
     @Published private(set) var isAlarming = false
+    @Published private(set) var subscriptions: [SubscribedStreamer] = []
+    @Published private(set) var isLoadingSubscriptions = false
+    @Published private(set) var subscriptionsLoadError: String?
+    @Published private(set) var mutedStreamerIds: Set<String> = AlarmPreferencesStore.allMuted()
 
     private let socketManager = LiveSocketManager(serverURL: Config.serverURL)
     private let audioController = AlarmAudioController()
     private let notificationManager = NotificationManager()
+    private var sessionCookie: String?
 
     private var cancellables = Set<AnyCancellable>()
 
     init() {
-        isLoggedIn = KeychainStore.load() != nil
+        let cookie = KeychainStore.load()
+        isLoggedIn = cookie != nil
+        sessionCookie = cookie
 
         socketManager.$state
             .receive(on: DispatchQueue.main)
             .assign(to: &$connectionState)
 
-        socketManager.onStreamerWentLive = { [weak self] _ in
-            self?.triggerAlarm()
+        socketManager.onStreamerWentLive = { [weak self] streamerId in
+            self?.handleStreamerWentLive(streamerId)
         }
 
         notificationManager.onStopRequested = { [weak self] in
@@ -39,6 +46,7 @@ final class AppState: ObservableObject {
 
     func completeLogin(cookie: String) {
         KeychainStore.save(cookie)
+        sessionCookie = cookie
         isLoggedIn = true
         startListening(cookie: cookie)
     }
@@ -47,6 +55,8 @@ final class AppState: ObservableObject {
         KeychainStore.clear()
         socketManager.disconnect()
         isLoggedIn = false
+        sessionCookie = nil
+        subscriptions = []
     }
 
     /// Call when the app returns to the foreground - cheap no-op if already
@@ -62,9 +72,51 @@ final class AppState: ObservableObject {
         audioController.stopAlarm()
     }
 
+    func loadSubscriptions() async {
+        guard let cookie = sessionCookie else { return }
+
+        isLoadingSubscriptions = true
+        subscriptionsLoadError = nil
+
+        defer { isLoadingSubscriptions = false }
+
+        do {
+            subscriptions = try await DinkDonkAPI.fetchSubscribedStreamers(
+                serverURL: Config.serverURL,
+                sessionCookie: cookie
+            )
+        } catch {
+            subscriptionsLoadError = "Couldn't load your subscriptions. Pull to retry."
+        }
+    }
+
+    func isAlarmEnabled(for streamerId: String) -> Bool {
+        !mutedStreamerIds.contains(streamerId)
+    }
+
+    func setAlarmEnabled(_ enabled: Bool, for streamerId: String) {
+        AlarmPreferencesStore.setMuted(!enabled, for: streamerId)
+
+        if enabled {
+            mutedStreamerIds.remove(streamerId)
+        } else {
+            mutedStreamerIds.insert(streamerId)
+        }
+    }
+
     private func startListening(cookie: String) {
         socketManager.connect(sessionCookie: cookie)
         audioController.startKeepAlive()
+    }
+
+    // Muting a subscription (setAlarmEnabled(false, for:)) suppresses the
+    // alarm entirely for that streamer - not just the sound, but the
+    // lock-screen notification too, since notifyStreamerLive() exists purely
+    // to accompany/control the alarm (see NotificationManager's doc comment).
+    private func handleStreamerWentLive(_ streamerId: String) {
+        guard isAlarmEnabled(for: streamerId) else { return }
+
+        triggerAlarm()
     }
 
     private func triggerAlarm() {

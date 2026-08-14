@@ -1,0 +1,375 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		00C19A5CD21BDE3119D741EF /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AED4D8D4715AE34E9140BBF /* AppState.swift */; };
+		09EC6049DF2D816A44932BB4 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F818DCBB2B4B53DDC9E681 /* NotificationManager.swift */; };
+		277CEA5337C5359D8F8DF061 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = DF4B87AE23507F0ADE912B64 /* SocketIO */; };
+		312BC96DD18CB9373F514817 /* LiveSocketManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19263C3918678F379F0AF545 /* LiveSocketManager.swift */; };
+		6D965E414D2027030E1EC8C6 /* DinkDonkAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF5BC4DF0858E9DA2E6BC6E7 /* DinkDonkAPI.swift */; };
+		767729ED12498237F92493B0 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D85C2CE5B2D52FD4F0A069ED /* Theme.swift */; };
+		7F3CCCC07D24E3DE7945482D /* AlarmAudioController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F72E271239A911E8008A0F52 /* AlarmAudioController.swift */; };
+		AE483066001B560AA4EAAA5F /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C2957C300371F774F65E52 /* Config.swift */; };
+		B83AFF799999AA1B2AB9989C /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B8E5672941515C10FC043C1 /* LoginView.swift */; };
+		BE76BD7670F16E282AB5B3A9 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E512E179D23AD8DFCB3503C /* KeychainStore.swift */; };
+		BF806189B52C915CD5D67A6A /* DinkDonkAlarmApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B8E86EB8416BF6FC3CCD7E5 /* DinkDonkAlarmApp.swift */; };
+		F2F85023F71E8D8015122EA1 /* AlarmPreferencesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 709A8D5E5712B3189A9C6082 /* AlarmPreferencesStore.swift */; };
+		FA559FFC3C83E1CDAE0501EB /* SubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F6C2D46F6D06BBD7BE740E /* SubscriptionsView.swift */; };
+		FABAA8E18CCCAD9B8A6655AB /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B532FBDF675F25050FFAAD /* RootView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		07F6C2D46F6D06BBD7BE740E /* SubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionsView.swift; sourceTree = "<group>"; };
+		19263C3918678F379F0AF545 /* LiveSocketManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSocketManager.swift; sourceTree = "<group>"; };
+		1B8E5672941515C10FC043C1 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		4AED4D8D4715AE34E9140BBF /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		4B8E86EB8416BF6FC3CCD7E5 /* DinkDonkAlarmApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DinkDonkAlarmApp.swift; sourceTree = "<group>"; };
+		5E512E179D23AD8DFCB3503C /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		65ED386C963229B276CF0D6E /* DinkDonkAlarm.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DinkDonkAlarm.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		709A8D5E5712B3189A9C6082 /* AlarmPreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmPreferencesStore.swift; sourceTree = "<group>"; };
+		80C2957C300371F774F65E52 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
+		88F818DCBB2B4B53DDC9E681 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		CF5BC4DF0858E9DA2E6BC6E7 /* DinkDonkAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DinkDonkAPI.swift; sourceTree = "<group>"; };
+		D85C2CE5B2D52FD4F0A069ED /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		F4B532FBDF675F25050FFAAD /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		F72E271239A911E8008A0F52 /* AlarmAudioController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmAudioController.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		7DB591A8E32057F451323F43 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				277CEA5337C5359D8F8DF061 /* SocketIO in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0C61C9C13CCC75FB7745BBEF /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				65ED386C963229B276CF0D6E /* DinkDonkAlarm.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		2CCB1083FE1D96AABBDF78F9 = {
+			isa = PBXGroup;
+			children = (
+				630211B443E8B93CDBC2B819 /* Sources */,
+				0C61C9C13CCC75FB7745BBEF /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		630211B443E8B93CDBC2B819 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				F72E271239A911E8008A0F52 /* AlarmAudioController.swift */,
+				709A8D5E5712B3189A9C6082 /* AlarmPreferencesStore.swift */,
+				4AED4D8D4715AE34E9140BBF /* AppState.swift */,
+				80C2957C300371F774F65E52 /* Config.swift */,
+				4B8E86EB8416BF6FC3CCD7E5 /* DinkDonkAlarmApp.swift */,
+				CF5BC4DF0858E9DA2E6BC6E7 /* DinkDonkAPI.swift */,
+				5E512E179D23AD8DFCB3503C /* KeychainStore.swift */,
+				19263C3918678F379F0AF545 /* LiveSocketManager.swift */,
+				1B8E5672941515C10FC043C1 /* LoginView.swift */,
+				88F818DCBB2B4B53DDC9E681 /* NotificationManager.swift */,
+				F4B532FBDF675F25050FFAAD /* RootView.swift */,
+				07F6C2D46F6D06BBD7BE740E /* SubscriptionsView.swift */,
+				D85C2CE5B2D52FD4F0A069ED /* Theme.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		16837308367EF1F9452CF2FE /* DinkDonkAlarm */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 64F28EF80A02BED296D42A17 /* Build configuration list for PBXNativeTarget "DinkDonkAlarm" */;
+			buildPhases = (
+				B88C0785CFEC435D1E67A5EB /* Sources */,
+				7DB591A8E32057F451323F43 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DinkDonkAlarm;
+			packageProductDependencies = (
+				DF4B87AE23507F0ADE912B64 /* SocketIO */,
+			);
+			productName = DinkDonkAlarm;
+			productReference = 65ED386C963229B276CF0D6E /* DinkDonkAlarm.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2444D25603D2C0D5FACBE84B /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					16837308367EF1F9452CF2FE = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = C81F5E4E39240D4A6F7398E1 /* Build configuration list for PBXProject "DinkDonkAlarm" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 2CCB1083FE1D96AABBDF78F9;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				DA600BA86FA5A916DC42C7CE /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 0C61C9C13CCC75FB7745BBEF /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				16837308367EF1F9452CF2FE /* DinkDonkAlarm */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B88C0785CFEC435D1E67A5EB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7F3CCCC07D24E3DE7945482D /* AlarmAudioController.swift in Sources */,
+				F2F85023F71E8D8015122EA1 /* AlarmPreferencesStore.swift in Sources */,
+				00C19A5CD21BDE3119D741EF /* AppState.swift in Sources */,
+				AE483066001B560AA4EAAA5F /* Config.swift in Sources */,
+				6D965E414D2027030E1EC8C6 /* DinkDonkAPI.swift in Sources */,
+				BF806189B52C915CD5D67A6A /* DinkDonkAlarmApp.swift in Sources */,
+				BE76BD7670F16E282AB5B3A9 /* KeychainStore.swift in Sources */,
+				312BC96DD18CB9373F514817 /* LiveSocketManager.swift in Sources */,
+				B83AFF799999AA1B2AB9989C /* LoginView.swift in Sources */,
+				09EC6049DF2D816A44932BB4 /* NotificationManager.swift in Sources */,
+				FABAA8E18CCCAD9B8A6655AB /* RootView.swift in Sources */,
+				FA559FFC3C83E1CDAE0501EB /* SubscriptionsView.swift in Sources */,
+				767729ED12498237F92493B0 /* Theme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		13D3B57BB8FF6FFF4DE90473 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Generated/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.doneot.dinkdonkalarm;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		4FF0698B13B00CFAEA5E658B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Generated/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.doneot.dinkdonkalarm;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A6299CC80DE084EE6A758984 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		C77F742370E88D3B27DBC399 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		64F28EF80A02BED296D42A17 /* Build configuration list for PBXNativeTarget "DinkDonkAlarm" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4FF0698B13B00CFAEA5E658B /* Debug */,
+				13D3B57BB8FF6FFF4DE90473 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C81F5E4E39240D4A6F7398E1 /* Build configuration list for PBXProject "DinkDonkAlarm" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C77F742370E88D3B27DBC399 /* Debug */,
+				A6299CC80DE084EE6A758984 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		DA600BA86FA5A916DC42C7CE /* XCRemoteSwiftPackageReference "socket.io-client-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/socketio/socket.io-client-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 16.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		DF4B87AE23507F0ADE912B64 /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DA600BA86FA5A916DC42C7CE /* XCRemoteSwiftPackageReference "socket.io-client-swift" */;
+			productName = SocketIO;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 2444D25603D2C0D5FACBE84B /* Project object */;
+}

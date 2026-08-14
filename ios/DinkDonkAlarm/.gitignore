@@ -1,0 +1,9 @@
+# Xcode per-user IDE state (window layout, open-file history, local absolute
+# paths) - machine-specific, never useful to a different checkout.
+xcuserdata/
+*.xcuserstate
+
+# Build products/derived data if ever produced alongside the project instead
+# of in ~/Library/Developer/Xcode/DerivedData.
+build/
+DerivedData/

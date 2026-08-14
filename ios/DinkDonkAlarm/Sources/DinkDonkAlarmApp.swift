@@ -9,6 +9,7 @@ struct DinkDonkAlarmApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
+                .tint(Theme.accent)
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
