@@ -5,12 +5,19 @@
 {$DOMAIN} {
     encode zstd gzip
 
+    # Content-Security-Policy is deliberately not here: it only actually
+    # matters for a response the browser renders as a document (the SPA
+    # catch-all and /docs below), not for /api's JSON or /eventsub's
+    # webhook responses, and /docs needs a different policy than the SPA -
+    # a single shared value here would mean whichever "header" directive
+    # Caddy places last in its (position-in-file-independent) internal
+    # ordering silently wins for every route, which is exactly what broke
+    # the /docs-specific override that used to live in that handle block.
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options "nosniff"
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
-        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://cdn.discordapp.com https://static-cdn.jtvnw.net https://*.googleusercontent.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         -Server
     }
 
@@ -28,10 +35,10 @@
         # inline style="..." attributes (e.g. the hidden icon-sprite SVG's
         # position:absolute;width:0;height:0, which collapses it to
         # invisible - without this, the browser blocks that attribute under
-        # the site-wide style-src 'self' policy below, so the SVG renders at
-        # its default ~300x150 intrinsic size instead: a blank box at the
-        # top of the page). Scoped to just this auth-gated admin path rather
-        # than loosening the main app's CSP.
+        # a style-src 'self' policy, so the SVG renders at its default
+        # ~300x150 intrinsic size instead: a blank box at the top of the
+        # page). Scoped to just this auth-gated admin path rather than
+        # loosening the main app's CSP below.
         header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
         reverse_proxy backend:3000
@@ -46,6 +53,8 @@
     }
 
     handle {
+        header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://cdn.discordapp.com https://static-cdn.jtvnw.net https://*.googleusercontent.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
         root * /srv/frontend
 
         @assets path *.js *.css *.png *.jpg *.jpeg *.gif *.svg *.ico *.webp *.woff *.woff2
