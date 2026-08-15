@@ -18,6 +18,15 @@
         reverse_proxy backend:3000
     }
 
+    # Both patterns: /docs/* alone doesn't match the bare "/docs" a browser
+    # actually gets typed/linked as, which would otherwise fall through to
+    # the SPA catch-all below instead of reaching swagger-ui-express's own
+    # redirect-to-trailing-slash logic (its relative asset paths need it).
+    @docs path /docs /docs/*
+    handle @docs {
+        reverse_proxy backend:3000
+    }
+
     handle /eventsub {
         reverse_proxy backend:3000
     }
