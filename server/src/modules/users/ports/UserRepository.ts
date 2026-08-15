@@ -15,6 +15,10 @@ export interface UserRepository {
    * subscribe/unsubscribe below). A `Subscription` lives embedded in
    * `User.subscriptions`, not as its own aggregate, so this repository owns
    * both - a subscription only ever exists as part of a user.
+   *
+   * "streamerAdded" fires on every successful subscribe, not just the
+   * streamer's first ever subscriber - see subscribe's implementation for
+   * why.
    */
   readonly events: DomainEventBus;
 

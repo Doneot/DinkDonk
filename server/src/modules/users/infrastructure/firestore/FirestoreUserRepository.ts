@@ -229,11 +229,19 @@ export class FirestoreUserRepository implements UserRepository {
       } as const;
     });
 
-    // "Is this streamer newly-added" is decided right here, inline, rather
-    // than in a dedicated application-layer service - known, accepted debt
-    // (see ARCHITECTURE.md's modules/ section) shared with
-    // FirestoreStreamerRepository.createStreamer()'s identical decision.
-    if (result.success && result.createdStreamer) {
+    // Emitted on every successful subscribe, not just when createdStreamer
+    // is true: the streamer doc persists even after its last subscriber
+    // leaves (nothing deletes it), so gating on doc-existence previously
+    // meant re-subscribing to a streamer everyone had since dropped skipped
+    // this entirely - silently leaving no EventSub subscription behind for
+    // a streamer someone is actively (and, as far as they know, currently)
+    // tracking. handleStreamerAdded's ensureSubscriptions is already
+    // idempotent (it checks Twitch's real subscription state before
+    // creating anything), so firing unconditionally just makes the doc's
+    // existence irrelevant to correctness, at the cost of one extra cheap
+    // Twitch API check on the (common) case where a subscription already
+    // exists.
+    if (result.success) {
       this.events.emit({ type: "streamerAdded", streamerId });
     }
 

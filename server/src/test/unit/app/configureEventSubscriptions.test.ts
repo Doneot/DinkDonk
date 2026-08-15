@@ -65,13 +65,23 @@ describe("configureEventSubscriptions", () => {
     expect(handleStreamerAdded.mock.calls).toEqual([["streamer-1"]]);
   });
 
-  it("does not resubscribe when a second user subscribes", async () => {
+  it("also fires handleStreamerAdded when a second user subscribes", async () => {
+    // handleStreamerAdded's own ensureSubscriptions check is idempotent
+    // against Twitch's real subscription state, so firing it again here is
+    // a safe, cheap no-op in the common case - and it's what makes
+    // resubscribing to a streamer everyone had since dropped (whose doc
+    // still exists, but whose EventSub subscription doesn't) actually
+    // recreate that subscription instead of assuming doc-existence means
+    // it's still covered.
     const { users, handleStreamerAdded } = setup();
 
     await users.subscribe("user-1", "streamer-1", "");
     await users.subscribe("user-2", "streamer-1", "");
 
-    expect(handleStreamerAdded).toHaveBeenCalledOnce();
+    expect(handleStreamerAdded.mock.calls).toEqual([
+      ["streamer-1"],
+      ["streamer-1"],
+    ]);
   });
 
   it("garbage collects a streamer once its last subscriber leaves", async () => {

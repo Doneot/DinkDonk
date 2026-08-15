@@ -39,14 +39,14 @@ export class InMemoryStreamerRepository implements StreamerRepository {
   }
 
   createStreamer(id: string): Promise<void> {
-    const created = !this.streamers.has(id);
-
     this.streamers.set(id, { id, isLive: false, liveSince: null });
     this.subscribers.ensure(id);
 
-    if (created) {
-      this.events.emit({ type: "streamerAdded", streamerId: id });
-    }
+    // Matches FirestoreStreamerRepository: emitted unconditionally, not
+    // just when the streamer is newly created - see its implementation for
+    // why doc/entry existence isn't a safe proxy for "has an active
+    // subscription."
+    this.events.emit({ type: "streamerAdded", streamerId: id });
 
     return Promise.resolve();
   }

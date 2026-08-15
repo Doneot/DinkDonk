@@ -93,28 +93,18 @@ export class FirestoreStreamerRepository implements StreamerRepository {
 
     const streamerRef = this.streamers.doc(id);
 
-    // Transactional read-before-write (not a separate .get() then .set())
-    // so the "did this create a new streamer" check can't race a concurrent
-    // caller the way two independent calls could - mirrors
-    // FirestoreUserRepository.subscribe()'s createdStreamer guard,
-    // which this previously didn't match: an unconditional emit here meant
-    // calling createStreamer on an already-existing streamer fired a
-    // spurious streamerAdded event.
-    const created = await this.streamers.firestore.runTransaction(
-      async (tx) => {
-        const doc = await tx.get(streamerRef);
+    await streamerRef.set({ id }, { merge: true });
 
-        tx.set(streamerRef, { id }, { merge: true });
-
-        return !doc.exists;
-      },
-    );
-
-    // Same known, accepted debt as FirestoreUserRepository.subscribe()'s
-    // identical decision - see ARCHITECTURE.md's modules/ section.
-    if (created) {
-      this.events.emit({ type: "streamerAdded", streamerId: id });
-    }
+    // Emitted unconditionally, including when the streamer doc already
+    // existed: the doc persists even after its last subscriber leaves, so
+    // gating this on "was it just created" (as a previous version of this
+    // method did, mirroring FirestoreUserRepository.subscribe()'s old
+    // createdStreamer guard) meant calling createStreamer for a streamer
+    // everyone had since dropped silently skipped re-creating its EventSub
+    // subscription. handleStreamerAdded's ensureSubscriptions is already
+    // idempotent against Twitch's real subscription state, so there's no
+    // need to approximate that here via document existence.
+    this.events.emit({ type: "streamerAdded", streamerId: id });
   }
 
   async deleteStreamer(id: string): Promise<void> {
