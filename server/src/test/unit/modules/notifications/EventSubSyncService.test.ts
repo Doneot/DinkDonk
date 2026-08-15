@@ -146,12 +146,11 @@ describe("EventSubSyncService", () => {
           subscription.condition.broadcaster_user_id === "streamer-1",
       );
 
-      // The dead subscription is still in the list (Twitch doesn't remove it
-      // automatically), plus a freshly created replacement.
-      expect(streamOnline).toHaveLength(2);
-      expect(
-        streamOnline.some((subscription) => subscription.status === "enabled"),
-      ).toBe(true);
+      // The dead subscription is actively deleted once its replacement is
+      // created - Twitch wouldn't remove it on its own, so only one
+      // (the fresh, enabled one) survives.
+      expect(streamOnline).toHaveLength(1);
+      expect(streamOnline[0]?.status).toBe("enabled");
     });
 
     it("recreates a subscription stuck in webhook_callback_verification_failed", async () => {
@@ -182,10 +181,58 @@ describe("EventSubSyncService", () => {
           subscription.condition.broadcaster_user_id === "streamer-1",
       );
 
-      expect(streamOnline).toHaveLength(2);
+      expect(streamOnline).toHaveLength(1);
+      expect(streamOnline[0]?.status).toBe("enabled");
+    });
+
+    it("keeps the fresh subscription and logs, rather than throwing, when deleting the dead one fails", async () => {
+      // The replacement already succeeded by the time the delete is
+      // attempted - a delete failure (e.g. a transient Twitch API error)
+      // must not be treated as this streamer's sync having failed, and must
+      // not stop the sibling event type (stream.offline) below from being
+      // created in the same call.
+      vi.spyOn(logger, "info").mockReturnValue();
+      const errorSpy = vi.spyOn(logger, "error").mockReturnValue();
+
+      const { service, twitch } = setup({
+        subscriptions: [
+          buildEventSubSubscription({
+            id: "sub-1",
+            type: "stream.online",
+            condition: { broadcaster_user_id: "streamer-1" },
+            status: "webhook_callback_verification_failed",
+          }),
+        ],
+        streamers: [buildStreamer({ id: "streamer-1" })],
+      });
+
+      const deleteError = new Error("twitch unavailable");
+
+      vi.spyOn(twitch, "unsubscribeFromEvent").mockRejectedValue(deleteError);
+
+      await service.syncEventSubSubscriptions();
+
+      const forStreamer1 = twitch.subscriptions.filter(
+        (subscription) =>
+          subscription.condition.broadcaster_user_id === "streamer-1",
+      );
+
+      // The dead sub-1 survives (delete failed), plus fresh replacements
+      // for both stream.online and stream.offline.
+      expect(forStreamer1).toHaveLength(3);
       expect(
-        streamOnline.some((subscription) => subscription.status === "enabled"),
-      ).toBe(true);
+        forStreamer1.filter((subscription) => subscription.status === "enabled"),
+      ).toHaveLength(2);
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        {
+          error: deleteError,
+          streamerId: "streamer-1",
+          type: "stream.online",
+          subscriptionId: "sub-1",
+        },
+        "Failed to delete a dead EventSub subscription after replacing it",
+      );
     });
 
     it("continues syncing remaining streamers when one streamer's subscription attempt fails", async () => {

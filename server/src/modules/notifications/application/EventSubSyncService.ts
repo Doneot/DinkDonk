@@ -1,4 +1,7 @@
-import { eventSubSubscriptionsCreatedTotal } from "../../../infrastructure/metrics/prometheus.js";
+import {
+  eventSubSubscriptionsCreatedTotal,
+  eventSubSubscriptionsDeletedTotal,
+} from "../../../infrastructure/metrics/prometheus.js";
 import { logger } from "../../../shared/logger/logger.js";
 import type { StreamerRepository } from "../../streamers/ports/StreamerRepository.js";
 import type { TwitchEventSubSubscription } from "../../twitch/domain/Twitch.js";
@@ -166,6 +169,21 @@ export class EventSubSyncService {
           continue;
         }
 
+        // Distinct from "no subscription exists at all": this is the case
+        // hasActiveSubscription just rejected above - one exists but is
+        // dead (e.g. webhook_callback_verification_failed). Twitch never
+        // deletes it on its own, so without this it would sit there
+        // forever once replaced - accumulating as clutter in the dashboard
+        // and in every future getEventSubSubscriptions() page, though
+        // harmlessly (Twitch doesn't charge subscription-cost quota for a
+        // dead subscription).
+        const dead = fresh.find(
+          (sub) =>
+            sub.type === type &&
+            sub.condition?.broadcaster_user_id === streamerId &&
+            DEAD_SUBSCRIPTION_STATUSES.has(sub.status),
+        );
+
         logger.info(
           { streamerId, type },
           "Creating Twitch EventSub subscription",
@@ -179,6 +197,27 @@ export class EventSubSyncService {
         // beforehand would count a failed/duplicate-rejected attempt as a
         // real creation.
         eventSubSubscriptionsCreatedTotal.inc();
+
+        if (dead) {
+          try {
+            await this.twitch.unsubscribeFromEvent(dead.id);
+
+            eventSubSubscriptionsDeletedTotal.inc();
+          } catch (error) {
+            // Isolated from the outer per-streamer catch in
+            // syncEventSubSubscriptions: the replacement above already
+            // succeeded and is what actually matters for notifications, so
+            // a cleanup failure here shouldn't be logged as "failed to sync
+            // this streamer" (misleading - the sync half worked) or abort
+            // the sibling event type in this same call. The dead entry
+            // just stays listed until the next time this streamer's
+            // subscription needs replacing.
+            logger.error(
+              { error, streamerId, type, subscriptionId: dead.id },
+              "Failed to delete a dead EventSub subscription after replacing it",
+            );
+          }
+        }
       }
     } finally {
       this.streamersBeingSubscribed.delete(streamerId);
