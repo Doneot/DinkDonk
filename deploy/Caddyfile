@@ -39,9 +39,20 @@
         # ~300x150 intrinsic size instead: a blank box at the top of the
         # page). Scoped to just this auth-gated admin path rather than
         # loosening the main app's CSP below.
-        header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-
-        reverse_proxy backend:3000
+        #
+        # header_down (not a plain header directive) is required here: the
+        # backend's own helmet() middleware already sets its own
+        # Content-Security-Policy on every response, and reverse_proxy
+        # copies that upstream header onto the response as-is - a plain
+        # `header` directive only adds a second CSP header alongside it
+        # rather than replacing it, which happens to still work (browsers
+        # intersect multiple CSP headers, and both happen to allow
+        # 'unsafe-inline' for styles) but leaves two different policies
+        # relying on that coincidence. header_down explicitly replaces the
+        # header coming from the upstream instead.
+        reverse_proxy backend:3000 {
+            header_down Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        }
     }
 
     handle /eventsub {
