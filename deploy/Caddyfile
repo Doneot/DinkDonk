@@ -24,6 +24,16 @@
     # redirect-to-trailing-slash logic (its relative asset paths need it).
     @docs path /docs /docs/*
     handle @docs {
+        # Swagger UI's static template and its React bundle both rely on
+        # inline style="..." attributes (e.g. the hidden icon-sprite SVG's
+        # position:absolute;width:0;height:0, which collapses it to
+        # invisible - without this, the browser blocks that attribute under
+        # the site-wide style-src 'self' policy below, so the SVG renders at
+        # its default ~300x150 intrinsic size instead: a blank box at the
+        # top of the page). Scoped to just this auth-gated admin path rather
+        # than loosening the main app's CSP.
+        header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
         reverse_proxy backend:3000
     }
 
