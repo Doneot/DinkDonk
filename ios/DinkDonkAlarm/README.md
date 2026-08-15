@@ -1,11 +1,46 @@
-# DinkDonk Alarm (iOS companion app)
+<div align="center">
+  <img src="../../client/public/DinkDonk.png" width="96" alt="DinkDonk mascot" />
 
-A tiny native iOS app that turns a `streamer_live_changed` event from your
-DinkDonk deployment into a genuine alarm — one that plays through the
-phone's Ring/Silent switch, which no web push notification or Discord
-notification can do (that's an iOS platform restriction, not a DinkDonk
-limitation). See `ios/DinkDonkAlarm/Sources/AlarmAudioController.swift` for
-why this works and what it can't do.
+# DinkDonk Alarm
+
+### The iOS companion app
+
+![Swift](https://img.shields.io/badge/Swift-F05138?style=flat-square&logo=swift&logoColor=white)
+![SwiftUI](https://img.shields.io/badge/SwiftUI-0d6efd?style=flat-square&logo=swift&logoColor=white)
+![iOS](https://img.shields.io/badge/iOS-17.0+-000000?style=flat-square&logo=apple&logoColor=white)
+![Xcode](https://img.shields.io/badge/Xcode-16.2-147EFB?style=flat-square&logo=xcode&logoColor=white)
+
+</div>
+
+<br />
+
+A tiny native iOS app that turns a `streamer_live_changed` event from your DinkDonk deployment into a genuine alarm — one that plays through the phone's Ring/Silent switch, which no web push notification or Discord notification can do (that's an iOS platform restriction, not a DinkDonk limitation). See [`Sources/AlarmAudioController.swift`](Sources/AlarmAudioController.swift) for why this works and what it can't do.
+
+See the root **[README](../../README.md)** for what DinkDonk itself does.
+
+<p align="center">
+  <img src="screenshots/alarm-status.png" height="480" alt="Connection status" />
+  &nbsp;&nbsp;
+  <img src="screenshots/alarm-subscriptions.png" height="480" alt="Alarm subscriptions" />
+  <br />
+  <sub>Connection status &nbsp;·&nbsp; per-streamer alarm subscriptions</sub>
+</p>
+
+## Contents
+
+- [DinkDonk Alarm](#dinkdonk-alarm)
+  - [The iOS companion app](#the-ios-companion-app)
+  - [Contents](#contents)
+  - [Prerequisites](#prerequisites)
+  - [Why no Apple Push Notifications (APNs)](#why-no-apple-push-notifications-apns)
+  - [1. Open the project](#1-open-the-project)
+  - [2. Sign it](#2-sign-it)
+  - [3. Point it at your deployment](#3-point-it-at-your-deployment)
+  - [4. Build and run on your phone](#4-build-and-run-on-your-phone)
+  - [Using it](#using-it)
+  - [Known limitations](#known-limitations)
+
+---
 
 ## Prerequisites
 
@@ -39,7 +74,7 @@ than hand-written — a hand-edited project file with no easy way to
 test-compile it is a good way to end up with something subtly broken. Just
 open it:
 
-```
+```bash
 open ios/DinkDonkAlarm/DinkDonkAlarm.xcodeproj
 ```
 
@@ -54,7 +89,7 @@ is backgrounded or the phone is locked), and an SPM dependency on
 If you add/remove a source file under `Sources/`, or change `project.yml`,
 regenerate before building:
 
-```
+```bash
 brew install xcodegen   # once
 cd ios/DinkDonkAlarm && xcodegen generate
 ```
