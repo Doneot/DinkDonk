@@ -76,12 +76,17 @@ export function configureRoutes({
     app.use("/metrics", ...metricsGuards, createMetricsRouter());
   }
 
-  // Never served in production: the OpenAPI document/Swagger UI has no
-  // authentication of its own, and shouldn't be a public, unauthenticated
-  // way to enumerate every route this deployment exposes.
-  if (!env.isProduction) {
-    app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
-  }
+  // swagger-ui-express has no authentication of its own, so it shouldn't be
+  // mounted as a public, unauthenticated way to enumerate every route this
+  // deployment exposes - gated behind the same session auth as the API
+  // routes below instead of being environment-gated: anyone who can already
+  // reach /api authenticated isn't learning much new from the docs for it.
+  app.use(
+    "/docs",
+    requireAuthenticated,
+    swaggerUi.serve,
+    swaggerUi.setup(openApiDocument),
+  );
 
   const authRouter = createAuthRouter({
     repository: repositories.users,

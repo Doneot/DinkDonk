@@ -165,20 +165,25 @@ describe("createApp", () => {
       await request(app).get("/health/ready").expect(200);
     });
 
-    it("serves the OpenAPI documentation outside production", async () => {
+    it("requires authentication for the OpenAPI documentation", async () => {
       const { app } = setup();
 
-      const response = await request(app).get("/docs/").expect(200);
+      const response = await request(app).get("/docs/").expect(401);
 
-      expect(response.text).toContain("swagger");
+      expect(response.body).toMatchObject({ error: "unauthorized" });
     });
 
-    it("does not expose the OpenAPI documentation in production", async () => {
+    it("also requires authentication for the OpenAPI documentation in production", async () => {
+      // Mounted (not 404) but still gated - unlike the previous environment-
+      // gated version, /docs is now reachable in production the same way
+      // /api is: behind a real session, not behind a build-time toggle.
       env.isProduction = true;
 
       const { app } = setup();
 
-      await request(app).get("/docs/").expect(404);
+      const response = await request(app).get("/docs/").expect(401);
+
+      expect(response.body).toMatchObject({ error: "unauthorized" });
     });
 
     it("redirects a failed login back to the client", async () => {
