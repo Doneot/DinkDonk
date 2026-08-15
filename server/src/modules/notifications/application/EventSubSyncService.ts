@@ -17,6 +17,16 @@ const DEAD_SUBSCRIPTION_STATUSES = new Set([
   "notification_failures_exceeded",
   "websocket_disconnected",
   "failed_to_connect",
+
+  // Twitch marks a subscription this way when it couldn't verify the
+  // callback URL right after creation (e.g. the callback was briefly
+  // unreachable) and gives up retrying it - unlike the pending state that
+  // precedes it, this is terminal: the subscription will never deliver
+  // events and Twitch will not retry verification on its own. Previously
+  // missing from this set, which meant hasActiveSubscription treated a
+  // permanently-failed subscription as healthy forever, silently blocking
+  // that streamer's notifications until someone deleted it by hand.
+  "webhook_callback_verification_failed",
 ]);
 
 // Every streamer needs both: stream.online drives the live-notification

@@ -154,6 +154,40 @@ describe("EventSubSyncService", () => {
       ).toBe(true);
     });
 
+    it("recreates a subscription stuck in webhook_callback_verification_failed", async () => {
+      // Regression test: this status was previously missing from
+      // DEAD_SUBSCRIPTION_STATUSES, so a subscription that failed its
+      // initial callback verification (e.g. the callback was briefly
+      // unreachable) was treated as active forever - Twitch never retries
+      // verification on its own, so that streamer's notifications stayed
+      // silently broken until someone deleted the subscription by hand.
+      vi.spyOn(logger, "info").mockReturnValue();
+
+      const { service, twitch } = setup({
+        subscriptions: [
+          buildEventSubSubscription({
+            id: "sub-1",
+            condition: { broadcaster_user_id: "streamer-1" },
+            status: "webhook_callback_verification_failed",
+          }),
+        ],
+        streamers: [buildStreamer({ id: "streamer-1" })],
+      });
+
+      await service.syncEventSubSubscriptions();
+
+      const streamOnline = twitch.subscriptions.filter(
+        (subscription) =>
+          subscription.type === "stream.online" &&
+          subscription.condition.broadcaster_user_id === "streamer-1",
+      );
+
+      expect(streamOnline).toHaveLength(2);
+      expect(
+        streamOnline.some((subscription) => subscription.status === "enabled"),
+      ).toBe(true);
+    });
+
     it("continues syncing remaining streamers when one streamer's subscription attempt fails", async () => {
       vi.spyOn(logger, "info").mockReturnValue();
       const errorSpy = vi.spyOn(logger, "error").mockReturnValue();
