@@ -414,6 +414,30 @@ export function userRepositoryBehavior(
         });
       });
 
+      it("re-emits streamerAdded when subscribing to a streamer whose doc already exists from a prior, now-empty subscription", async () => {
+        // Regression test: the streamer doc persists after its last
+        // subscriber unsubscribes (nothing deletes it), so a second user
+        // subscribing later can't tell from doc-existence alone whether an
+        // EventSub subscription is still actually active for it. Gating the
+        // emit on createdStreamer previously meant this case silently
+        // skipped recreating the subscription.
+        const repository = createRepository();
+
+        await repository.subscribe("user-1", "streamer-1");
+        await repository.unsubscribe("user-1", "streamer-1");
+
+        const listener = vi.fn();
+
+        repository.events.on("streamerAdded", listener);
+
+        await repository.subscribe("user-2", "streamer-1");
+
+        expect(listener).toHaveBeenCalledWith({
+          type: "streamerAdded",
+          streamerId: "streamer-1",
+        });
+      });
+
       it("emits streamerEmpty", async () => {
         const repository = createRepository();
 

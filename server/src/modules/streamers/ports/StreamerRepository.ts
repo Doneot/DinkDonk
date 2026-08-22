@@ -2,7 +2,12 @@ import type { DomainEventBus } from "../../../shared/events/DomainEventBus.js";
 import type { Streamer } from "../domain/Streamer.js";
 
 export interface StreamerRepository {
-  /** Emits "streamerAdded" when a new streamer is created. */
+  /**
+   * Emits "streamerAdded" on every createStreamer call, whether or not the
+   * streamer doc already existed - see createStreamer's implementation for
+   * why doc-existence isn't a safe proxy for "does this streamer need an
+   * EventSub subscription."
+   */
   readonly events: DomainEventBus;
 
   /**

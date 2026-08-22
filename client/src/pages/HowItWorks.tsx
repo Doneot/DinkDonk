@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 const STEPS = [
   {
     title: "Subscribe to a streamer",
-    body: "Search Twitch from your dashboard and subscribe to anyone you want to track. No limit beyond keeping the list useful.",
+    body: "Search Twitch streamers from your dashboard and subscribe to anyone you want to track. No limit beyond keeping the list useful.",
   },
   {
     title: "DinkDonk watches Twitch for you",

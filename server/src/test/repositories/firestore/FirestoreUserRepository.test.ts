@@ -417,7 +417,12 @@ describe("FirestoreUserRepository", () => {
       });
     });
 
-    it("reports an existing streamer as not newly created, and does not announce it", async () => {
+    it("reports an existing streamer as not newly created, but still announces it", async () => {
+      // The streamer doc's existence isn't a safe proxy for "has an active
+      // EventSub subscription" (it persists even after every subscriber
+      // leaves), so streamerAdded fires regardless of createdStreamer -
+      // handleStreamerAdded's own idempotency check is what actually
+      // decides whether a subscription needs (re)creating.
       const { firestore, repository } = setup();
 
       const listener = vi.fn();
@@ -433,7 +438,10 @@ describe("FirestoreUserRepository", () => {
         repository.subscribe("user-1", "streamer-1"),
       ).resolves.toEqual({ success: true, createdStreamer: false });
 
-      expect(listener).not.toHaveBeenCalled();
+      expect(listener).toHaveBeenCalledWith({
+        type: "streamerAdded",
+        streamerId: "streamer-1",
+      });
 
       expect(subscriberIds(firestore, "streamer-1")).toEqual([
         "user-1",

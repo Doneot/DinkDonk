@@ -59,6 +59,7 @@ services:
       - firebase_service_account
       - discord_token
       - discord_client_secret
+      - google_client_secret
       - twitch_client_secret
       - twitch_webhook_secret
       - session_secret
@@ -223,6 +224,8 @@ secrets:
     file: ./secrets/discord-token
   discord_client_secret:
     file: ./secrets/discord-client-secret
+  google_client_secret:
+    file: ./secrets/google-client-secret
   twitch_client_secret:
     file: ./secrets/twitch-client-secret
   twitch_webhook_secret:

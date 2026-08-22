@@ -177,9 +177,11 @@ export class InMemoryUserRepository implements UserRepository {
 
     this.subscribers.ensure(streamerId).add(userId);
 
-    if (createdStreamer) {
-      this.events.emit({ type: "streamerAdded", streamerId });
-    }
+    // Matches FirestoreUserRepository: emitted on every successful
+    // subscribe, not just when createdStreamer is true - see its
+    // implementation for why doc/entry existence isn't a safe proxy for
+    // "has an active subscription."
+    this.events.emit({ type: "streamerAdded", streamerId });
 
     return Promise.resolve({ success: true, createdStreamer });
   }

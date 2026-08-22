@@ -5,17 +5,54 @@
 {$DOMAIN} {
     encode zstd gzip
 
+    # Content-Security-Policy is deliberately not here: it only actually
+    # matters for a response the browser renders as a document (the SPA
+    # catch-all and /docs below), not for /api's JSON or /eventsub's
+    # webhook responses, and /docs needs a different policy than the SPA -
+    # a single shared value here would mean whichever "header" directive
+    # Caddy places last in its (position-in-file-independent) internal
+    # ordering silently wins for every route, which is exactly what broke
+    # the /docs-specific override that used to live in that handle block.
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options "nosniff"
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
-        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://cdn.discordapp.com https://static-cdn.jtvnw.net https://*.googleusercontent.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         -Server
     }
 
     handle /api/* {
         reverse_proxy backend:3000
+    }
+
+    # Both patterns: /docs/* alone doesn't match the bare "/docs" a browser
+    # actually gets typed/linked as, which would otherwise fall through to
+    # the SPA catch-all below instead of reaching swagger-ui-express's own
+    # redirect-to-trailing-slash logic (its relative asset paths need it).
+    @docs path /docs /docs/*
+    handle @docs {
+        # Swagger UI's static template and its React bundle both rely on
+        # inline style="..." attributes (e.g. the hidden icon-sprite SVG's
+        # position:absolute;width:0;height:0, which collapses it to
+        # invisible - without this, the browser blocks that attribute under
+        # a style-src 'self' policy, so the SVG renders at its default
+        # ~300x150 intrinsic size instead: a blank box at the top of the
+        # page). Scoped to just this auth-gated admin path rather than
+        # loosening the main app's CSP below.
+        #
+        # header_down (not a plain header directive) is required here: the
+        # backend's own helmet() middleware already sets its own
+        # Content-Security-Policy on every response, and reverse_proxy
+        # copies that upstream header onto the response as-is - a plain
+        # `header` directive only adds a second CSP header alongside it
+        # rather than replacing it, which happens to still work (browsers
+        # intersect multiple CSP headers, and both happen to allow
+        # 'unsafe-inline' for styles) but leaves two different policies
+        # relying on that coincidence. header_down explicitly replaces the
+        # header coming from the upstream instead.
+        reverse_proxy backend:3000 {
+            header_down Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        }
     }
 
     handle /eventsub {
@@ -27,6 +64,8 @@
     }
 
     handle {
+        header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://cdn.discordapp.com https://static-cdn.jtvnw.net https://*.googleusercontent.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
         root * /srv/frontend
 
         @assets path *.js *.css *.png *.jpg *.jpeg *.gif *.svg *.ico *.webp *.woff *.woff2

@@ -30,20 +30,17 @@ Sign in, pick the streamers you care about, and choose how you want to hear abou
 
 ## Contents
 
-- [DinkDonk](#dinkdonk)
-  - [Know the second a streamer you follow goes live.](#know-the-second-a-streamer-you-follow-goes-live)
-  - [Contents](#contents)
-  - [Screenshots](#screenshots)
-  - [What you can do](#what-you-can-do)
-  - [Signing in](#signing-in)
-  - [💬 Discord commands](#-discord-commands)
-  - [Notification channels](#notification-channels)
-  - [⏰ iOS alarm companion](#-ios-alarm-companion)
-  - [🛠️ For developers](#️-for-developers)
-    - [Quick local setup](#quick-local-setup)
-    - [Discord slash commands (deployment)](#discord-slash-commands-deployment)
-  - [Secrets](#secrets)
-  - [License](#license)
+- [Screenshots](#screenshots)
+- [What you can do](#what-you-can-do)
+- [Signing in](#signing-in)
+- [💬 Discord commands](#-discord-commands)
+- [Notification channels](#notification-channels)
+- [⏰ iOS alarm companion](#-ios-alarm-companion)
+- [🛠️ For developers](#️-for-developers)
+  - [Quick local setup](#quick-local-setup)
+  - [Discord slash commands (deployment)](#discord-slash-commands-deployment)
+- [Secrets](#secrets)
+- [License](#license)
 
 ---
 

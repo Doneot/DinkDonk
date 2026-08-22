@@ -127,7 +127,13 @@ export function streamerRepositoryBehavior(
       });
     });
 
-    it("does not re-emit streamerAdded for a streamer that already exists", async () => {
+    it("re-emits streamerAdded for a streamer that already exists", async () => {
+      // Regression test: the streamer doc persists even after its last
+      // subscriber leaves (nothing deletes it), so a caller can't tell from
+      // doc-existence alone whether this streamer currently has a live
+      // EventSub subscription. Gating the emit on "was this doc just
+      // created" previously meant createStreamer on a pre-existing-but-
+      // unsubscribed streamer silently skipped recreating its subscription.
       const repository = createRepository();
 
       const listener = vi.fn();
@@ -138,7 +144,10 @@ export function streamerRepositoryBehavior(
 
       await repository.createStreamer("streamer-1");
 
-      expect(listener).not.toHaveBeenCalled();
+      expect(listener).toHaveBeenCalledWith({
+        type: "streamerAdded",
+        streamerId: "streamer-1",
+      });
     });
 
     it("clear removes every streamer", async () => {
