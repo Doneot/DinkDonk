@@ -17,8 +17,8 @@ import AVFoundation
 final class AlarmAudioController: ObservableObject {
     @Published private(set) var isAlarming = false
 
-    private let engine = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
+    private var engine = AVAudioEngine()
+    private var player = AVAudioPlayerNode()
     private let sampleRate: Double = 44_100
 
     private lazy var keepAliveBuffer = Self.makeToneBuffer(
@@ -31,9 +31,13 @@ final class AlarmAudioController: ObservableObject {
     private lazy var alarmBuffer = Self.makeAlarmBuffer(sampleRate: sampleRate)
 
     init() {
+        wireEngine()
+        observeInterruptions()
+    }
+
+    private func wireEngine() {
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: alarmBuffer.format)
-        observeInterruptions()
     }
 
     /// Call once, after login succeeds (or on cold launch if already logged
@@ -68,6 +72,21 @@ final class AlarmAudioController: ObservableObject {
         player.play()
     }
 
+    /// Called periodically by AppState's watchdog timer. The keep-alive loop
+    /// can silently stop (an interruption that never resumed cleanly, a
+    /// route change, an edge case the notification-based handlers miss) and
+    /// once it does, the background process has nothing keeping it resident
+    /// - this is the safety net that notices and restarts it without waiting
+    /// for the user to reopen the app.
+    func ensureRunning() {
+        guard !engine.isRunning else { return }
+        if isAlarming {
+            triggerAlarm()
+        } else {
+            startKeepAlive()
+        }
+    }
+
     private func configureSession(mixWithOthers: Bool) {
         let session = AVAudioSession.sharedInstance()
         let options: AVAudioSession.CategoryOptions = mixWithOthers ? [.mixWithOthers] : []
@@ -82,6 +101,29 @@ final class AlarmAudioController: ObservableObject {
             name: AVAudioSession.interruptionNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMediaServicesReset),
+            name: AVAudioSession.mediaServicesWereResetNotification,
+            object: nil
+        )
+    }
+
+    // Media services resetting (rare, but happens - e.g. after certain
+    // CarPlay/AirPlay route changes) invalidates the engine and everything
+    // connected to it; Apple's docs say the fix is to throw the old engine
+    // away and rebuild from scratch, not just restart it.
+    @objc private func handleMediaServicesReset() {
+        Task { @MainActor in
+            self.engine = AVAudioEngine()
+            self.player = AVAudioPlayerNode()
+            self.wireEngine()
+            if self.isAlarming {
+                self.triggerAlarm()
+            } else {
+                self.startKeepAlive()
+            }
+        }
     }
 
     // A phone call or another app briefly taking over audio interrupts the

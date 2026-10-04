@@ -18,6 +18,7 @@ final class AppState: ObservableObject {
     private let audioController = AlarmAudioController()
     private let notificationManager = NotificationManager()
     private var sessionCookie: String?
+    private var watchdogTimer: Timer?
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -51,6 +52,7 @@ final class AppState: ObservableObject {
     func logOut() {
         KeychainStore.clear()
         socketManager.disconnect()
+        stopWatchdog()
         isLoggedIn = false
         sessionCookie = nil
         subscriptions = []
@@ -104,6 +106,30 @@ final class AppState: ObservableObject {
     private func startListening(cookie: String) {
         socketManager.connect(sessionCookie: cookie)
         audioController.startKeepAlive()
+        startWatchdog()
+    }
+
+    // socket.io already reconnects on its own once the process is alive
+    // (see LiveSocketManager's .reconnects config), and AlarmAudioController
+    // resumes itself after interruptions/media-service resets it knows
+    // about. This is the backstop for everything neither of those notices on
+    // its own during a long background stretch: it runs on the same run
+    // loop the background-audio session keeps alive, so it keeps firing
+    // whether or not the app is in the foreground.
+    private func startWatchdog() {
+        watchdogTimer?.invalidate()
+        watchdogTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.audioController.ensureRunning()
+                self.ensureConnected()
+            }
+        }
+    }
+
+    private func stopWatchdog() {
+        watchdogTimer?.invalidate()
+        watchdogTimer = nil
     }
 
     // Muting a subscription (setAlarmEnabled(false, for:)) suppresses the

@@ -150,14 +150,26 @@ Management** on the phone → trust your developer certificate.
   switch, but it still uses the phone's media volume (the one the physical
   buttons adjust during playback). If that's turned all the way down, the
   alarm is silent. Keep it up.
-- **Long idle stretches can get the background session suspended by iOS.**
-  Reopening the app reconnects immediately (`AppState.ensureConnected()`
-  runs on every foreground). Not bulletproof, but fine for personal use.
+- **Won't survive a force-quit.** Swiping the app away in the app switcher
+  tells iOS not to resume it in the background at all — no code runs again
+  until you reopen it by hand, so a `streamer_live_changed` event that
+  arrives while force-quit is missed entirely. This isn't a bug to fix, it's
+  a hard platform rule: the only way around it is a remote push (APNs) that
+  wakes the app on the server's signal, and APNs requires a paid Apple
+  Developer Program membership plus a backend change to send the push. As
+  long as the app is *merely backgrounded* (not force-quit), the
+  `AppState` watchdog (a 20s timer that restarts the audio engine and
+  socket if either died) and `AlarmAudioController`'s
+  interruption/media-services-reset handling keep it alive and reconnected
+  without needing to be reopened.
 - **7-day reinstall** on a free Apple ID, as above.
 - **Muted subscriptions are per-device.** They're stored in `UserDefaults`,
   not synced anywhere — a reinstall or a second device starts with every
   subscription unmuted.
-- If reliability ever becomes a real problem, iOS 26's **AlarmKit**
-  framework gives true system-alarm behavior (dedicated ringer volume,
-  guaranteed firing) and doesn't need a paid account either — it'd replace
-  just `AlarmAudioController`, nothing else in this app.
+- If a paid Apple Developer account ever enters the picture, iOS 26's
+  **AlarmKit** framework would be the natural upgrade for the alarm itself
+  (dedicated alarm-volume audio channel, guaranteed firing even across
+  suspension, native lock-screen slide-to-stop UI) — it wasn't adopted here
+  because this repo's toolchain (Xcode 16.2) predates the iOS 26 SDK it
+  requires, and it still wouldn't remove the force-quit limitation above,
+  since something still has to be alive to *notice* the streamer went live.
