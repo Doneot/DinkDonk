@@ -135,9 +135,14 @@ Management** on the phone → trust your developer certificate.
    DinkDonk subscriptions, so muting someone here only silences this
    device's alarm for them.
 4. When a streamer you're subscribed to (and haven't muted) goes live, the
-   app plays a loud, looping alarm — even with the phone muted — and shows
-   a lock-screen notification. Tap **Stop Alarm** (in-app or on the
-   notification) to silence it.
+   app plays a loud, looping alarm — even with the phone muted — opens a
+   full-screen alarm face (`AlarmDismissView.swift`), and posts a
+   lock-screen notification alongside it. There's no quick way to silence
+   it: tapping the notification just opens the app, and the app requires
+   dragging the on-screen slider all the way across — deliberately modeled
+   on iOS's own lock-screen alarm — before the sound stops. That friction is
+   the point; a one-tap "Stop" is too easy to hit half asleep without
+   actually waking up.
 
 ## Known limitations
 

@@ -13,6 +13,15 @@ struct RootView: View {
                 }
             }
         }
+        // Ignores attempts to set this false - the only way out is
+        // AlarmDismissView completing the slide gesture, which flips
+        // appState.isAlarming itself. `.interactiveDismissDisabled` blocks
+        // the swipe-down shortcut for the same reason.
+        .fullScreenCover(isPresented: Binding(get: { appState.isAlarming }, set: { _ in })) {
+            AlarmDismissView()
+                .environmentObject(appState)
+                .interactiveDismissDisabled(true)
+        }
     }
 }
 
@@ -41,23 +50,6 @@ struct StatusView: View {
                         }
                     }
                     .padding(.horizontal)
-
-                    if appState.isAlarming {
-                        Button(role: .destructive) {
-                            appState.stopAlarm()
-                        } label: {
-                            Label("Stop Alarm", systemImage: "stop.fill")
-                                .font(.title3.bold())
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 6)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
-                        .clipShape(Capsule())
-                        .shadow(color: .red.opacity(0.35), radius: 20, y: 8)
-                        .padding(.horizontal, 32)
-                        .transition(.scale.combined(with: .opacity))
-                    }
 
                     Spacer()
                     Spacer()

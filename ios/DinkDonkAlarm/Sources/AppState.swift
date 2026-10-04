@@ -34,9 +34,6 @@ final class AppState: ObservableObject {
             self?.handleStreamerWentLive(streamerId)
         }
 
-        notificationManager.onStopRequested = { [weak self] in
-            self?.stopAlarm()
-        }
         notificationManager.requestAuthorization()
 
         if let cookie = KeychainStore.load() {

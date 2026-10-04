@@ -11,6 +11,7 @@
 		09EC6049DF2D816A44932BB4 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F818DCBB2B4B53DDC9E681 /* NotificationManager.swift */; };
 		277CEA5337C5359D8F8DF061 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = DF4B87AE23507F0ADE912B64 /* SocketIO */; };
 		312BC96DD18CB9373F514817 /* LiveSocketManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19263C3918678F379F0AF545 /* LiveSocketManager.swift */; };
+		675457AC28D5C123EF5ABD91 /* AlarmDismissView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED2B9F2C0C7ECE29CFC1999A /* AlarmDismissView.swift */; };
 		6D965E414D2027030E1EC8C6 /* DinkDonkAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF5BC4DF0858E9DA2E6BC6E7 /* DinkDonkAPI.swift */; };
 		767729ED12498237F92493B0 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D85C2CE5B2D52FD4F0A069ED /* Theme.swift */; };
 		7F3CCCC07D24E3DE7945482D /* AlarmAudioController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F72E271239A911E8008A0F52 /* AlarmAudioController.swift */; };
@@ -36,6 +37,7 @@
 		88F818DCBB2B4B53DDC9E681 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		CF5BC4DF0858E9DA2E6BC6E7 /* DinkDonkAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DinkDonkAPI.swift; sourceTree = "<group>"; };
 		D85C2CE5B2D52FD4F0A069ED /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		ED2B9F2C0C7ECE29CFC1999A /* AlarmDismissView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmDismissView.swift; sourceTree = "<group>"; };
 		F4B532FBDF675F25050FFAAD /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		F72E271239A911E8008A0F52 /* AlarmAudioController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmAudioController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -72,6 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				F72E271239A911E8008A0F52 /* AlarmAudioController.swift */,
+				ED2B9F2C0C7ECE29CFC1999A /* AlarmDismissView.swift */,
 				709A8D5E5712B3189A9C6082 /* AlarmPreferencesStore.swift */,
 				4AED4D8D4715AE34E9140BBF /* AppState.swift */,
 				80C2957C300371F774F65E52 /* Config.swift */,
@@ -152,6 +155,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7F3CCCC07D24E3DE7945482D /* AlarmAudioController.swift in Sources */,
+				675457AC28D5C123EF5ABD91 /* AlarmDismissView.swift in Sources */,
 				F2F85023F71E8D8015122EA1 /* AlarmPreferencesStore.swift in Sources */,
 				00C19A5CD21BDE3119D741EF /* AppState.swift in Sources */,
 				AE483066001B560AA4EAAA5F /* Config.swift in Sources */,
@@ -175,6 +179,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 3P8AVA2Q72;
 				INFOPLIST_FILE = Generated/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -192,6 +197,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 3P8AVA2Q72;
 				INFOPLIST_FILE = Generated/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
